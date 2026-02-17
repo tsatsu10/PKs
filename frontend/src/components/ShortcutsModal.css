@@ -1,0 +1,85 @@
+.shortcuts-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop-overlay);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 10001;
+}
+
+.shortcuts-modal {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--modal-shadow);
+  overflow: hidden;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.shortcuts-modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--polar-white);
+}
+
+.shortcuts-modal-close {
+  background: none;
+  border: none;
+  color: var(--polar-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.shortcuts-modal-close:hover {
+  color: var(--polar-white);
+}
+
+.shortcuts-modal-list {
+  margin: 0;
+  padding: 0.75rem 1.25rem 1rem;
+  list-style: none;
+}
+
+.shortcuts-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hover-overlay);
+}
+
+.shortcuts-modal-row:last-child {
+  border-bottom: none;
+}
+
+.shortcuts-modal-keys {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+  background: var(--hover-overlay-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--polar-muted);
+}
+
+.shortcuts-modal-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+}

@@ -1,0 +1,785 @@
+================================================================================
+PERSONAL KNOWLEDGE SYSTEM (PKS)
+SECOND BRAIN FOR AFRICAN TECH & HEALTH
+FULL PRODUCT PLAN + BUILD SPECIFICATION
+================================================================================
+Version: 2.0
+Document: Unified Master Plan + Step-by-Step Requirements
+Last Updated: Feb 2025
+
+================================================================================
+PART A — PRODUCT VISION & STRATEGY
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION A1 — PRODUCT OVERVIEW
+--------------------------------------------------------------------------------
+
+Product Name:
+  Personal Knowledge System (PKS)
+
+Working Tagline:
+  Second Brain for African Tech & Health Professionals
+
+Product Type:
+  Web-based SaaS (MVP-first, platform-ready)
+
+Core Idea:
+  PKS is a structured personal knowledge operating system that captures,
+  indexes, links, structures, and synthesizes everything a professional
+  learns, reads, and produces — turning scattered information into
+  reusable, searchable, and insight-generating knowledge assets.
+
+Primary Purpose:
+  Convert learning and documents into reusable operational intelligence.
+
+Primary Differentiator:
+  Domain-structured knowledge objects + concept linking +
+  prompt-driven reasoning + multi-format exportable outputs +
+  professional workflow templates.
+
+--------------------------------------------------------------------------------
+SECTION A2 — DESIGN PRINCIPLE (ESSENCE)
+--------------------------------------------------------------------------------
+
+Adding prompt templates to each Knowledge Object type turns PKS from a
+passive storage system into an active thinking and synthesis engine.
+
+WITHOUT PROMPTS:
+  PKS = store + tag + link + search
+  (Passive: you put things in, you search them out)
+
+WITH PROMPTS:
+  PKS = store + structure + reason + generate outputs
+  (Active: you put things in, you run prompts, you get synthesized outputs)
+
+Prompt outputs can be saved as new Knowledge Objects and auto-linked to
+their source objects — turning PKS into a compounding knowledge engine.
+
+--------------------------------------------------------------------------------
+SECTION A3 — WHY THIS SHOULD BE BUILT
+--------------------------------------------------------------------------------
+
+Core Problem:
+  Knowledge workers operate in document-heavy environments with scattered
+  information across PDFs, docs, chats, folders, and memory.
+
+Result:
+  - Rework
+  - Slow retrieval
+  - Lost institutional memory
+  - Poor synthesis
+  - Repeated mistakes
+
+Why PKS Is Necessary:
+  PKS converts learning and documents into structured, reusable assets.
+  Without PKS, knowledge decays.
+  With PKS, knowledge compounds.
+
+Strategic Value:
+  - Faster report writing
+  - Faster proposal development
+  - Better decisions
+  - Personal institutional memory
+  - Domain expertise acceleration
+  - Repeatable knowledge workflows
+  - Exportable, shareable outputs
+
+--------------------------------------------------------------------------------
+SECTION A4 — TARGET USERS
+--------------------------------------------------------------------------------
+
+Primary Users:
+  - Digital health & public health professionals
+  - NGO / development sector staff
+  - Consultants & project managers
+  - Researchers & graduate students
+  - IT & informatics managers
+
+User Traits:
+  - High document exposure
+  - Multi-project workload
+  - Needs fast retrieval
+  - Needs synthesis
+  - Needs reusable outputs
+  - Low bandwidth environments (Africa-friendly)
+
+================================================================================
+PART B — TECHNICAL FOUNDATION
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION B1 — GLOBAL BUILD RULES
+--------------------------------------------------------------------------------
+
+Platforms:
+  - App: Web (responsive)
+  - Backend: API (monolith is fine)
+  - DB: PostgreSQL (schema defined below)
+  - Auth: Email + password
+
+Global Non-Functional Requirements:
+  - Search query response: < 300ms (typical dataset up to 10k objects/user)
+  - Dashboard/object pages load: < 2 seconds
+  - Data integrity: strict FK constraints
+  - Security: password hashing, auth-protected routes
+  - Reliability: exports + prompt outputs must not be lost
+  - Low bandwidth friendly
+  - Minimal UI
+
+Definition of Done (DoD) for any feature:
+  - UI implemented
+  - API endpoints implemented
+  - DB persisted correctly
+  - Server-side validations enforced
+  - Tests for core business rules
+  - Acceptance criteria met
+
+--------------------------------------------------------------------------------
+SECTION B2 — CORE SYSTEM MODEL
+--------------------------------------------------------------------------------
+
+Everything is stored as KNOWLEDGE OBJECTS.
+
+Knowledge Object Types:
+  - note
+  - document
+  - sop
+  - report
+  - proposal
+  - guideline
+  - insight
+  - template
+  - concept
+  - tool
+  - incident
+  - case
+  - research_paper
+  - decision
+  - prompt        [Prompt output saved as a knowledge object]
+
+Common Fields (per object):
+  - id
+  - user_id
+  - type
+  - title
+  - source
+  - content
+  - summary
+  - key_points (JSONB)
+  - domain_ids[] (via M:N)
+  - tags[] (via M:N)
+  - linked_object_ids[] (via link_edges)
+  - linked_project_ids[] (via junction, future)
+  - is_deleted
+  - current_version
+  - created_at
+  - updated_at
+
+================================================================================
+PART C — CORE FEATURES
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION C1 — CAPTURE LAYER
+--------------------------------------------------------------------------------
+
+  - Text notes
+  - Structured notes
+  - File uploads (PDF, DOCX, TXT)
+  - Links
+  - Pasted content
+  - Prompt outputs (saved as new objects)
+
+--------------------------------------------------------------------------------
+SECTION C2 — CLASSIFICATION
+--------------------------------------------------------------------------------
+
+  - Manual tags (MVP)
+  - Suggested tags (Phase 2)
+  - Domain classification (objects belong to one or more domains)
+  - Domain/tag uniqueness enforced per user (no duplicates)
+
+--------------------------------------------------------------------------------
+SECTION C3 — KNOWLEDGE LINKING
+--------------------------------------------------------------------------------
+
+  - Object-to-object links
+  - Manual linking (MVP)
+  - Optional relationship_type (e.g., "references", "derived_from")
+  - Auto-link prompt outputs to source object
+  - Related suggestions (Phase 2)
+
+--------------------------------------------------------------------------------
+SECTION C4 — SEARCH & RETRIEVAL
+--------------------------------------------------------------------------------
+
+  - Full-text search (title, summary, content)
+  - Tag filter
+  - Domain filter
+  - Type filter
+  - Date range filter (created_at, updated_at)
+  - Paginated results
+  - Results exclude soft-deleted objects
+
+--------------------------------------------------------------------------------
+SECTION C5 — KNOWLEDGE VIEW PAGE
+--------------------------------------------------------------------------------
+
+  - Content
+  - Summary
+  - Tags
+  - Domains
+  - Linked objects (outgoing + incoming)
+  - Related objects
+  - Attached files (with download link)
+  - Run Prompt button
+  - Export button
+  - Version history
+  - Prompt run history
+
+================================================================================
+PART D — PROMPT ENGINE & PROMPT BANK
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION D0 — PKS PROMPT LAYER — DESIGN OVERVIEW
+--------------------------------------------------------------------------------
+
+Goal of Prompt Layer:
+  Each Knowledge Object Type gets a default prompt set so PKS acts as an
+  active thinking and synthesis engine, not just passive storage.
+
+Per-Type Prompt Layer Components:
+  - Default prompt set (curated templates for that type)
+  - Context-aware questions (e.g., "What is the core idea?", "Why does this matter?")
+  - Structured extraction prompts (metrics, steps, roles, findings, etc.)
+  - Output prompts (what can be produced from this object: reports, briefs, checklists)
+  - AI-ready generation templates (for Phase 2 automated execution)
+
+This Enables:
+  - Faster capture (guided questions and templates at create/edit time)
+  - Better summaries (extraction prompts per type)
+  - Cross-object synthesis (prompts that combine multiple objects; Phase 2)
+  - Automated document generation later (export + prompt output pipelines)
+
+What the Prompt Layer Produces:
+  Reports | SOPs | Proposals | Briefs | Decisions | Training materials
+  (Each object type maps to one or more of these output families.)
+
+--------------------------------------------------------------------------------
+SECTION D1 — PROMPT BANK MODULE
+--------------------------------------------------------------------------------
+
+Prompt Bank = centralized reusable prompt template library.
+
+PromptTemplate Fields:
+  - id
+  - user_id
+  - name
+  - description
+  - applies_to_types[] (e.g., ['report','sop'])
+  - prompt_text
+  - output_format (text | markdown | json)
+  - tags[]
+  - visibility (private | org)
+  - version
+  - created_at
+  - updated_at
+
+Prompt Categories:
+  - Capture
+  - Extraction
+  - Transformation
+  - Synthesis
+  - Decision
+  - Training
+
+Prompt Bank Flows:
+  Run Prompt: Open Object → Run Prompt → Select Template → Execute →
+              View Output → Save as Object → Auto-Link to Source
+
+  Create Prompt: Prompt Bank → New → Define → Save
+
+--------------------------------------------------------------------------------
+SECTION D2 — KNOWLEDGE OBJECT PROMPT SETS (BY TYPE)
+--------------------------------------------------------------------------------
+
+NOTE Prompts:
+  - What is the core idea?
+  - Why does this matter?
+  - What decision could this affect?
+  Outputs: Convert to checklist | task list | training note
+
+REPORT Prompts:
+  - Extract metrics | findings | risks
+  Outputs: Executive summary | Stakeholder brief | Action list
+
+SOP Prompts:
+  - Extract steps | Extract roles
+  Outputs: Checklist | Training guide | Audit checklist
+
+INCIDENT Prompts:
+  - Root cause summary | Control failures
+  Outputs: Incident report | Postmortem | Risk register entry
+
+RESEARCH Prompts:
+  - Extract question, method, results
+  Outputs: Literature review paragraph | Evidence brief
+
+TOOL Prompts:
+  Outputs: Quickstart guide | Setup checklist | Troubleshooting guide
+
+GUIDELINE Prompts:
+  Outputs: Checklist | Compliance brief | Training summary
+
+CONCEPT Prompts:
+  Outputs: Definition | Related concepts | Examples
+
+PROPOSAL Prompts:
+  - Extract problem statement | objectives | approach | resources
+  Outputs: Proposal draft | Executive summary | Budget summary | Timeline
+
+DECISION Prompts:
+  - What are the options? | What are the criteria? | What is the recommendation?
+  Outputs: Decision brief | Options comparison | Recommendation with rationale
+
+--------------------------------------------------------------------------------
+SECTION D3 — PROMPT RUN PIPELINE
+--------------------------------------------------------------------------------
+
+  1. User selects object
+  2. User selects prompt template (filtered by applicable types)
+  3. User clicks "Run"
+  4. System creates prompt_runs record (status: queued → running → completed/failed)
+  5. System returns output (MVP: simulated/manual paste; Phase 2: real AI)
+  6. User can "Save output as new object"
+  7. System creates new knowledge_object, auto-creates link_edge to source
+  8. Prompt run history visible per object
+
+================================================================================
+PART E — EXPORT SYSTEM
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION E1 — EXPORT FILE FORMATS
+--------------------------------------------------------------------------------
+
+Knowledge objects and attached files must be exportable in multiple formats.
+
+MVP Formats:
+  - TXT (plain text)
+  - MD (Markdown)
+  - PDF
+
+Phase 2 Formats:
+  - DOCX (Word)
+  - HTML
+  - JSON (structured data)
+
+Export Templates (content structure):
+  - Raw (minimal, content only)
+  - Brief (summary + key points)
+  - Full (content + summary + tags + domains + links)
+  - Stakeholder (executive-facing, condensed)
+
+--------------------------------------------------------------------------------
+SECTION E2 — EXPORT INCLUSION OPTIONS
+--------------------------------------------------------------------------------
+
+User can toggle inclusion of:
+  - content
+  - summary
+  - key_points
+  - tags
+  - domains
+  - links (outgoing/incoming)
+
+--------------------------------------------------------------------------------
+SECTION E3 — EXPORT SCOPE
+--------------------------------------------------------------------------------
+
+  - Single object (MVP)
+  - Multi-object bundle (Phase 2)
+  - Export job status: queued → processing → completed | failed
+
+================================================================================
+PART F — AI CAPABILITIES (PHASE 2)
+================================================================================
+
+  - Auto summaries
+  - Key point extraction
+  - Concept detection
+  - Tag suggestions
+  - Cross-object synthesis
+  - SOP draft generation
+  - Real AI execution for prompts (replace simulated/manual paste)
+
+================================================================================
+PART G — STEP-BY-STEP BUILD REQUIREMENTS
+================================================================================
+
+--------------------------------------------------------------------------------
+PHASE 1 — FOUNDATION (Auth + DB + Base Layout)
+--------------------------------------------------------------------------------
+
+R1: Project Setup
+  - Create frontend project
+  - Create backend project
+  - Environment config (dev/prod)
+  - DB connection established
+
+R2: Implement Users + Auth
+  - Register (email/password)
+  - Login/logout
+  - Password reset (optional for MVP, recommended)
+  - Auth middleware for protected routes
+  - Passwords hashed (never plaintext)
+
+R3: Apply Database Schema
+  - Implement users table
+  - Core indexes
+  - updated_at triggers (optional)
+
+Acceptance Criteria (Phase 1):
+  - User can register and login successfully
+  - Protected pages redirect to login when unauthenticated
+  - users table correctly stores user records
+  - Passwords are hashed (never stored plaintext)
+
+--------------------------------------------------------------------------------
+PHASE 2 — KNOWLEDGE OBJECTS (CRUD + Versioning)
+--------------------------------------------------------------------------------
+
+R4: Knowledge Object CRUD
+  - Create Knowledge Object
+  - Read (list + view detail)
+  - Update
+  - Soft delete (is_deleted = true)
+  - Fields: type, title, content (required); source, summary, key_points (optional)
+  - DB: knowledge_objects
+
+R5: Versioning Rules (server-side)
+  - On every update: insert row into knowledge_object_versions
+  - Increment knowledge_objects.current_version
+  - Store: edited_by, change_reason (optional)
+  - DB: knowledge_object_versions
+
+Acceptance Criteria (Phase 2):
+  - User can create, edit, view, delete an object
+  - Object updates create version history entries
+  - Version numbers increment correctly
+  - Old versions remain immutable
+  - Soft-deleted objects do not appear in default lists
+
+--------------------------------------------------------------------------------
+PHASE 3 — DOMAINS + TAGS (Classification System)
+--------------------------------------------------------------------------------
+
+R6: Domains CRUD
+  - Create, edit, delete domain
+  - Delete only if no objects linked (or require reassignment)
+  - DB: domains
+
+R7: Tags CRUD
+  - Create tag (implicitly when typing new tag)
+  - List tags, delete tag (remove associations)
+  - DB: tags
+
+R8: Associate domains/tags with objects (M:N)
+  - Assign/remove domains on knowledge object
+  - Assign/remove tags on knowledge object
+  - DB: knowledge_object_domains, knowledge_object_tags
+
+Acceptance Criteria (Phase 3):
+  - User can manage domains and tags
+  - User can attach multiple domains/tags to an object
+  - Filters and counts reflect correct relationships
+  - Domain/tag uniqueness enforced per user (no duplicates)
+
+--------------------------------------------------------------------------------
+PHASE 4 — SEARCH + FILTERS (Retrieval Engine)
+--------------------------------------------------------------------------------
+
+R9: Full-Text Search
+  - Search by query across title/summary/content
+  - Return paginated results
+  - FTS index on knowledge_objects
+
+R10: Filters
+  - Filter by type, domain, tag, date range (created_at/updated_at)
+
+R11: Search UX
+  - Global search bar
+  - Filter panel
+  - Result list: title, type, updated_at, snippet (optional)
+
+Acceptance Criteria (Phase 4):
+  - Search returns relevant results from title/content/summary
+  - Filters work independently and combined
+  - Results exclude soft-deleted objects
+  - Median search response < 300ms (dev target)
+
+--------------------------------------------------------------------------------
+PHASE 5 — LINKING (Knowledge Graph)
+--------------------------------------------------------------------------------
+
+R12: Object-to-Object Linking
+  - Add link from object A to object B
+  - Remove link
+  - Optional relationship_type (e.g., "references")
+  - DB: link_edges (unique constraint on from/to/type)
+
+R13: Linked Objects Display
+  - On object detail page: outgoing links, incoming links (optional MVP)
+
+Acceptance Criteria (Phase 5):
+  - User can link objects reliably
+  - Duplicate prevention works (unique constraint)
+  - Linked objects show correctly on detail pages
+
+--------------------------------------------------------------------------------
+PHASE 6 — FILE UPLOADS + ATTACHMENTS
+--------------------------------------------------------------------------------
+
+R14: File Upload
+  - Upload file (PDF, DOCX, TXT)
+  - Store metadata: filename, mime, size, storage_key
+  - Attach file to knowledge object
+  - DB: files, knowledge_object_files
+
+R15: Basic File Handling
+  - Files can exist without extracted text (MVP)
+  - Provide download/open link
+  - Optional: store extracted_text for search (Phase 2, recommended)
+
+Acceptance Criteria (Phase 6):
+  - User can upload and attach file to an object
+  - Attached file appears on object page
+  - Downloads work
+  - Files are access-controlled to owning user
+
+--------------------------------------------------------------------------------
+PHASE 7 — PROMPT ENGINE (Run Prompts + Save Outputs)
+--------------------------------------------------------------------------------
+
+R16: Prompt Bank (CRUD)
+  - Create, edit, delete prompt template
+  - Filter by applicable types
+  - DB: prompt_templates, (optional) prompt_template_versions
+
+R17: Run Prompt
+  - User selects object, selects prompt, clicks "Run"
+  - Creates prompt_runs record (status flow)
+  - Returns output (MVP: simulated/manual paste/placeholder)
+  - "Save output as new object" creates new knowledge_object
+  - Auto-link output to source object (link_edges)
+  - DB: prompt_runs, knowledge_objects, link_edges
+
+Acceptance Criteria (Phase 7):
+  - User can create prompts and view them in Prompt Bank
+  - User can run a prompt against an object and get output result
+  - User can save output as a new knowledge object
+  - Saved output is linked to the source object
+  - Prompt run history is visible per object
+
+--------------------------------------------------------------------------------
+PHASE 8 — EXPORT ENGINE (Multi-Format Outputs)
+--------------------------------------------------------------------------------
+
+R18: Export Single Object (MVP)
+  - Export to TXT, MD, PDF
+  - Export templates: Raw | Brief | Full | Stakeholder
+  - Inclusion toggles: content, summary, tags, domains, links
+  - DB: export_jobs
+
+R19: Export Job Processing
+  - Export creates export_jobs record
+  - Job status: queued → processing → completed | failed
+  - Store output storage_key or return file directly
+
+R20: Multi-Format Export (Phase 2)
+  - Add DOCX, HTML, JSON export formats
+  - Files attached to objects can be exported in chosen format where applicable
+
+Acceptance Criteria (Phase 8):
+  - User can export any object to TXT/MD/PDF (DOCX/HTML/JSON Phase 2)
+  - Export contains selected sections correctly
+  - Export job status is tracked
+  - Errors are surfaced to user
+
+--------------------------------------------------------------------------------
+PHASE 9 — TEMPLATES + GUIDED WIZARDS
+--------------------------------------------------------------------------------
+
+R21: Template Library
+  - Create template (JSON schema describing fields/questions)
+  - Apply template when creating new knowledge object
+  - Save filled result as object
+  - DB: templates
+
+Acceptance Criteria (Phase 9):
+  - User can create a template and reuse it
+  - Template-guided creation produces correctly structured objects
+
+--------------------------------------------------------------------------------
+PHASE 10 — NOTIFICATIONS
+--------------------------------------------------------------------------------
+
+R22: Notification Center
+  - Trigger for: export completed, prompt completed, shared object updated (future)
+  - DB: notifications
+  - Mark read/unread
+
+Acceptance Criteria (Phase 10):
+  - Notifications appear in-app
+  - Mark read/unread works
+  - Events generate notifications reliably
+
+--------------------------------------------------------------------------------
+PHASE 11 — GOVERNANCE (Audit Logs + Sharing)
+--------------------------------------------------------------------------------
+
+R23: Audit Logs
+  - Log: object create/update/delete, prompt run, export run
+  - DB: audit_logs
+
+R24: Sharing & Permissions (Phase 2)
+  - Share object with another user
+  - Role enforcement (viewer/editor)
+  - DB: share_permissions
+
+Acceptance Criteria (Phase 11):
+  - Audit log entries created for key actions
+  - Sharing restricts access properly (Phase 2 milestone)
+
+--------------------------------------------------------------------------------
+PHASE 12 — INTEGRATIONS + API (Phase 2)
+--------------------------------------------------------------------------------
+
+R25: Integration Scaffolding
+  - DB: integrations, import_items
+
+R26: Public API + Webhooks
+  - Object CRUD API
+  - Search API
+  - Export trigger
+  - Webhook events (later)
+
+Acceptance Criteria (Phase 12):
+  - Integrations can be stored/enabled/disabled
+  - Imports can create objects without duplication
+  - API endpoints are auth-protected
+
+================================================================================
+PART H — DATA MODEL (ENTITIES)
+================================================================================
+
+  User
+  Domain
+  KnowledgeObject
+  Tag
+  Concept
+  LinkEdge
+  File
+  KnowledgeObjectFile
+  PromptTemplate
+  PromptTemplateVersion (optional)
+  PromptRun
+  ExportJob
+  ExportJobItem (Phase 2 multi-object)
+  Template
+  Notification
+  SharePermission
+  AuditLog
+  Integration
+  ImportItem
+  Project (stub)
+  KnowledgeObjectProject (junction)
+
+================================================================================
+PART I — FUNCTIONAL REQUIREMENTS (MASTER LIST)
+================================================================================
+
+  FR-1   Authentication (register, login, logout, reset)
+  FR-2   Object CRUD (create, read, update, soft delete)
+  FR-3   File upload + attach
+  FR-4   Tagging (assign, remove, list)
+  FR-5   Linking (add, remove, display)
+  FR-6   Domain assignment (assign, remove, manage)
+  FR-7   Search (full-text, paginated)
+  FR-8   Filters (type, domain, tag, date)
+  FR-9   Prompt run (execute, view output)
+  FR-10  Prompt output save (as new object, auto-link)
+  FR-11  Prompt Bank CRUD (create, edit, delete, filter)
+  FR-12  Export object (TXT, MD, PDF; Phase 2: DOCX, HTML, JSON)
+  FR-13  Version history (view, immutable)
+  FR-14  Notification center (view, mark read)
+  FR-15  Audit logs (view, filter)
+  FR-16  Template library (create, apply)
+  FR-17  Sharing (Phase 2)
+  FR-18  Integrations (Phase 2)
+
+================================================================================
+PART J — NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+
+  - Fast search (< 300ms for 10k objects/user)
+  - Dashboard/object load < 2 seconds
+  - Low bandwidth friendly
+  - Secure storage (password hashing, auth-protected routes)
+  - Scalable schema
+  - Minimal UI
+  - Prompt execution logging
+  - Reliable export generation (outputs must not be lost)
+
+================================================================================
+PART K — MVP BUILD ORDER (SUMMARY)
+================================================================================
+
+  Phase 1   Foundation          Auth + DB + Core models
+  Phase 2   Storage             KnowledgeObject + Tags + Domains + Versioning
+  Phase 3   Retrieval           Search + Filters + Views
+  Phase 4   Relationships       Linking engine
+  Phase 5   Capture UX          Editor + Upload + Tag UI
+  Phase 6   Prompt Engine       Prompt Bank + Run + Save outputs
+  Phase 7   Export Engine       TXT + MD + PDF export
+  Phase 8   Templates           Guided wizards
+  Phase 9   Polish              Performance + UX + Edge cases
+  Phase 10  Notifications       Notification center
+  Phase 11  Governance          Audit logs + Sharing (Phase 2)
+  Phase 12  Integrations        API + Import scaffolding (Phase 2)
+
+================================================================================
+PART L — FUTURE EXTENSIONS
+================================================================================
+
+  - AI synthesis (auto-summary, key points, concept detection)
+  - Org prompt libraries (shared prompt templates)
+  - Team knowledge bases (multi-user, shared domains)
+  - Vertical templates (health, NGO, consulting)
+  - Webhooks for integrations
+  - Mobile app
+  - Offline sync
+
+================================================================================
+PART M — SCHEMA REFERENCE
+================================================================================
+
+See PKS_Full_Product_Plan.txt (lines 537-1102) for the complete PostgreSQL
+schema v1.2 including:
+  - All enums (knowledge_object_type, export_format, prompt_output_format, etc.)
+  - All tables (users, domains, tags, knowledge_objects, knowledge_object_versions,
+    knowledge_object_domains, knowledge_object_tags, link_edges, files,
+    knowledge_object_files, templates, prompt_templates, prompt_template_versions,
+    prompt_runs, export_jobs, export_job_items, notifications, share_permissions,
+    audit_logs, integrations, import_items, projects_stub, knowledge_object_projects)
+  - Indexes (including GIN FTS on knowledge_objects)
+  - Triggers (updated_at)
+  - Foreign keys
+
+NOTE: Add 'prompt', 'proposal', and 'decision' to knowledge_object_type enum when implementing.
+
+================================================================================
+END OF PKS MASTER PLAN & REQUIREMENTS v2.0
+================================================================================

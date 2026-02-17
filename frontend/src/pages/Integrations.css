@@ -1,0 +1,250 @@
+.integrations-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.06), transparent 50%);
+}
+
+.integrations-page > * {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.integrations-header {
+  margin-bottom: 1.5rem;
+}
+
+.integrations-header .back-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--polar-dim);
+  font-size: 0.875rem;
+}
+
+.integrations-header .back-link:hover {
+  color: var(--polar-white);
+}
+
+.integrations-header h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.integrations-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0;
+}
+
+.integrations-page .form-error {
+  border-radius: var(--input-radius);
+  margin-bottom: 1rem;
+}
+
+.integrations-add,
+.integrations-list,
+.integrations-api {
+  margin-bottom: 2rem;
+}
+
+.integrations-add h2,
+.integrations-list h2,
+.integrations-api h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--polar-muted);
+}
+
+.integrations-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.integrations-form label {
+  min-width: 160px;
+  flex: 1 1 200px;
+}
+
+.integrations-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.integration-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+@media (max-width: 768px) {
+  .integration-item {
+    flex-wrap: wrap;
+  }
+  .integration-info {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .integration-name {
+    width: 100%;
+  }
+}
+
+.integration-info {
+  flex: 1;
+}
+
+.integration-name {
+  font-weight: 500;
+  color: var(--polar-white);
+}
+
+.integration-type {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--polar-faint);
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--polar-dim);
+  cursor: pointer;
+}
+
+.integrations-list .muted {
+  color: var(--polar-faint);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.api-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0 0 0.75rem 0;
+}
+
+.api-bullets {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--polar-muted);
+  line-height: 1.6;
+}
+
+.api-bullets li {
+  margin-bottom: 0.5rem;
+}
+
+.api-bullets code {
+  background: var(--glass-bg);
+  padding: 0.15rem 0.4rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--glass-border);
+}
+
+.webhook-config {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--glass-border);
+  margin-top: 0.25rem;
+}
+
+.webhook-config label {
+  max-width: 360px;
+}
+
+.webhook-events {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.webhook-events > span {
+  font-size: 0.875rem;
+  color: var(--polar-muted);
+  margin-right: 0.25rem;
+}
+
+.integrations-page .checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--label-size);
+  color: var(--label-color);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.integrations-page .checkbox-label input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--cosmic-pink);
+}
+
+.integration-webhook-url {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--polar-faint);
+  margin-top: 0.2rem;
+}
+
+.webhook-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--panel-overlay-strong);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.webhook-edit-box {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  max-width: 420px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: var(--modal-shadow);
+}
+
+.webhook-edit-box h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: var(--polar-muted);
+}
+
+.webhook-edit-box.form label {
+  margin-bottom: var(--form-section-gap);
+}
+
+.webhook-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.25rem;
+}

@@ -1,0 +1,177 @@
+.templates-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.06), transparent 50%);
+}
+
+.templates-page > * {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.templates-header {
+  margin-bottom: 1.5rem;
+}
+
+.templates-header .back-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--polar-dim);
+  font-size: 0.875rem;
+}
+
+.templates-header .back-link:hover {
+  color: var(--polar-white);
+}
+
+.templates-header h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.templates-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0;
+}
+
+.templates-page .form-error {
+  border-radius: var(--input-radius);
+  margin-bottom: 1rem;
+}
+
+.templates-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .templates-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.template-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0 0;
+}
+
+.template-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.template-item {
+  flex: 1;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--polar-white);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.template-item:hover,
+.template-item.active {
+  background: var(--surface-elevated);
+  border-color: var(--input-border-hover);
+}
+
+.template-list .btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.template-list .muted {
+  color: var(--polar-faint);
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+}
+
+.template-editor h2 {
+  font-size: 1.125rem;
+  margin: 0 0 1rem 0;
+  color: var(--polar-white);
+}
+
+.template-editor .editor-form label {
+  max-width: 400px;
+}
+
+.template-editor .editor-form .field-block label {
+  max-width: none;
+}
+
+.field-block {
+  margin-bottom: 1rem;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.field-options {
+  margin-left: 0;
+  margin-top: 0.35rem;
+  width: 100%;
+  max-width: 320px;
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: 0.875rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--input-radius);
+  color: var(--input-color);
+}
+
+.field-key {
+  width: 100px !important;
+  max-width: none !important;
+}
+
+.field-label {
+  width: 120px !important;
+  max-width: none !important;
+}
+
+.field-row select {
+  width: auto !important;
+  max-width: none !important;
+}
+
+.template-editor .checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--label-size);
+  color: var(--label-color);
+  cursor: pointer;
+}
+
+.template-editor .checkbox-label input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--cosmic-pink);
+}
+
+.template-editor .editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}

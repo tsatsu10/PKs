@@ -1,0 +1,202 @@
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--space-black);
+  background-image:
+    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(99, 102, 241, 0.18), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 80% 60%, rgba(236, 72, 153, 0.1), transparent 45%);
+  padding: 1.5rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 2.25rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--modal-shadow);
+  animation: cardAppear 0.4s ease;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--polar-white);
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.02em;
+}
+
+.auth-tagline {
+  font-size: 0.9375rem;
+  color: var(--polar-dim);
+  margin: 0 0 1.75rem 0;
+}
+
+.auth-card h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--polar-muted);
+  margin: 0 0 1.25rem 0;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.auth-card form label {
+  margin-bottom: 0;
+}
+
+/* World-class floating labels: minimal, clear, single-column (research-backed) */
+.form-floating {
+  position: relative;
+  margin-bottom: 0;
+}
+
+.form-floating .form-floating-input {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 1.25rem 1rem 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--input-radius);
+  color: var(--input-color);
+  font-size: 1rem;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-floating .form-floating-input::placeholder {
+  color: transparent;
+}
+
+.form-floating .form-floating-input:hover:not(:focus):not(:disabled) {
+  border-color: var(--input-border-hover);
+}
+
+.form-floating .form-floating-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: var(--input-focus-ring);
+}
+
+.form-floating .form-floating-input[aria-invalid="true"] {
+  border-color: var(--input-error-border);
+}
+
+.form-floating .form-floating-input:focus[aria-invalid="true"] {
+  border-color: var(--input-focus-border);
+  box-shadow: var(--input-focus-ring);
+}
+
+.form-floating .form-floating-label {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  color: var(--input-placeholder);
+  pointer-events: none;
+  transition: top 0.2s ease, transform 0.2s ease, font-size 0.2s ease, color 0.2s ease;
+}
+
+.form-floating:focus-within .form-floating-label,
+.form-floating .form-floating-input:not(:placeholder-shown) ~ .form-floating-label {
+  top: 0.75rem;
+  transform: translateY(0);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--label-color);
+  letter-spacing: 0.01em;
+}
+
+.form-floating .field-error,
+.form-floating .field-hint {
+  margin-top: 0.5rem;
+  margin-left: 0;
+}
+
+.auth-card .form-floating + .form-floating {
+  margin-top: 0;
+}
+
+.auth-card button {
+  padding: 0.875rem 1.25rem;
+  min-height: 48px;
+  background: var(--accent-gradient);
+  color: var(--polar-white);
+  border: none;
+  border-radius: var(--input-radius);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  margin-top: 0.25rem;
+}
+
+.auth-card button:hover:not(:disabled) {
+  box-shadow: 0 4px 24px var(--cosmic-pink-glow);
+  transform: translateY(-1px);
+}
+
+.auth-card button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.auth-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-hint {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0 0 0.75rem 0;
+}
+
+.auth-error {
+  padding: 0.875rem 1rem;
+  background: var(--danger-bg);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: var(--input-radius);
+  color: var(--error-text);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.auth-footer {
+  margin-top: 1.75rem;
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--cosmic-pink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-footer a:hover {
+  color: var(--polar-white);
+  text-decoration: underline;
+}

@@ -1,0 +1,1102 @@
+0) Global Build Rules
+Platforms
+
+App: Web (responsive)
+
+Backend: API (monolith is fine)
+
+DB: PostgreSQL (schema already defined)
+
+Auth: Email + password
+
+Global Non-Functional Requirements
+
+Search query response: < 300ms for typical dataset sizes (up to 10k objects/user)
+
+Dashboard/object pages load: < 2 seconds
+
+Data integrity: strict FK constraints
+
+Security: password hashing, auth-protected routes
+
+Reliability: exports + prompt outputs must not be lost
+
+Definition of Done (DoD) for any feature
+
+UI implemented
+
+API endpoints implemented
+
+DB persisted correctly
+
+Server-side validations enforced
+
+Tests for core business rules
+
+Acceptance criteria met
+
+PHASE 1 — FOUNDATION (Auth + DB + Base Layout)
+1.1 Requirements
+R1: Project Setup
+
+Frontend project created
+
+Backend project created
+
+Environment config (dev/prod)
+
+DB connection established
+
+R2: Implement Users + Auth
+
+Register (email/password)
+
+Login/logout
+
+Password reset (optional for MVP, recommended)
+
+Auth middleware for protected routes
+
+R3: Apply Database Schema
+
+Implement tables:
+
+users
+
+Core indexes
+
+updated_at triggers (optional)
+
+1.2 Acceptance Criteria
+
+User can register and login successfully
+
+Protected pages redirect to login when unauthenticated
+
+users table correctly stores user records
+
+Passwords are hashed (never stored plaintext)
+
+PHASE 2 — KNOWLEDGE OBJECTS (CRUD + Versioning)
+
+This is the “minimum viable system”: create, store, view, edit.
+
+2.1 Requirements
+R4: Knowledge Object CRUD
+
+Implement:
+
+Create Knowledge Object
+
+Read (list + view detail)
+
+Update
+
+Soft delete (is_deleted = true)
+
+Fields required:
+
+type
+
+title
+
+content (can be empty for file-only objects)
+Optional:
+
+source
+
+summary
+
+key_points
+
+DB tables:
+
+knowledge_objects
+
+R5: Versioning Rules (must be server-side)
+
+Implement:
+
+On every update to a knowledge object:
+
+insert a row into knowledge_object_versions
+
+increment knowledge_objects.current_version
+
+Store:
+
+edited_by
+
+change_reason (optional UI field)
+
+DB table:
+
+knowledge_object_versions
+
+2.2 Acceptance Criteria
+
+User can create, edit, view, delete an object
+
+Object updates create version history entries
+
+Version numbers increment correctly
+
+Old versions remain immutable
+
+Soft-deleted objects do not appear in default lists
+
+PHASE 3 — DOMAINS + TAGS (Classification System)
+3.1 Requirements
+R6: Domains CRUD
+
+Implement:
+
+Create domain
+
+Edit domain
+
+Delete domain (only if no objects linked, or require reassignment)
+
+DB:
+
+domains
+
+R7: Tags CRUD
+
+Implement:
+
+Create tag (implicitly when typing new tag)
+
+List tags
+
+Delete tag (remove associations)
+
+DB:
+
+tags
+
+R8: Associate domains/tags with objects (M:N)
+
+Implement:
+
+Assign/remove domains on a knowledge object
+
+Assign/remove tags on a knowledge object
+
+DB:
+
+knowledge_object_domains
+
+knowledge_object_tags
+
+3.2 Acceptance Criteria
+
+User can manage domains and tags
+
+User can attach multiple domains/tags to an object
+
+Filters and counts reflect correct relationships
+
+Domain/tag uniqueness enforced per user (no duplicates)
+
+PHASE 4 — SEARCH + FILTERS (Retrieval Engine)
+4.1 Requirements
+R9: Full-Text Search
+
+Implement:
+
+Search by query across title/summary/content
+
+Return paginated results
+
+DB:
+
+FTS index on knowledge_objects
+
+R10: Filters
+
+Implement filters:
+
+by type
+
+by domain
+
+by tag
+
+by date range (created_at or updated_at)
+
+R11: Search UX
+
+Implement:
+
+Search bar (global)
+
+Filter panel
+
+Result list item shows:
+
+title
+
+type
+
+updated_at
+
+snippet (optional)
+
+4.2 Acceptance Criteria
+
+Search returns relevant results from title/content/summary
+
+Filters work independently and combined
+
+Results exclude soft-deleted objects
+
+Median search response < 300ms (dev target)
+
+PHASE 5 — LINKING (Knowledge Graph)
+5.1 Requirements
+R12: Object-to-Object Linking
+
+Implement:
+
+Add link from object A to object B
+
+Remove link
+
+Optional relationship_type (e.g., “references”)
+
+DB:
+
+link_edges
+
+R13: Linked Objects Display
+
+On object detail page show:
+
+Outgoing links
+
+Incoming links (optional for MVP but valuable)
+
+5.2 Acceptance Criteria
+
+User can link objects reliably
+
+Duplicate prevention works (unique constraint)
+
+Linked objects show correctly on detail pages
+
+PHASE 6 — FILE UPLOADS + ATTACHMENTS (Real-world capture)
+6.1 Requirements
+R14: File Upload
+
+Implement:
+
+Upload file (PDF/DOCX/TXT)
+
+Store metadata:
+
+filename, mime, size, storage_key
+
+Attach file to knowledge object
+
+DB:
+
+files
+
+knowledge_object_files
+
+R15: Basic File Handling Rules
+
+Files can exist without extracted text (MVP)
+
+Provide “download/open” link
+
+Optional: store extracted_text for search (Phase 2, but recommended)
+
+6.2 Acceptance Criteria
+
+User can upload and attach file to an object
+
+Attached file appears on object page
+
+Downloads work
+
+Files are access-controlled to owning user
+
+PHASE 7 — PROMPT ENGINE (Run prompts + Save outputs)
+
+This makes PKS “active”.
+
+7.1 Requirements
+R16: Prompt Bank (CRUD)
+
+Implement:
+
+Create prompt template
+
+Edit prompt template
+
+Delete prompt template
+
+Filter by applicable types
+
+DB:
+
+prompt_templates
+
+(optional) prompt_template_versions
+
+R17: Run Prompt (MVP = simulated execution OR real AI later)
+
+Even without AI, implement the pipeline:
+
+User selects object
+
+Selects prompt
+
+“Run” creates a prompt_runs record
+
+Returns an output (for MVP you can allow manual output paste, or use a placeholder)
+
+Allow “Save output as new object”
+
+Auto-link output to source object
+
+DB:
+
+prompt_runs
+
+knowledge_objects (new object created)
+
+link_edges (auto-link)
+
+7.2 Acceptance Criteria
+
+User can create prompts and view them in a Prompt Bank
+
+User can run a prompt against an object and get an output result
+
+User can save output as a new knowledge object
+
+Saved output is linked to the source object
+
+Prompt run history is visible per object
+
+PHASE 8 — EXPORT ENGINE (Multi-file outputs)
+8.1 Requirements
+R18: Export Single Object (MVP)
+
+Implement:
+
+Export to TXT
+
+Export to MD
+
+Export to PDF
+
+Export templates:
+
+Raw / Brief / Full / Stakeholder
+
+User can choose inclusion toggles:
+
+content, summary, tags, domains, links
+
+DB:
+
+export_jobs
+
+R19: Export Job Processing
+
+Clicking export creates an export job record
+
+Job moves: queued → processing → completed/failed
+
+Store output storage_key or return file directly
+
+8.2 Acceptance Criteria
+
+User can export any object to TXT/MD/PDF
+
+Export contains selected sections correctly
+
+Export job status is tracked
+
+Errors are surfaced to user
+
+PHASE 9 — TEMPLATES + GUIDED WIZARDS
+9.1 Requirements
+R20: Template Library
+
+Implement:
+
+Create template (JSON schema describing fields/questions)
+
+Apply template when creating new knowledge object
+
+Save filled result as an object
+
+DB:
+
+templates
+
+9.2 Acceptance Criteria
+
+User can create a template and reuse it
+
+Template-guided creation produces correctly structured objects
+
+PHASE 10 — NOTIFICATIONS
+10.1 Requirements
+R21: Notification Center
+
+Trigger notifications for:
+
+Export completed
+
+Prompt completed
+
+Shared object updated (future)
+
+DB:
+
+notifications
+
+10.2 Acceptance Criteria
+
+Notifications appear in-app
+
+Mark read/unread works
+
+Events generate notifications reliably
+
+PHASE 11 — GOVERNANCE (Audit Logs + Sharing)
+11.1 Requirements
+R22: Audit Logs
+
+Log:
+
+object create/update/delete
+
+prompt run
+
+export run
+
+DB:
+
+audit_logs
+
+R23: Sharing & Permissions (Phase 2)
+
+Implement:
+
+Share object with another user
+
+Role enforcement (viewer/editor)
+
+DB:
+
+share_permissions
+
+11.2 Acceptance Criteria
+
+Audit log entries created for key actions
+
+Sharing restricts access properly (Phase 2 milestone)
+
+PHASE 12 — INTEGRATIONS + API (Phase 2)
+12.1 Requirements
+R24: Integration scaffolding
+
+DB:
+
+integrations
+
+import_items
+
+R25: Public API + Webhooks
+
+Object CRUD API
+
+Search API
+
+Export trigger
+
+Webhook events (later)
+
+12.2 Acceptance Criteria
+
+Integrations can be stored/enabled/disabled
+
+Imports can create objects without duplication
+
+API endpoints are auth-protected
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ============================================================
+-- PKS (Personal Knowledge System) — PostgreSQL Schema v1.2
+-- Covers: Knowledge Objects, Versioning, Tags/Domains, Linking,
+-- Prompt Bank + Runs, Exports, Templates, Notifications,
+-- Sharing/Permissions, Audit Logs, Integrations scaffolding.
+-- ============================================================
+
+-- Enable UUID generation (choose one extension; pgcrypto is common)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- -----------------------------
+-- Core enums
+-- -----------------------------
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'knowledge_object_type') THEN
+    CREATE TYPE knowledge_object_type AS ENUM (
+      'note', 'document', 'sop', 'report', 'guideline', 'insight',
+      'template', 'concept', 'tool', 'incident', 'case', 'research_paper',
+      'prompt'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'prompt_output_format') THEN
+    CREATE TYPE prompt_output_format AS ENUM ('text', 'markdown', 'json');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'export_format') THEN
+    CREATE TYPE export_format AS ENUM ('txt', 'md', 'pdf', 'docx', 'html', 'json');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'export_template') THEN
+    CREATE TYPE export_template AS ENUM ('raw', 'brief', 'full', 'stakeholder');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_channel') THEN
+    CREATE TYPE notification_channel AS ENUM ('in_app', 'email');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'share_role') THEN
+    CREATE TYPE share_role AS ENUM ('owner', 'editor', 'commenter', 'viewer');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'integration_provider') THEN
+    CREATE TYPE integration_provider AS ENUM ('google_drive', 'onedrive', 'email_ingest');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'export_status') THEN
+    CREATE TYPE export_status AS ENUM ('queued', 'processing', 'completed', 'failed');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'prompt_run_status') THEN
+    CREATE TYPE prompt_run_status AS ENUM ('queued', 'running', 'completed', 'failed');
+  END IF;
+END $$;
+
+-- -----------------------------
+-- Users
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email             TEXT UNIQUE NOT NULL,
+  password_hash     TEXT NOT NULL,
+  display_name      TEXT,
+  timezone          TEXT DEFAULT 'Africa/Accra',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- -----------------------------
+-- Domains
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS domains (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  objective         TEXT,
+  kpis              JSONB DEFAULT '[]'::jsonb,   -- e.g., ["weekly reports done", "papers read"]
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+
+-- -----------------------------
+-- Tags
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS tags (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
+
+-- -----------------------------
+-- Concepts (optional semantic layer)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS concepts (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  description       TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_concepts_user_id ON concepts(user_id);
+
+-- -----------------------------
+-- Knowledge Objects (current canonical version)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS knowledge_objects (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  type              knowledge_object_type NOT NULL,
+  title             TEXT NOT NULL,
+  source            TEXT,                    -- URL, file name, origin, etc.
+  content           TEXT,                    -- raw text content (for MVP)
+  summary           TEXT,
+  key_points        JSONB DEFAULT '[]'::jsonb,  -- e.g., ["point 1", "point 2"]
+
+  -- governance / lifecycle
+  is_deleted        BOOLEAN NOT NULL DEFAULT FALSE,
+  current_version   INTEGER NOT NULL DEFAULT 1,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ko_user_id ON knowledge_objects(user_id);
+CREATE INDEX IF NOT EXISTS idx_ko_type ON knowledge_objects(type);
+CREATE INDEX IF NOT EXISTS idx_ko_updated_at ON knowledge_objects(updated_at);
+
+-- Full-text search index (content + title + summary)
+-- Note: you may later add a generated tsvector column; this is MVP-friendly.
+CREATE INDEX IF NOT EXISTS idx_ko_fts ON knowledge_objects
+USING GIN (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(content,'')));
+
+-- -----------------------------
+-- Knowledge Object Versions (immutable history)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS knowledge_object_versions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  version           INTEGER NOT NULL,
+
+  title             TEXT NOT NULL,
+  source            TEXT,
+  content           TEXT,
+  summary           TEXT,
+  key_points        JSONB DEFAULT '[]'::jsonb,
+
+  -- who/why
+  edited_by         UUID REFERENCES users(id) ON DELETE SET NULL,
+  change_reason     TEXT,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (knowledge_object_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kov_koid ON knowledge_object_versions(knowledge_object_id);
+
+-- -----------------------------
+-- Knowledge Object ↔ Domain (M:N)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS knowledge_object_domains (
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  domain_id           UUID NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+  PRIMARY KEY (knowledge_object_id, domain_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kod_domain ON knowledge_object_domains(domain_id);
+
+-- -----------------------------
+-- Knowledge Object ↔ Tag (M:N)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS knowledge_object_tags (
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  tag_id              UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (knowledge_object_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kot_tag ON knowledge_object_tags(tag_id);
+
+-- -----------------------------
+-- Knowledge Object ↔ Concept (M:N)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS knowledge_object_concepts (
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  concept_id          UUID NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+  PRIMARY KEY (knowledge_object_id, concept_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_koc_concept ON knowledge_object_concepts(concept_id);
+
+-- -----------------------------
+-- Object ↔ Object Links (graph edges)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS link_edges (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  from_object_id    UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  to_object_id      UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+
+  relationship_type TEXT,        -- e.g., "references", "derived_from", "similar_to"
+  note              TEXT,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- prevent duplicate edges of same type
+  UNIQUE (from_object_id, to_object_id, relationship_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_links_from ON link_edges(from_object_id);
+CREATE INDEX IF NOT EXISTS idx_links_to ON link_edges(to_object_id);
+
+-- -----------------------------
+-- Files (uploads) + attachment mapping
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS files (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  original_filename TEXT NOT NULL,
+  mime_type         TEXT,
+  byte_size         BIGINT,
+  storage_key       TEXT NOT NULL,   -- pointer to S3/local/etc.
+  sha256            TEXT,            -- dedupe / integrity
+  extracted_text    TEXT,            -- optional: extracted for search
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
+CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
+
+CREATE TABLE IF NOT EXISTS knowledge_object_files (
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  file_id             UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  PRIMARY KEY (knowledge_object_id, file_id)
+);
+
+-- -----------------------------
+-- Templates (structured creation)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS templates (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  name              TEXT NOT NULL,
+  description       TEXT,
+  applies_to_type   knowledge_object_type,
+  schema            JSONB NOT NULL DEFAULT '{}'::jsonb, -- fields/questions layout
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_templates_user_id ON templates(user_id);
+
+-- -----------------------------
+-- Prompt Bank (prompt templates)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  name              TEXT NOT NULL,
+  description       TEXT,
+  applies_to_types  knowledge_object_type[] NOT NULL, -- e.g., '{report,sop}'
+  prompt_text       TEXT NOT NULL,
+
+  output_format     prompt_output_format NOT NULL DEFAULT 'markdown',
+  tags              TEXT[] DEFAULT '{}'::text[],
+
+  visibility        TEXT NOT NULL DEFAULT 'private', -- 'private' now; 'org' later
+  version           INTEGER NOT NULL DEFAULT 1,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompts_user_id ON prompt_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompt_templates(name);
+
+-- Prompt versioning (optional but recommended, mirrors object versioning)
+CREATE TABLE IF NOT EXISTS prompt_template_versions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  prompt_template_id UUID NOT NULL REFERENCES prompt_templates(id) ON DELETE CASCADE,
+  version           INTEGER NOT NULL,
+  name              TEXT NOT NULL,
+  description       TEXT,
+  applies_to_types  knowledge_object_type[] NOT NULL,
+  prompt_text       TEXT NOT NULL,
+  output_format     prompt_output_format NOT NULL,
+  tags              TEXT[] DEFAULT '{}'::text[],
+  edited_by         UUID REFERENCES users(id) ON DELETE SET NULL,
+  change_reason     TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (prompt_template_id, version)
+);
+
+-- -----------------------------
+-- Prompt Runs (execution logging)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS prompt_runs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  prompt_template_id UUID REFERENCES prompt_templates(id) ON DELETE SET NULL,
+  knowledge_object_id UUID REFERENCES knowledge_objects(id) ON DELETE SET NULL,
+
+  status            prompt_run_status NOT NULL DEFAULT 'queued',
+  input_snapshot    JSONB DEFAULT '{}'::jsonb, -- captured variables/context
+  output_text       TEXT,
+  error_message     TEXT,
+
+  created_object_id UUID REFERENCES knowledge_objects(id) ON DELETE SET NULL, -- if saved as object
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at      TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_runs_user_id ON prompt_runs(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_runs_ko ON prompt_runs(knowledge_object_id);
+
+-- -----------------------------
+-- Export Jobs
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS export_jobs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  knowledge_object_id UUID REFERENCES knowledge_objects(id) ON DELETE SET NULL, -- MVP single-object export
+  format            export_format NOT NULL,
+  template          export_template NOT NULL DEFAULT 'full',
+
+  include_content   BOOLEAN NOT NULL DEFAULT TRUE,
+  include_summary   BOOLEAN NOT NULL DEFAULT TRUE,
+  include_tags      BOOLEAN NOT NULL DEFAULT TRUE,
+  include_domains   BOOLEAN NOT NULL DEFAULT TRUE,
+  include_links     BOOLEAN NOT NULL DEFAULT FALSE,
+
+  filename          TEXT,
+  status            export_status NOT NULL DEFAULT 'queued',
+  storage_key       TEXT,          -- where the exported file is stored
+  error_message     TEXT,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at      TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_export_jobs_user_id ON export_jobs(user_id);
+
+-- Phase 2 bundle exports (many objects per export job)
+CREATE TABLE IF NOT EXISTS export_job_items (
+  export_job_id     UUID NOT NULL REFERENCES export_jobs(id) ON DELETE CASCADE,
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  sort_order        INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (export_job_id, knowledge_object_id)
+);
+
+-- -----------------------------
+-- Notifications
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS notifications (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  channel           notification_channel NOT NULL DEFAULT 'in_app',
+  title             TEXT NOT NULL,
+  body              TEXT,
+  metadata          JSONB DEFAULT '{}'::jsonb, -- link target, ids, etc.
+
+  is_read           BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at           TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+
+-- -----------------------------
+-- Sharing & Permissions (Phase 2-ready)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS share_permissions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  resource_type     TEXT NOT NULL, -- 'knowledge_object', 'prompt_template', 'domain', etc.
+  resource_id       UUID NOT NULL,
+
+  owner_user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  grantee_user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  role              share_role NOT NULL DEFAULT 'viewer',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (resource_type, resource_id, grantee_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_owner ON share_permissions(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_share_grantee ON share_permissions(grantee_user_id);
+
+-- -----------------------------
+-- Audit Logs (security + governance)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID REFERENCES users(id) ON DELETE SET NULL,
+
+  action            TEXT NOT NULL, -- e.g., 'object.create', 'object.update', 'export.run'
+  resource_type     TEXT,
+  resource_id       UUID,
+
+  ip_address        INET,
+  user_agent        TEXT,
+  metadata          JSONB DEFAULT '{}'::jsonb,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+
+-- -----------------------------
+-- Integrations (Phase 2 scaffolding)
+-- -----------------------------
+CREATE TABLE IF NOT EXISTS integrations (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  provider          integration_provider NOT NULL,
+  display_name      TEXT,
+  credentials       JSONB NOT NULL DEFAULT '{}'::jsonb, -- encrypted at app layer
+  is_enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (user_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_integrations_user_id ON integrations(user_id);
+
+-- Imported items tracking (to avoid duplicates and support re-sync)
+CREATE TABLE IF NOT EXISTS import_items (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  integration_id    UUID NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
+
+  external_id       TEXT NOT NULL,       -- provider file/message id
+  external_url      TEXT,
+  payload           JSONB DEFAULT '{}'::jsonb, -- metadata snapshot
+
+  status            TEXT NOT NULL DEFAULT 'imported', -- imported/skipped/failed
+  created_knowledge_object_id UUID REFERENCES knowledge_objects(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (integration_id, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_items_integration ON import_items(integration_id);
+
+-- ============================================================
+-- Notes on "Projects" linkage:
+-- Your PKS spec includes linked_project_ids[].
+-- If you later merge with PCC, you should reference PCC.projects(id)
+-- via a join table. For now, keep a lightweight stub.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS projects_stub (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_object_projects (
+  knowledge_object_id UUID NOT NULL REFERENCES knowledge_objects(id) ON DELETE CASCADE,
+  project_id          UUID NOT NULL REFERENCES projects_stub(id) ON DELETE CASCADE,
+  PRIMARY KEY (knowledge_object_id, project_id)
+);
+
+-- ============================================================
+-- Minimal triggers for updated_at (optional)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_users_updated_at') THEN
+    CREATE TRIGGER trg_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_domains_updated_at') THEN
+    CREATE TRIGGER trg_domains_updated_at
+    BEFORE UPDATE ON domains
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_ko_updated_at') THEN
+    CREATE TRIGGER trg_ko_updated_at
+    BEFORE UPDATE ON knowledge_objects
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_prompt_templates_updated_at') THEN
+    CREATE TRIGGER trg_prompt_templates_updated_at
+    BEFORE UPDATE ON prompt_templates
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_templates_updated_at') THEN
+    CREATE TRIGGER trg_templates_updated_at
+    BEFORE UPDATE ON templates
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_integrations_updated_at') THEN
+    CREATE TRIGGER trg_integrations_updated_at
+    BEFORE UPDATE ON integrations
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+END $$;

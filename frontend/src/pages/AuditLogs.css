@@ -1,0 +1,136 @@
+.audit-logs-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.06), transparent 50%);
+}
+
+.audit-logs-page > * {
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.audit-logs-header {
+  margin-bottom: 1.5rem;
+}
+
+.audit-logs-header .back-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--polar-dim);
+  font-size: 0.875rem;
+}
+
+.audit-logs-header .back-link:hover {
+  color: var(--polar-white);
+}
+
+.audit-logs-header h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.audit-logs-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0 0 1rem 0;
+}
+
+.audit-logs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.audit-logs-filters label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8125rem;
+  color: var(--polar-muted);
+}
+
+.audit-logs-filters select,
+.audit-logs-filters input {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--polar-white);
+  font-size: 0.875rem;
+  min-width: 140px;
+}
+
+.audit-logs-loading,
+.audit-logs-empty {
+  color: var(--polar-dim);
+  font-size: 0.875rem;
+  padding: 2rem 0;
+  margin: 0;
+}
+
+.audit-logs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.audit-logs-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 0.875rem;
+}
+
+.audit-logs-action {
+  font-weight: 500;
+  color: var(--polar-muted);
+  min-width: 120px;
+}
+
+.audit-logs-entity {
+  color: var(--polar-dim);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+}
+
+.audit-logs-payload {
+  color: var(--polar-faint);
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-logs-time {
+  color: var(--polar-faint);
+  font-size: 0.8125rem;
+}
+
+.audit-logs-link {
+  color: var(--cosmic-pink);
+  text-decoration: none;
+  font-size: 0.8125rem;
+}
+
+.audit-logs-link:hover {
+  text-decoration: underline;
+  color: var(--polar-white);
+}
+
+@media (max-width: 768px) {
+  .audit-logs-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .audit-logs-action {
+    min-width: 0;
+  }
+}
