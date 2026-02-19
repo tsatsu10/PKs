@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # Markdown (excluded from repo)
 *.md
+
+# Plain text docs (excluded from repo)
+*.txt
