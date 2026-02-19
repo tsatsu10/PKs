@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
 export default function Login() {
@@ -22,7 +23,6 @@ export default function Login() {
     }
   }, [error]);
 
-  // If already logged in, go to dashboard (or the page they tried to open)
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || '/';
@@ -40,7 +40,7 @@ export default function Login() {
         password,
       });
       if (err) {
-        const msg = err.message || 'Login failed';
+        const msg = err?.message ?? err?.error_description ?? 'Login failed';
         if (msg.toLowerCase().includes('email not confirmed')) {
           throw new Error('Please check your email and click the confirmation link before signing in.');
         }
@@ -70,70 +70,66 @@ export default function Login() {
         timezone: profile?.timezone ?? 'Africa/Accra',
         createdAt: profile?.created_at ?? data.user.created_at,
       });
-      // Defer navigation so AuthContext state is committed before ProtectedRoute reads it
       setTimeout(() => navigate('/', { replace: true }), 50);
     } catch (err) {
-      setError(err.message || 'Login failed');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Login failed'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="auth-page" role="main" id="main-content">
-      <div className="auth-card">
-        <h1>PKS</h1>
-        <p className="auth-tagline">Second Brain for African Tech & Health</p>
-        <h2>Sign in</h2>
-        {location.state?.from && (
-          <p className="auth-hint">Please sign in to continue.</p>
-        )}
-        <form ref={formRef} className="form" onSubmit={handleSubmit} aria-describedby={error ? 'login-error' : undefined} noValidate>
-          {error && (
-            <div id="login-error" className="auth-error" role="alert" aria-live="assertive">
-              {error}
-            </div>
-          )}
-          <div className="form-floating">
-            <input
-              ref={firstInputRef}
-              id="login-email"
-              type="email"
-              className="form-floating-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder=" "
-              required
-              autoComplete="email"
-              aria-invalid={!!error}
-              aria-describedby={error ? 'login-error' : undefined}
-            />
-            <label htmlFor="login-email" className="form-floating-label">Email</label>
-          </div>
-          <div className="form-floating">
-            <input
-              id="login-password"
-              type="password"
-              className="form-floating-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder=" "
-              required
-              autoComplete="current-password"
-              aria-invalid={!!error}
-            />
-            <label htmlFor="login-password" className="form-floating-label">Password</label>
-          </div>
-          <button type="submit" disabled={submitting} aria-busy={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-        <p className="auth-footer">
+    <AuthLayout
+      title="Sign in"
+      hint={location.state?.from ? 'Please sign in to continue.' : null}
+      footer={
+        <>
           <Link to="/forgot-password">Forgot password?</Link>
-          {' · '}
+          <span className="auth-footer-sep" aria-hidden>·</span>
           Don&apos;t have an account? <Link to="/register">Register</Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form ref={formRef} className="form" onSubmit={handleSubmit} aria-describedby={error ? 'login-error' : undefined} noValidate>
+        {error && (
+          <div id="login-error" className="auth-error" role="alert" aria-live="assertive">
+            {error}
+          </div>
+        )}
+        <div className="form-floating">
+          <input
+            ref={firstInputRef}
+            id="login-email"
+            type="email"
+            className="form-floating-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder=" "
+            required
+            autoComplete="email"
+            aria-invalid={!!error}
+            aria-describedby={error ? 'login-error' : undefined}
+          />
+          <label htmlFor="login-email" className="form-floating-label">Email</label>
+        </div>
+        <div className="form-floating">
+          <input
+            id="login-password"
+            type="password"
+            className="form-floating-input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder=" "
+            required
+            autoComplete="current-password"
+            aria-invalid={!!error}
+          />
+          <label htmlFor="login-password" className="form-floating-label">Password</label>
+        </div>
+        <button type="submit" disabled={submitting} aria-busy={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+    </AuthLayout>
   );
 }

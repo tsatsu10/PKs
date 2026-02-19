@@ -75,3 +75,6 @@ export const AUDIT_ACTION_LIST = [
   'prompt_run',
   'export_run',
 ];
+
+/** SessionStorage key for "use prompt on object" flow from Prompt Bank */
+export const RUN_PROMPT_STORAGE_KEY = 'pks_run_prompt_template';

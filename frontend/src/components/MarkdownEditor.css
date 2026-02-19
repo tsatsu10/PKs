@@ -1,0 +1,19 @@
+/* Wrapper for MDEditor; dark theme via data-color-mode on parent */
+.markdown-editor-wrapper {
+  --md-editor-font-family: inherit;
+}
+.markdown-editor-wrapper[data-color-mode='dark'] .w-md-editor {
+  background-color: var(--glass-bg, #1e293b);
+  border: 1px solid var(--glass-border, #334155);
+  border-radius: 10px;
+}
+.markdown-editor-wrapper .w-md-editor-toolbar {
+  background-color: var(--glass-bg, #1e293b);
+  border-bottom: 1px solid var(--glass-border, #334155);
+}
+.markdown-editor-wrapper .w-md-editor-text-pre,
+.markdown-editor-wrapper .w-md-editor-text-input,
+.markdown-editor-wrapper .w-md-editor-area {
+  background-color: var(--space-black, #0f172a);
+  color: var(--polar-white, #f8fafc);
+}

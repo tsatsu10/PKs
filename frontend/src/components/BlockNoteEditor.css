@@ -1,0 +1,38 @@
+/* BlockNote editor — dark theme to match PKS */
+.blocknote-editor-wrapper {
+  --bn-colors-editor-text: var(--polar-white);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--polar-white);
+  --bn-colors-menu-background: var(--surface-elevated);
+  --bn-colors-tooltip-text: var(--polar-white);
+  --bn-colors-tooltip-background: var(--surface-elevated);
+  --bn-colors-hovered-text: var(--polar-white);
+  --bn-colors-hovered-background: var(--glass-border);
+  --bn-colors-selected-text: var(--polar-white);
+  --bn-colors-selected-background: var(--active-highlight-bg);
+  --bn-colors-disabled-text: var(--polar-faint);
+  --bn-colors-disabled-background: var(--surface);
+  --bn-colors-shadow: rgba(0, 0, 0, 0.4);
+  --bn-colors-border: var(--glass-border);
+  --bn-colors-side-menu: var(--polar-dim);
+  --bn-border-radius: 8px;
+  --bn-font-family: inherit;
+}
+
+.blocknote-editor-wrapper .bn-container {
+  font-family: inherit;
+}
+
+.blocknote-editor-wrapper .bn-editor {
+  padding: 0.5rem 0;
+  min-height: 100%;
+}
+
+.blocknote-editor-wrapper .bn-block-content {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.blocknote-editor-wrapper [data-node-type="blockContainer"] {
+  margin: 0.15rem 0;
+}

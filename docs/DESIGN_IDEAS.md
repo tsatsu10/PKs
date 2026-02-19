@@ -1,6 +1,6 @@
 # PKS — Design Ideas & Suggestions
 
-This document suggests design directions based on the current codebase and the product vision (Second Brain for African Tech & Health). Use it as a backlog of ideas, not a fixed spec.
+This document suggests design directions based on the current codebase and the product vision (Your second brain for knowledge). Use it as a backlog of ideas, not a fixed spec.
 
 ---
 
@@ -8,7 +8,7 @@ This document suggests design directions based on the current codebase and the p
 
 - **Product:** PKS = structured knowledge objects (notes, documents, SOPs, reports, etc.) with domains, tags, links, prompt-driven synthesis, export, and sharing.
 - **Current UI:** Dark theme (Space Black, Cosmic Pink, Midnight Purple), glassmorphism, Plus Jakarta Sans. Dashboard = search + filters + flat list; ObjectDetail = long single column with many sections (meta, edit/view, domains, tags, links, attachments, prompts, export, share, versions).
-- **Users:** African Tech & Health professionals; knowledge workers who need to capture, structure, and reuse what they learn.
+- **Users:** Anyone who wants to capture, structure, and reuse what they learn — knowledge workers, researchers, students, and curious minds.
 
 ---
 
@@ -58,11 +58,11 @@ This document suggests design directions based on the current codebase and the p
 
 ---
 
-## 6. Visual & brand (African Tech & Health)
+## 6. Visual & brand
 
 | Idea | What | Why |
 |------|------|-----|
-| **Subtle regional identity** | Optional: palette accent inspired by African design (e.g. earth, indigo, or existing pink/purple framed as “energy + depth”); or a single illustration/motif on empty or auth. | Differentiates without cliché; reinforces “for African professionals”. |
+| **Distinct visual identity** | Optional: palette accent (e.g. earth, indigo, or existing pink/purple framed as “energy + depth”); or a single illustration/motif on empty or auth. | Differentiates without cliché; reinforces “your second brain” feel. |
 | **Type icons** | Consistent icon set for object types (document, report, SOP, insight, etc.). | Improves recognition and makes the product feel finished. |
 | **Light mode** | Optional theme toggle (e.g. in Settings) with a light palette that keeps contrast and readability. | Accessibility and preference; some users work in bright environments. |
 | **Illustration for empty / auth** | Simple, on-brand illustration on login, register, or “no results” (e.g. knowledge nodes, or abstract “building blocks”). | Warmth and clarity; supports positioning as a thinking tool. |
@@ -107,4 +107,4 @@ This document suggests design directions based on the current codebase and the p
 - **Brand & identity:** Type icons, one or two illustrations (empty/auth), optional regional accent in palette.
 - **Later:** Full reading mode, TOC, saved filters, AI-first create, mobile bottom nav.
 
-Use this list to pick the next design improvements that best match your roadmap and users (e.g. African tech/health professionals who need fast capture and synthesis).
+Use this list to pick the next design improvements that best match your roadmap and users (anyone who needs fast capture and synthesis).

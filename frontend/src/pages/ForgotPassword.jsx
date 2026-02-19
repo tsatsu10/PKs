@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
 export default function ForgotPassword() {
@@ -21,7 +22,7 @@ export default function ForgotPassword() {
       if (err) throw err;
       setSent(true);
     } catch (err) {
-      setError(err.message || 'Failed to send reset email');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to send reset email'));
     } finally {
       setSubmitting(false);
     }
@@ -29,57 +30,50 @@ export default function ForgotPassword() {
 
   if (sent) {
     return (
-      <div className="auth-page" role="main" id="main-content">
-        <div className="auth-card">
-          <h1>PKS</h1>
-          <p className="auth-tagline">Second Brain for African Tech & Health</p>
-          <h2>Check your email</h2>
-          <p className="auth-hint">
+      <AuthLayout
+        title="Check your email"
+        hint={
+          <>
             If an account exists for <strong>{email}</strong>, we&apos;ve sent a link to reset your password.
-          </p>
-          <p className="auth-footer">
-            <Link to="/login">Back to sign in</Link>
-          </p>
-        </div>
-      </div>
+          </>
+        }
+        footer={<Link to="/login">Back to sign in</Link>}
+      >
+        <p className="auth-message">Check your inbox and spam folder. The link will expire in an hour.</p>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="auth-page" role="main" id="main-content">
-      <div className="auth-card">
-        <h1>PKS</h1>
-        <p className="auth-tagline">Second Brain for African Tech & Health</p>
-        <h2>Reset password</h2>
-        <p className="auth-hint">Enter your email and we&apos;ll send you a link to set a new password.</p>
-        <form className="form" onSubmit={handleSubmit} aria-describedby={error ? 'forgot-error' : undefined} noValidate>
-          {error && (
-            <div id="forgot-error" className="auth-error" role="alert" aria-live="assertive">
-              {error}
-            </div>
-          )}
-          <div className="form-floating">
-            <input
-              id="forgot-email"
-              type="email"
-              className="form-floating-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder=" "
-              required
-              autoComplete="email"
-              aria-invalid={!!error}
-            />
-            <label htmlFor="forgot-email" className="form-floating-label">Email</label>
+    <AuthLayout
+      title="Reset password"
+      hint="Enter your email and we'll send you a link to set a new password."
+      footer={<Link to="/login">Back to sign in</Link>}
+    >
+      <form className="form" onSubmit={handleSubmit} aria-describedby={error ? 'forgot-error' : undefined} noValidate>
+        {error && (
+          <div id="forgot-error" className="auth-error" role="alert" aria-live="assertive">
+            {error}
           </div>
-          <button type="submit" disabled={submitting} aria-busy={submitting}>
-            {submitting ? 'Sending…' : 'Send reset link'}
-          </button>
-        </form>
-        <p className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
-        </p>
-      </div>
-    </div>
+        )}
+        <div className="form-floating">
+          <input
+            id="forgot-email"
+            type="email"
+            className="form-floating-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder=" "
+            required
+            autoComplete="email"
+            aria-invalid={!!error}
+          />
+          <label htmlFor="forgot-email" className="form-floating-label">Email</label>
+        </div>
+        <button type="submit" disabled={submitting} aria-busy={submitting}>
+          {submitting ? 'Sending…' : 'Send reset link'}
+        </button>
+      </form>
+    </AuthLayout>
   );
 }

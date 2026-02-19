@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
+import { createNotification } from '../lib/notifications';
+import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
+import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 
 export default function QuickCapture() {
@@ -17,6 +20,24 @@ export default function QuickCapture() {
   const [error, setError] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const hasRestoredDraft = useRef(false);
+
+  useEffect(() => {
+    if (hasRestoredDraft.current) return;
+    const draft = getDraft(DRAFT_KEYS.quick);
+    if (!draft || (!draft.title?.trim() && !draft.content?.trim())) return;
+    hasRestoredDraft.current = true;
+    setTitle(draft.title ?? '');
+    setContent(draft.content ?? '');
+    addToast('Draft restored');
+  }, [addToast]);
+
+  const draftTimerRef = useRef(null);
+  useEffect(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => setDraft(DRAFT_KEYS.quick, { title, content }), 500);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [title, content]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -45,11 +66,14 @@ export default function QuickCapture() {
       const objectId = data.id;
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, objectId, { title: t, type: 'note' });
       deliverWebhookEvent('object.created', { objectId, title: t, type: 'note' });
+      createNotification(user.id, 'object_created', 'Quick capture', t.slice(0, 80), { type: 'knowledge_object', id: objectId });
       addToast('success', 'Captured');
+      clearDraft(DRAFT_KEYS.quick);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
-      addToast('error', err.message || 'Failed to capture');
-      setError(err.message || 'Failed to capture');
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to capture');
+      addToast('error', msg);
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -75,16 +99,16 @@ export default function QuickCapture() {
             autoFocus
           />
         </label>
-        <label>
-          Content <span className="required">*</span>
-          <textarea
+        <div className="object-form-field">
+          <span className="object-form-label">Content <span className="required">*</span></span>
+          <BlockNoteEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Notes, snippet, or idea…"
-            rows={6}
-            required
+            onChange={(val) => setContent(val)}
+            placeholder="Notes, snippet, or idea… (press / for commands)"
+            minHeight={180}
+            aria-label="Content"
           />
-        </label>
+        </div>
         <div className="object-form-actions">
           <Link to="/" className="btn btn-secondary">Cancel</Link>
           <button type="submit" className="btn btn-primary" disabled={saving}>

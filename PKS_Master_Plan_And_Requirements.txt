@@ -1,6 +1,6 @@
 ================================================================================
 PERSONAL KNOWLEDGE SYSTEM (PKS)
-SECOND BRAIN FOR AFRICAN TECH & HEALTH
+YOUR SECOND BRAIN FOR KNOWLEDGE
 FULL PRODUCT PLAN + BUILD SPECIFICATION
 ================================================================================
 Version: 2.0
@@ -19,16 +19,16 @@ Product Name:
   Personal Knowledge System (PKS)
 
 Working Tagline:
-  Second Brain for African Tech & Health Professionals
+  Your second brain for knowledge
 
 Product Type:
   Web-based SaaS (MVP-first, platform-ready)
 
 Core Idea:
   PKS is a structured personal knowledge operating system that captures,
-  indexes, links, structures, and synthesizes everything a professional
-  learns, reads, and produces — turning scattered information into
-  reusable, searchable, and insight-generating knowledge assets.
+  indexes, links, structures, and synthesizes everything you learn, read,
+  and produce — turning scattered information into reusable, searchable,
+  and insight-generating knowledge assets.
 
 Primary Purpose:
   Convert learning and documents into reusable operational intelligence.

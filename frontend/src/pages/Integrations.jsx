@@ -57,7 +57,7 @@ export default function Integrations() {
       setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       setForm({ name: '', type: 'generic', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
     } catch (err) {
-      setError(err.message || 'Failed to add integration');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add integration'));
     } finally {
       setAdding(false);
     }
@@ -105,7 +105,7 @@ export default function Integrations() {
       setEditingConfigId(null);
       setEditConfig({ url: '', events: [], secret: '' });
     } catch (err) {
-      setError(err.message || 'Failed to update webhook config');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to update webhook config'));
     }
   }
 
@@ -120,7 +120,7 @@ export default function Integrations() {
       if (err) throw err;
       setList((prev) => prev.map((i) => (i.id === id ? { ...i, enabled } : i)));
     } catch (err) {
-      setError(err.message || 'Failed to update');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to update'));
     }
   }
 
@@ -132,7 +132,7 @@ export default function Integrations() {
       if (err) throw err;
       setList((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
-      setError(err.message || 'Failed to delete');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete'));
     }
   }
 

@@ -1,0 +1,243 @@
+.journal-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image:
+    radial-gradient(ellipse 60% 35% at 50% -5%, rgba(168, 85, 247, 0.08), transparent 45%);
+}
+
+.journal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.journal-header-meta {
+  font-size: 0.8125rem;
+  color: var(--polar-dim);
+  font-weight: 500;
+}
+
+.journal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.journal-back-btn {
+  color: var(--polar-muted);
+}
+
+.journal-calendar-card {
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.journal-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.journal-nav-btn {
+  padding: 0.5rem 0.75rem;
+  min-width: 40px;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--polar-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.journal-nav-btn:hover {
+  color: var(--polar-white);
+  background: var(--glass-border);
+}
+
+.journal-calendar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--polar-white);
+  letter-spacing: 0.02em;
+}
+
+.journal-today-btn {
+  width: 100%;
+  margin-bottom: 1.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.journal-loading {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.journal-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  background: var(--surface);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+
+.journal-calendar-cell {
+  background: var(--glass-bg);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+}
+
+.journal-calendar-head {
+  color: var(--polar-dim);
+  font-weight: 600;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.journal-calendar-head:first-child,
+.journal-calendar-head:nth-child(7) {
+  color: var(--polar-muted);
+}
+
+.journal-calendar-blank {
+  background: var(--surface);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.journal-calendar-day {
+  border: none;
+  color: var(--polar-white);
+  cursor: pointer;
+  padding: 0.35rem;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.journal-calendar-day:hover {
+  background: var(--glass-border);
+}
+
+.journal-calendar-day:active {
+  transform: scale(0.98);
+}
+
+.journal-calendar-day.has-entry {
+  color: var(--cosmic-pink);
+  font-weight: 500;
+}
+
+.journal-calendar-day.today {
+  outline: 2px solid var(--cosmic-pink);
+  outline-offset: -2px;
+  font-weight: 600;
+}
+
+.journal-day-num {
+  line-height: 1.2;
+}
+
+.journal-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.journal-legend {
+  font-size: 0.75rem;
+  color: var(--polar-dim);
+  margin: 1rem 0 0 0;
+  text-align: center;
+}
+
+.journal-muted {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0;
+}
+
+.journal-entry-block {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.journal-entry-date-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--polar-white);
+  margin: 0 0 1.25rem 0;
+  letter-spacing: 0.02em;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.journal-entry-textarea {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  padding: 1.25rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--polar-white);
+  font-size: 1rem;
+  line-height: 1.65;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.journal-entry-textarea::placeholder {
+  color: var(--polar-dim);
+}
+
+.journal-entry-textarea:focus {
+  outline: none;
+  border-color: var(--cosmic-pink);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+
+.journal-page .btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.journal-page .btn-primary {
+  background: var(--accent-gradient);
+  color: var(--polar-white);
+}
+
+.journal-page .btn-secondary {
+  background: var(--glass-bg);
+  color: var(--polar-muted);
+  border: 1px solid var(--glass-border);
+}

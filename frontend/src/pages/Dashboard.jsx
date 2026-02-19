@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
@@ -8,7 +8,7 @@ import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { useToast } from '../context/ToastContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
-import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
 import JSZip from 'jszip';
 import './Dashboard.css';
 
@@ -17,6 +17,7 @@ const PAGE_SIZE = 20;
 export default function Dashboard() {
   const { user } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [objects, setObjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,18 +39,48 @@ export default function Dashboard() {
   const [exportFormat, setExportFormat] = useState('md');
   const [exportTemplate, setExportTemplate] = useState('full');
   const [exporting, setExporting] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddTitle, setQuickAddTitle] = useState('');
+  const [quickAddContent, setQuickAddContent] = useState('');
+  const [quickAddSaving, setQuickAddSaving] = useState(false);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [bulkModal, setBulkModal] = useState(null); // 'add_domain' | 'add_tag' | 'remove_domain' | 'remove_tag' | 'delete'
+  const [bulkDomainId, setBulkDomainId] = useState('');
+  const [bulkTagId, setBulkTagId] = useState('');
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const qFromUrl = searchParams.get('q') ?? '';
   const searchInputRef = useRef(null);
+  const quickAddInputRef = useRef(null);
+  const bulkMenuRef = useRef(null);
+  const location = useLocation();
+  const [runPromptTemplate, setRunPromptTemplate] = useState(null);
 
   useEffect(() => {
     if (qFromUrl !== searchQuery) setSearchQuery(qFromUrl);
   }, [qFromUrl]);
 
-  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null) => {
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(RUN_PROMPT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.id && parsed?.name) setRunPromptTemplate(parsed);
+    } catch {
+      sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
+    }
+  }, []);
+
+  function dismissRunPromptBanner() {
+    sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
+    setRunPromptTemplate(null);
+  }
+
+  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
     if (!user?.id) return;
     const isLoadMore = nextOffset > 0;
     const q = queryOverride !== null && queryOverride !== undefined ? String(queryOverride).trim() : searchQuery.trim();
+    const dom = filtersOverride && 'domain_id_f' in filtersOverride ? filtersOverride.domain_id_f : domainFilter;
     if (!isLoadMore) setLoading(true);
     else setLoadingMore(true);
     setError('');
@@ -57,7 +88,7 @@ export default function Dashboard() {
       const { data, error: err } = await supabase.rpc('search_knowledge_objects', {
         search_query: q || null,
         type_filter: typeFilter || null,
-        domain_id_f: domainFilter || null,
+        domain_id_f: dom || null,
         tag_id_f: tagFilter || null,
         date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
         date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
@@ -74,7 +105,7 @@ export default function Dashboard() {
       setHasMore(list.length === PAGE_SIZE);
       setOffset(nextOffset + list.length);
     } catch (e) {
-      setError(e.message || 'Search failed');
+      setError(e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Search failed'));
       if (!isLoadMore) setObjects([]);
     } finally {
       setLoading(false);
@@ -92,16 +123,33 @@ export default function Dashboard() {
     if (user?.id && qFromUrl) runSearch(0, qFromUrl);
   }, [user?.id, qFromUrl]);
 
+  const closeQuickAdd = useCallback(() => {
+    setShowQuickAdd(false);
+    setQuickAddTitle('');
+    setQuickAddContent('');
+  }, []);
+
   useEffect(() => {
     function onKeyDown(e) {
+      if (e.key === 'Escape' && showQuickAdd) {
+        e.preventDefault();
+        closeQuickAdd();
+        return;
+      }
       if (e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        if (location.pathname === '/') {
+          setShowQuickAdd(true);
+          setTimeout(() => quickAddInputRef.current?.focus(), 0);
+        } else {
+          searchInputRef.current?.focus();
+        }
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [location.pathname, showQuickAdd, closeQuickAdd]);
+
 
   useEffect(() => {
     if (!user?.id) return;
@@ -151,6 +199,46 @@ export default function Dashboard() {
     setSelectedIds(new Set());
   }
 
+  async function handleQuickAddCreate(e) {
+    e.preventDefault();
+    const t = quickAddTitle.trim();
+    const c = quickAddContent.trim();
+    if (!t || !c) {
+      addToast('error', 'Title and content are required');
+      return;
+    }
+    setQuickAddSaving(true);
+    try {
+      const { data, error: err } = await supabase
+        .from('knowledge_objects')
+        .insert({
+          user_id: user.id,
+          type: 'note',
+          title: t,
+          content: c,
+          summary: null,
+          source: null,
+        })
+        .select('id')
+        .single();
+      if (err) throw err;
+      logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, data.id, { title: t, type: 'note' });
+      deliverWebhookEvent('object.created', { objectId: data.id, title: t, type: 'note' });
+      addToast('success', 'Created');
+      setShowQuickAdd(false);
+      setQuickAddTitle('');
+      setQuickAddContent('');
+      runSearch(0);
+      navigate(`/objects/${data.id}`);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to create');
+      addToast('error', msg);
+      setError(msg);
+    } finally {
+      setQuickAddSaving(false);
+    }
+  }
+
   async function handleExportSelected() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -177,7 +265,8 @@ export default function Dashboard() {
       jobId = job?.id;
       await supabase.from('export_job_items').insert(ids.map((knowledge_object_id, i) => ({ export_job_id: jobId, knowledge_object_id, sort_order: i })));
 
-      const { data: objs } = await supabase.from('knowledge_objects').select('*').in('id', ids);
+      const { data: objs, error: objsErr } = await supabase.from('knowledge_objects').select('*').in('id', ids);
+      if (objsErr) throw objsErr;
       if (!objs?.length) throw new Error('No objects found');
       const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));
       const [kodRes, kotRes] = await Promise.all([
@@ -224,7 +313,7 @@ export default function Dashboard() {
       setShowExportModal(false);
       clearSelection();
     } catch (err) {
-      const msg = err.message || 'Export failed';
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Export failed');
       if (jobId) await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
       setError(msg);
       addToast('error', msg);
@@ -233,9 +322,154 @@ export default function Dashboard() {
     }
   }
 
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setShowBulkMenu(false);
+    }
+    if (!showBulkMenu) return;
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showBulkMenu]);
+
+  async function bulkAddDomain() {
+    const domainId = bulkDomainId;
+    if (!domainId || selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const rows = Array.from(selectedIds).map((knowledge_object_id) => ({ knowledge_object_id, domain_id: domainId }));
+      const { error: err } = await supabase.from('knowledge_object_domains').upsert(rows, { onConflict: 'knowledge_object_id,domain_id', ignoreDuplicates: true });
+      if (err) throw err;
+      addToast('success', `Domain added to ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setBulkDomainId('');
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk add domain failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  async function bulkAddTag() {
+    const tagId = bulkTagId;
+    if (!tagId || selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const rows = Array.from(selectedIds).map((knowledge_object_id) => ({ knowledge_object_id, tag_id: tagId }));
+      const { error: err } = await supabase.from('knowledge_object_tags').upsert(rows, { onConflict: 'knowledge_object_id,tag_id', ignoreDuplicates: true });
+      if (err) throw err;
+      addToast('success', `Tag added to ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setBulkTagId('');
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk add tag failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  async function bulkRemoveDomain() {
+    const domainId = bulkDomainId;
+    if (!domainId || selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_object_domains')
+        .delete()
+        .in('knowledge_object_id', Array.from(selectedIds))
+        .eq('domain_id', domainId);
+      if (err) throw err;
+      addToast('success', `Domain removed from ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setBulkDomainId('');
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk remove domain failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  async function bulkRemoveTag() {
+    const tagId = bulkTagId;
+    if (!tagId || selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_object_tags')
+        .delete()
+        .in('knowledge_object_id', Array.from(selectedIds))
+        .eq('tag_id', tagId);
+      if (err) throw err;
+      addToast('success', `Tag removed from ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setBulkTagId('');
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk remove tag failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_objects')
+        .update({ is_deleted: true })
+        .in('id', Array.from(selectedIds));
+      if (err) throw err;
+      addToast('success', `${selectedIds.size} object(s) deleted`);
+      setBulkModal(null);
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk delete failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
   return (
     <div className="dashboard">
       <main className="dashboard-main" aria-busy={loading} aria-live="polite">
+        {runPromptTemplate && (
+          <div className="dashboard-run-prompt-banner" role="status">
+            <span className="dashboard-run-prompt-banner-text">
+              Run prompt: <strong>{runPromptTemplate.name}</strong>. Click an object to open it and run this prompt.
+            </span>
+            <button type="button" className="btn btn-ghost btn-small" onClick={dismissRunPromptBanner} aria-label="Dismiss">
+              Dismiss
+            </button>
+          </div>
+        )}
         <section className="dashboard-actions">
           <h2>Knowledge objects</h2>
           <div className="dashboard-actions-right">
@@ -243,6 +477,26 @@ export default function Dashboard() {
               <span className="dashboard-selection-actions">
                 <span className="muted">{selectedIds.size} selected</span>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowExportModal(true)}>Export selected</button>
+                <div className="dashboard-bulk-dropdown" ref={bulkMenuRef}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowBulkMenu((v) => !v)}
+                    aria-expanded={showBulkMenu}
+                    aria-haspopup="true"
+                  >
+                    Bulk actions
+                  </button>
+                  {showBulkMenu && (
+                    <div className="dashboard-bulk-menu" role="menu">
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('add_domain'); setBulkDomainId(domains[0]?.id ?? ''); setShowBulkMenu(false); }}>Add domain…</button>
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('add_tag'); setBulkTagId(tags[0]?.id ?? ''); setShowBulkMenu(false); }}>Add tag…</button>
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('remove_domain'); setBulkDomainId(domains[0]?.id ?? ''); setShowBulkMenu(false); }}>Remove domain…</button>
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('remove_tag'); setBulkTagId(tags[0]?.id ?? ''); setShowBulkMenu(false); }}>Remove tag…</button>
+                      <button type="button" className="dashboard-bulk-menu-item dashboard-bulk-menu-item-danger" role="menuitem" onClick={() => { setBulkModal('delete'); setShowBulkMenu(false); }}>Delete selected</button>
+                    </div>
+                  )}
+                </div>
                 <button type="button" className="btn btn-secondary" onClick={selectAllOnPage}>Select all on page</button>
                 <button type="button" className="btn btn-secondary" onClick={clearSelection}>Clear</button>
               </span>
@@ -276,6 +530,28 @@ export default function Dashboard() {
             {showFilters ? 'Hide filters' : 'Filters'}
           </button>
         </form>
+
+        {domains.length > 0 && (
+          <nav className="dashboard-quick-filters" aria-label="Filter by domain">
+            <button
+              type="button"
+              className={`quick-filter-pill ${!domainFilter ? 'active' : ''}`}
+              onClick={() => { setDomainFilter(''); runSearch(0, null, { domain_id_f: null }); }}
+            >
+              All
+            </button>
+            {domains.slice(0, 8).map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={`quick-filter-pill ${domainFilter === d.id ? 'active' : ''}`}
+                onClick={() => { setDomainFilter(d.id); runSearch(0, null, { domain_id_f: d.id }); }}
+              >
+                {d.name}
+              </button>
+            ))}
+          </nav>
+        )}
 
         {showFilters && (
           <div className="filter-panel" role="group" aria-label="Search filters">
@@ -323,6 +599,49 @@ export default function Dashboard() {
           </div>
         )}
 
+        {!showQuickAdd ? (
+          <button
+            type="button"
+            className="dashboard-quick-add-trigger"
+            onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
+            aria-label="Add new object (or press /)"
+          >
+            <span className="dashboard-quick-add-icon">+</span>
+            <span className="dashboard-quick-add-label">Add new object</span>
+            <span className="dashboard-quick-add-hint">or press /</span>
+          </button>
+        ) : (
+          <form onSubmit={handleQuickAddCreate} className="dashboard-quick-add-form">
+            <div className="dashboard-quick-add-row">
+              <input
+                ref={quickAddInputRef}
+                type="text"
+                value={quickAddTitle}
+                onChange={(e) => setQuickAddTitle(e.target.value)}
+                placeholder="Title"
+                className="dashboard-quick-add-title"
+                required
+                aria-label="Title"
+              />
+              <div className="dashboard-quick-add-actions">
+                <button type="button" className="btn btn-ghost" onClick={closeQuickAdd}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={quickAddSaving}>
+                  {quickAddSaving ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </div>
+            <textarea
+              value={quickAddContent}
+              onChange={(e) => setQuickAddContent(e.target.value)}
+              placeholder="Content…"
+              className="dashboard-quick-add-content"
+              rows={3}
+              required
+              aria-label="Content"
+            />
+          </form>
+        )}
+
         {error && (
           <div className="dashboard-error" role="alert" aria-live="assertive">
             {error}
@@ -345,7 +664,7 @@ export default function Dashboard() {
                     <label className="object-card-checkbox">
                       <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                     </label>
-                    <Link to={`/objects/${obj.id}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
+                    <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
                       <span className="object-card-type" title={obj.type}>
                         <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
                         {obj.type}
@@ -364,7 +683,7 @@ export default function Dashboard() {
                     <label className="object-list-checkbox">
                       <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                     </label>
-                    <Link to={`/objects/${obj.id}`} className="object-list-link" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
+                    <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
                       <span className="object-list-type" title={obj.type}>
                         <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
                         {obj.type}
@@ -412,6 +731,115 @@ export default function Dashboard() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowExportModal(false)} disabled={exporting}>Cancel</button>
                 <button type="button" className="btn btn-primary" onClick={handleExportSelected} disabled={exporting}>
                   {exporting ? 'Exporting…' : 'Export ZIP'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'add_domain' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-add-domain-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-add-domain-title">Add domain to {selectedIds.size} object(s)</h2>
+              <label>
+                Domain
+                <select value={bulkDomainId} onChange={(e) => setBulkDomainId(e.target.value)}>
+                  <option value="">Select domain</option>
+                  {domains.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
+              {domains.length === 0 && <p className="muted">Create domains in Settings first.</p>}
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkDomainId(''); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkAddDomain} disabled={bulkActionLoading || !bulkDomainId || domains.length === 0}>
+                  {bulkActionLoading ? 'Adding…' : 'Add domain'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'add_tag' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-add-tag-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-add-tag-title">Add tag to {selectedIds.size} object(s)</h2>
+              <label>
+                Tag
+                <select value={bulkTagId} onChange={(e) => setBulkTagId(e.target.value)}>
+                  <option value="">Select tag</option>
+                  {tags.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </label>
+              {tags.length === 0 && <p className="muted">Create tags in Settings first.</p>}
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkTagId(''); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkAddTag} disabled={bulkActionLoading || !bulkTagId || tags.length === 0}>
+                  {bulkActionLoading ? 'Adding…' : 'Add tag'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'remove_domain' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-remove-domain-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-remove-domain-title">Remove domain from {selectedIds.size} object(s)</h2>
+              <label>
+                Domain
+                <select value={bulkDomainId} onChange={(e) => setBulkDomainId(e.target.value)}>
+                  <option value="">Select domain</option>
+                  {domains.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkDomainId(''); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkRemoveDomain} disabled={bulkActionLoading || !bulkDomainId}>
+                  {bulkActionLoading ? 'Removing…' : 'Remove domain'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'remove_tag' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-remove-tag-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-remove-tag-title">Remove tag from {selectedIds.size} object(s)</h2>
+              <label>
+                Tag
+                <select value={bulkTagId} onChange={(e) => setBulkTagId(e.target.value)}>
+                  <option value="">Select tag</option>
+                  {tags.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkTagId(''); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkRemoveTag} disabled={bulkActionLoading || !bulkTagId}>
+                  {bulkActionLoading ? 'Removing…' : 'Remove tag'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'delete' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-delete-title">Delete {selectedIds.size} object(s)?</h2>
+              <p className="muted">Objects will be moved to trash (soft delete). This action cannot be undone from this screen.</p>
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setBulkModal(null)} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-danger" onClick={bulkDelete} disabled={bulkActionLoading}>
+                  {bulkActionLoading ? 'Deleting…' : 'Delete selected'}
                 </button>
               </div>
             </div>

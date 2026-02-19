@@ -21,6 +21,8 @@ const navGroups = [
   {
     label: 'Tools',
     items: [
+      { to: '/paste', label: 'Paste bin', icon: '📋' },
+      { to: '/journal', label: 'Journal', icon: '📅' },
       { to: '/prompts', label: 'Prompts', icon: '◆' },
       { to: '/templates', label: 'Templates', icon: '◇' },
       { to: '/notifications', label: 'Notifications', icon: '◉' },
@@ -51,6 +53,11 @@ export default function AppLayout({ children }) {
         navigate('/objects/new');
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'Q') {
+        e.preventDefault();
+        navigate('/quick');
+        return;
+      }
       if (e.key === '?' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
         e.preventDefault();
         setShortcutsOpen(true);
@@ -78,14 +85,29 @@ export default function AppLayout({ children }) {
     <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''}`}>
       <aside className="app-layout-sidebar" aria-label="Main navigation">
         <div className="app-layout-sidebar-top">
-          <Link to="/" className="app-layout-brand">
-            {collapsed ? (
-              <span className="app-layout-brand-icon" aria-hidden>PKS</span>
-            ) : (
-              <span className="app-layout-brand-text">PKS</span>
+          <Link to="/" className="app-layout-brand" title="Personal Knowledge System">
+            <img src="/pks-logo.svg" alt="" className="app-layout-logo" width="32" height="32" />
+            {!collapsed && (
+              <span className="app-layout-brand-words">
+                <span className="app-layout-brand-mark" aria-hidden>PKS</span>
+                <span className="app-layout-brand-text">
+                  <span className="app-layout-tagline">Your second brain</span>
+                  <span className="app-layout-full-name">Personal Knowledge System</span>
+                </span>
+              </span>
             )}
           </Link>
-          {!collapsed && <span className="app-layout-tagline">Second Brain</span>}
+          {!collapsed && (
+            <button
+              type="button"
+              className="app-layout-command-hint"
+              onClick={() => setCommandOpen(true)}
+              title="Open command palette (Ctrl+K)"
+            >
+              <span className="app-layout-command-kbd">⌘K</span>
+              <span>Search or jump…</span>
+            </button>
+          )}
         </div>
         <nav className="app-layout-nav" aria-label="Primary">
           {navGroups.map(({ label: groupLabel, items }) => (
@@ -118,14 +140,15 @@ export default function AppLayout({ children }) {
         </nav>
         <div className="app-layout-sidebar-bottom">
           <div className="app-layout-sidebar-actions">
-            <button type="button" onClick={cycleTheme} className="app-layout-nav-link app-layout-theme-toggle" aria-label={resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}>
-              <span className="app-layout-nav-icon" aria-hidden>{resolvedTheme === 'dark' ? '☀' : '☽'}</span>
-              {!collapsed && <span className="app-layout-nav-label">{resolvedTheme === 'dark' ? 'Light' : 'Dark'}</span>}
+            <button type="button" onClick={cycleTheme} className="app-layout-icon-btn" aria-label={resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'} title={resolvedTheme === 'dark' ? 'Light' : 'Dark'}>
+              <span aria-hidden>{resolvedTheme === 'dark' ? '☀' : '☽'}</span>
             </button>
             <NotificationCenter />
-            <button type="button" onClick={() => setShortcutsOpen(true)} className="app-layout-nav-link" aria-label="Keyboard shortcuts" title={collapsed ? 'Shortcuts (?)' : undefined}>
-              <span className="app-layout-nav-icon" aria-hidden>?</span>
-              {!collapsed && <span className="app-layout-nav-label">Shortcuts</span>}
+            <button type="button" onClick={() => setShortcutsOpen(true)} className="app-layout-icon-btn" aria-label="Keyboard shortcuts" title="Shortcuts (?)">
+              <span aria-hidden>?</span>
+            </button>
+            <button type="button" onClick={() => setCommandOpen(true)} className="app-layout-icon-btn" aria-label="Command palette" title="Command palette (⌘K)">
+              <span aria-hidden>⌘</span>
             </button>
           </div>
           <div className="app-layout-sidebar-user">

@@ -381,6 +381,13 @@ select.form-control,
   padding-right: 2.25rem;
 }
 
+/* Native select options: light text on dark background in dark theme */
+[data-theme="dark"] select option,
+:root select option {
+  background: var(--surface-elevated);
+  color: var(--polar-white);
+}
+
 .form label {
   display: flex;
   flex-direction: column;

@@ -1,6 +1,6 @@
 # PKS — Personal Knowledge System
 
-**Second Brain for African Tech & Health Professionals**
+**Your second brain for knowledge** — capture, connect, and reuse what you learn.
 
 Uses **Supabase** for auth and database.
 

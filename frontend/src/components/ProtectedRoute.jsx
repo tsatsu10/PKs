@@ -9,7 +9,10 @@ export default function ProtectedRoute({ children }) {
   if (loading) {
     return (
       <div className="loading-screen" role="status" aria-live="polite" aria-label="Loading">
-        <p>Loading…</p>
+        <div className="loading-screen-logo-wrap">
+          <img src="/pks-logo.svg" alt="" className="loading-screen-logo" width="64" height="64" />
+        </div>
+        <p className="loading-screen-text">Loading…</p>
       </div>
     );
   }

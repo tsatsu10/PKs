@@ -80,11 +80,15 @@ export default function NotificationCenter() {
   }
 
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(e) {
       if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
     }
-    if (open) document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    const id = setTimeout(() => document.addEventListener('click', handleClickOutside), 100);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('click', handleClickOutside);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -110,7 +114,10 @@ export default function NotificationCenter() {
       <button
         type="button"
         className="notification-bell"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         aria-label={open ? 'Close notifications' : `Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
         aria-expanded={open}
         aria-haspopup="dialog"

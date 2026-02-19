@@ -33,6 +33,10 @@ const { data } = await supabase.rpc('search_knowledge_objects', {
 });
 ```
 
+## AI-powered prompts
+
+The **Run prompt** flow can generate output via AI. The app calls the Edge Function `run-prompt` with `{ promptText, objectTitle, objectContent }`. The function uses OpenAI and returns the generated text. Configure `OPENAI_API_KEY` in Supabase Edge Function secrets to enable this; otherwise users can paste prompt output manually.
+
 ## Export
 
 Export is currently implemented in the app (TXT, MD, PDF via print). To replicate server-side or in another client: build text from object fields (title, summary, key_points, content, domains, tags, links) using the same logic as the frontend export panel.

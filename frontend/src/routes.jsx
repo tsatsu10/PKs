@@ -9,6 +9,8 @@ import Templates from './pages/Templates';
 import Notifications from './pages/Notifications';
 import AuditLogs from './pages/AuditLogs';
 import Integrations from './pages/Integrations';
+import PasteBin from './pages/PasteBin';
+import Journal from './pages/Journal';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -35,4 +37,6 @@ export const routeConfig = [
   { path: '/notifications', element: withProtected(<Notifications />) },
   { path: '/audit-logs', element: withProtected(<AuditLogs />) },
   { path: '/integrations', element: withProtected(<Integrations />) },
+  { path: '/paste', element: withProtected(<PasteBin />) },
+  { path: '/journal', element: withProtected(<Journal />) },
 ];

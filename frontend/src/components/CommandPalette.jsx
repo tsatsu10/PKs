@@ -6,6 +6,8 @@ const QUICK_ACTIONS = [
   { label: 'Go to Dashboard', path: '/', keywords: ['home', 'dashboard'] },
   { label: 'Quick capture', path: '/quick', keywords: ['quick', 'capture', 'add'] },
   { label: 'New object', path: '/objects/new', keywords: ['new', 'create', 'object'] },
+  { label: 'Paste bin', path: '/paste', keywords: ['paste', 'pastebin', 'snippet', 'code'] },
+  { label: 'Journal', path: '/journal', keywords: ['journal', 'calendar', 'diary', 'entry'] },
   { label: 'Prompts', path: '/prompts', keywords: ['prompts', 'prompt'] },
   { label: 'Templates', path: '/templates', keywords: ['templates', 'template'] },
   { label: 'Notifications', path: '/notifications', keywords: ['notifications', 'notify'] },

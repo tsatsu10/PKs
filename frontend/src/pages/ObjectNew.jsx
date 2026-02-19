@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
+import { createNotification } from '../lib/notifications';
+import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
 import { OBJECT_TYPES } from '../constants';
+import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 
 export default function ObjectNew() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const templateFromUrl = searchParams.get('template');
   const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -39,19 +44,41 @@ export default function ObjectNew() {
       : null;
   const templateFields = schema?.fields || [];
 
-  useEffect(() => {
+  const fetchDomainsTagsTemplates = useCallback(async () => {
     if (!user?.id) return;
-    (async () => {
-      const [dRes, tRes, tmplRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name'),
-      ]);
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-      setTemplates(tmplRes.data || []);
-    })();
+    const [dRes, tRes, tmplRes] = await Promise.all([
+      supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
+      supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
+      supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name'),
+    ]);
+    setDomains(dRes.data || []);
+    setTags(tRes.data || []);
+    setTemplates(tmplRes.data || []);
   }, [user?.id]);
+
+  useEffect(() => {
+    fetchDomainsTagsTemplates();
+  }, [fetchDomainsTagsTemplates]);
+
+  // Pre-select template from URL ?template=<id>
+  const hasAppliedTemplateUrl = useRef(false);
+  useEffect(() => {
+    if (!templateFromUrl || !templates.length || hasAppliedTemplateUrl.current) return;
+    const exists = templates.some((t) => t.id === templateFromUrl);
+    if (exists) {
+      setSelectedTemplateId(templateFromUrl);
+      hasAppliedTemplateUrl.current = true;
+    }
+  }, [templateFromUrl, templates]);
+
+  // Refetch when user returns to this tab (e.g. after adding domains/tags in Settings in another tab)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') fetchDomainsTagsTemplates();
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchDomainsTagsTemplates]);
 
   useEffect(() => {
     if (!schema?.fields?.length) {
@@ -63,6 +90,28 @@ export default function ObjectNew() {
     setTemplateValues(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form when template selection changes only
   }, [selectedTemplateId]);
+
+  const hasRestoredDraft = useRef(false);
+  useEffect(() => {
+    if (hasRestoredDraft.current) return;
+    const draft = getDraft(DRAFT_KEYS.new);
+    if (!draft?.form) return;
+    if (!draft.form.title?.trim() && !draft.form.content?.trim()) return;
+    hasRestoredDraft.current = true;
+    setForm((f) => ({ ...f, ...draft.form }));
+    if (draft.selectedTemplateId) setSelectedTemplateId(draft.selectedTemplateId);
+    if (draft.templateValues && Object.keys(draft.templateValues).length) setTemplateValues(draft.templateValues);
+    addToast('Draft restored');
+  }, [addToast]);
+
+  const draftTimerRef = useRef(null);
+  useEffect(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      setDraft(DRAFT_KEYS.new, { form, selectedTemplateId, templateValues });
+    }, 500);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [form, selectedTemplateId, templateValues]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -111,205 +160,314 @@ export default function ObjectNew() {
       }
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, objectId, { title: title || 'Untitled', type: form.type });
       deliverWebhookEvent('object.created', { objectId, title: title || 'Untitled', type: form.type });
+      createNotification(user.id, 'object_created', 'Object created', (title || 'Untitled').slice(0, 80), { type: 'knowledge_object', id: objectId });
       addToast('success', 'Object created');
+      clearDraft(DRAFT_KEYS.new);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
-      addToast('error', err.message || 'Failed to create object');
-      setError(err.message || 'Failed to create object');
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to create object');
+      addToast('error', msg);
+      setError(msg);
     } finally {
       setSaving(false);
     }
   }
 
-  function toggleDomain(id) {
-    setForm((f) => ({
-      ...f,
-      domainIds: f.domainIds.includes(id) ? f.domainIds.filter((x) => x !== id) : [...f.domainIds, id],
-    }));
+  function addDomain(id) {
+    if (id && !form.domainIds.includes(id)) setForm((f) => ({ ...f, domainIds: [...f.domainIds, id] }));
   }
 
-  function toggleTag(id) {
-    setForm((f) => ({
-      ...f,
-      tagIds: f.tagIds.includes(id) ? f.tagIds.filter((x) => x !== id) : [...f.tagIds, id],
-    }));
+  function removeDomain(id) {
+    setForm((f) => ({ ...f, domainIds: f.domainIds.filter((x) => x !== id) }));
   }
+
+  function addTag(id) {
+    if (id && !form.tagIds.includes(id)) setForm((f) => ({ ...f, tagIds: [...f.tagIds, id] }));
+  }
+
+  function removeTag(id) {
+    setForm((f) => ({ ...f, tagIds: f.tagIds.filter((x) => x !== id) }));
+  }
+
+  const availableDomains = domains.filter((d) => !form.domainIds.includes(d.id));
+  const availableTags = tags.filter((t) => !form.tagIds.includes(t.id));
+
+  const [editorHeight, setEditorHeight] = useState(560);
+  useEffect(() => {
+    const updateHeight = () => setEditorHeight(Math.max(520, (typeof window !== 'undefined' ? window.innerHeight : 800) - 340));
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   return (
-    <div className="object-form-page" id="main-content" role="main">
-      <header className="object-form-header">
-        <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'New object' }]} />
-        <h1>New knowledge object</h1>
-      </header>
+    <div className="object-form-page notion-style" id="main-content" role="main">
       <form onSubmit={handleSubmit} className="object-form form">
         {error && <div className="form-error" role="alert">{error}</div>}
-        <section className="object-form-templates-first" aria-label="Start from template">
-          <h2 className="object-form-section-heading">Start from template</h2>
-          <p className="object-form-section-desc">Use a template for guided structure, or create from scratch.</p>
-          <div className="template-picker">
-            <button type="button" className={`template-picker-option ${!selectedTemplateId ? 'active' : ''}`} onClick={() => setSelectedTemplateId('')}>
-              Free form
-            </button>
-            {templates.map((t) => (
-              <button key={t.id} type="button" className={`template-picker-option ${selectedTemplateId === t.id ? 'active' : ''}`} onClick={() => setSelectedTemplateId(t.id)}>
-                {t.name}
+
+        <header className="notion-form-header">
+          <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'New' }]} />
+          <div className="notion-form-toolbar">
+            <div className="notion-form-toolbar-left">
+              <label className="notion-form-template-label" htmlFor="object-form-template-select">
+                Template
+              </label>
+              <select
+                id="object-form-template-select"
+                className="template-select"
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                aria-label="Choose template"
+              >
+                <option value="">Free form</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="notion-form-toolbar-right">
+              <Link to="/" className="btn btn-ghost">Cancel</Link>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Creating…' : 'Create'}
               </button>
-            ))}
+            </div>
           </div>
-        </section>
-        {templateFields.length > 0 ? (
-          <div className="template-driven-fields">
-            {templateFields.map((f) => (
-              <label key={f.key}>
-                {f.label || f.key} {f.required && <span className="required">*</span>}
-                {f.type === 'textarea' ? (
-                  <textarea
-                    value={templateValues[f.key] ?? ''}
-                    onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                    placeholder={f.label || f.key}
-                    rows={4}
-                    required={!!f.required}
-                  />
-                ) : f.type === 'select' ? (
-                  <select
-                    value={templateValues[f.key] ?? ''}
-                    onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                    required={!!f.required}
-                  >
-                    <option value="">—</option>
-                    {(f.options || []).map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : (
+        </header>
+
+        <div className="notion-form-body">
+          {templateFields.length > 0 ? (
+            <div className="template-driven-fields">
+              {templateFields.map((f) => {
+                const isBlockNote = f.type === 'textarea' && (f.key === 'content' || f.key === 'body');
+                const Wrapper = isBlockNote ? 'div' : 'label';
+                return (
+                  <Wrapper key={f.key} className="notion-field">
+                    <span className="notion-field-label">{f.label || f.key} {f.required && <span className="required">*</span>}</span>
+                    {isBlockNote ? (
+                      <BlockNoteEditor
+                        value={templateValues[f.key] ?? ''}
+                        onChange={(val) => setTemplateValues((v) => ({ ...v, [f.key]: val }))}
+                        placeholder={f.label || f.key}
+                        minHeight={editorHeight}
+                        aria-label={f.label || f.key}
+                      />
+                    ) : f.type === 'textarea' ? (
+                      <textarea
+                        value={templateValues[f.key] ?? ''}
+                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                        placeholder={f.label || f.key}
+                        rows={4}
+                        required={!!f.required}
+                      />
+                    ) : f.type === 'select' ? (
+                      <select
+                        value={templateValues[f.key] ?? ''}
+                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                        required={!!f.required}
+                      >
+                        <option value="">—</option>
+                        {(f.options || []).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={templateValues[f.key] ?? ''}
+                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                        placeholder={f.label || f.key}
+                        required={!!f.required}
+                      />
+                    )}
+                  </Wrapper>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="notion-form-layout">
+              <div className="notion-form-main">
+                <div className="notion-title-block">
                   <input
                     type="text"
-                    value={templateValues[f.key] ?? ''}
-                    onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                    placeholder={f.label || f.key}
-                    required={!!f.required}
+                    className="notion-title-input"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Untitled"
+                    required
+                    aria-label="Title"
                   />
-                )}
-              </label>
-            ))}
-          </div>
-        ) : (
-          <>
-            <label>
-              Type
-              <select
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                required
-              >
-                {OBJECT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Title <span className="required">*</span>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="Short title"
-                required
-              />
-            </label>
-            <label>
-              Source
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                placeholder="URL or reference"
-              />
-            </label>
-            <label>
-              Summary
-              <textarea
-                value={form.summary}
-                onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
-                placeholder="Brief summary"
-                rows={2}
-              />
-            </label>
-            <label>
-              Content
-              <textarea
-                value={form.content}
-                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                placeholder="Main content"
-                rows={8}
-              />
-            </label>
-          </>
-        )}
-        {templateFields.length > 0 && (
-          <>
-            <label>
-              Type
-              <select
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                required
-              >
-                {OBJECT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Source
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                placeholder="URL or reference"
-              />
-            </label>
-          </>
-        )}
-        {domains.length > 0 && (
-          <label>
-            Domains
-            <div className="checkbox-group">
-              {domains.map((d) => (
-                <label key={d.id} className="checkbox-label">
+                </div>
+
+                <div className="notion-summary-block">
                   <input
-                    type="checkbox"
-                    checked={form.domainIds.includes(d.id)}
-                    onChange={() => toggleDomain(d.id)}
+                    type="text"
+                    className="notion-summary-input"
+                    value={form.summary}
+                    onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
+                    placeholder="Add a short summary…"
+                    aria-label="Summary"
                   />
-                  {d.name}
-                </label>
-              ))}
-            </div>
-          </label>
-        )}
-        {tags.length > 0 && (
-          <label>
-            Tags
-            <div className="checkbox-group">
-              {tags.map((t) => (
-                <label key={t.id} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={form.tagIds.includes(t.id)}
-                    onChange={() => toggleTag(t.id)}
+                </div>
+
+                <div className="notion-content-block">
+                  <BlockNoteEditor
+                    value={form.content}
+                    onChange={(val) => setForm((f) => ({ ...f, content: val }))}
+                    placeholder="Write your content… (press / for commands)"
+                    minHeight={editorHeight}
+                    aria-label="Content"
                   />
-                  {t.name}
-                </label>
-              ))}
+                </div>
+              </div>
+
+              <aside className="notion-form-sidebar" aria-label="Properties">
+                <div className="notion-sidebar-props">
+                  <div className="notion-prop">
+                    <span className="notion-prop-label">Type</span>
+                    <select
+                      value={form.type}
+                      onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                      className="notion-prop-select"
+                      aria-label="Type"
+                    >
+                      {OBJECT_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="notion-prop">
+                    <span className="notion-prop-label">Source</span>
+                    <input
+                      type="text"
+                      value={form.source}
+                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
+                      placeholder="URL or reference"
+                      className="notion-prop-input"
+                      aria-label="Source"
+                    />
+                  </div>
+                  {domains.length > 0 && (
+                    <div className="notion-prop notion-prop-chips">
+                      <span className="notion-prop-label">Domains</span>
+                      <div className="form-chips-row">
+                        {form.domainIds.map((id) => {
+                          const d = domains.find((x) => x.id === id);
+                          return d ? (
+                            <span key={d.id} className="chip">
+                              {d.name}
+                              <button type="button" className="chip-remove" onClick={() => removeDomain(d.id)} aria-label={`Remove ${d.name}`}>×</button>
+                            </span>
+                          ) : null;
+                        })}
+                        <select
+                          className="chip-select"
+                          value=""
+                          onChange={(e) => { const v = e.target.value; if (v) addDomain(v); e.target.value = ''; }}
+                          aria-label="Add domain"
+                        >
+                          <option value="">+ Domain</option>
+                          {availableDomains.map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {tags.length > 0 && (
+                    <div className="notion-prop notion-prop-chips">
+                      <span className="notion-prop-label">Tags</span>
+                      <div className="form-chips-row">
+                        {form.tagIds.map((id) => {
+                          const t = tags.find((x) => x.id === id);
+                          return t ? (
+                            <span key={t.id} className="chip">
+                              {t.name}
+                              <button type="button" className="chip-remove" onClick={() => removeTag(t.id)} aria-label={`Remove ${t.name}`}>×</button>
+                            </span>
+                          ) : null;
+                        })}
+                        <select
+                          className="chip-select"
+                          value=""
+                          onChange={(e) => { const v = e.target.value; if (v) addTag(v); e.target.value = ''; }}
+                          aria-label="Add tag"
+                        >
+                          <option value="">+ Tag</option>
+                          {availableTags.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {domains.length === 0 && tags.length === 0 && (
+                    <p className="form-hint notion-hint"><Link to="/settings">Settings</Link> → Add domains and tags to classify objects.</p>
+                  )}
+                </div>
+              </aside>
             </div>
-          </label>
-        )}
-        <div className="form-actions">
-          <Link to="/" className="btn btn-secondary">Cancel</Link>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Creating…' : 'Create'}
-          </button>
+          )}
+
+          {templateFields.length > 0 && (
+            <div className="notion-properties-row">
+              <div className="notion-prop">
+                <span className="notion-prop-label">Type</span>
+                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="notion-prop-select" required>
+                  {OBJECT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="notion-prop notion-prop-source">
+                <span className="notion-prop-label">Source</span>
+                <input type="text" value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} placeholder="URL or reference" className="notion-prop-input" />
+              </div>
+              {domains.length > 0 && (
+                <div className="notion-prop notion-prop-chips">
+                  <span className="notion-prop-label">Domains</span>
+                  <div className="form-chips-row">
+                    {form.domainIds.map((id) => {
+                      const d = domains.find((x) => x.id === id);
+                      return d ? (
+                        <span key={d.id} className="chip">
+                          {d.name}
+                          <button type="button" className="chip-remove" onClick={() => removeDomain(d.id)} aria-label={`Remove ${d.name}`}>×</button>
+                        </span>
+                      ) : null;
+                    })}
+                    <select className="chip-select" value="" onChange={(e) => { const v = e.target.value; if (v) addDomain(v); e.target.value = ''; }} aria-label="Add domain">
+                      <option value="">+ Domain</option>
+                      {availableDomains.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {tags.length > 0 && (
+                <div className="notion-prop notion-prop-chips">
+                  <span className="notion-prop-label">Tags</span>
+                  <div className="form-chips-row">
+                    {form.tagIds.map((id) => {
+                      const t = tags.find((x) => x.id === id);
+                      return t ? (
+                        <span key={t.id} className="chip">
+                          {t.name}
+                          <button type="button" className="chip-remove" onClick={() => removeTag(t.id)} aria-label={`Remove ${t.name}`}>×</button>
+                        </span>
+                      ) : null;
+                    })}
+                    <select className="chip-select" value="" onChange={(e) => { const v = e.target.value; if (v) addTag(v); e.target.value = ''; }} aria-label="Add tag">
+                      <option value="">+ Tag</option>
+                      {availableTags.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </div>

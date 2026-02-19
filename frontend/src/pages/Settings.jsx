@@ -49,7 +49,7 @@ export default function Settings() {
       const { data } = await supabase.from('domains').select('id, name').eq('user_id', user.id).order('name');
       setDomains(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to add domain');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add domain'));
     } finally {
       setAddingDomain(false);
     }
@@ -68,7 +68,7 @@ export default function Settings() {
       if (data) setTags((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       setNewTag('');
     } catch (err) {
-      setError(err.message || 'Failed to add tag');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add tag'));
     } finally {
       setAddingTag(false);
     }
@@ -83,7 +83,7 @@ export default function Settings() {
       if (err) throw err;
       setDomains((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
-      setError(err.message || 'Failed to delete domain');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete domain'));
     } finally {
       setDeletingId(null);
     }
@@ -98,7 +98,7 @@ export default function Settings() {
       if (err) throw err;
       setTags((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
-      setError(err.message || 'Failed to delete tag');
+      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete tag'));
     } finally {
       setDeletingId(null);
     }
