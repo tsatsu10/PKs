@@ -6,18 +6,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   z-index: 10001;
 }
 
 .shortcuts-modal {
   width: 100%;
-  max-width: 400px;
+  max-width: min(400px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   background: var(--surface-elevated);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow: var(--modal-shadow);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .shortcuts-modal-header {
@@ -53,6 +56,9 @@
   margin: 0;
   padding: 0.75rem 1.25rem 1rem;
   list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .shortcuts-modal-row {

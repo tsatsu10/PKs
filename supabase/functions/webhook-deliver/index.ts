@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
     const { data: integrations } = await supabase
       .from("integrations")
       .select("id, config")
+      .eq("user_id", user.id)
       .eq("type", "webhook")
       .eq("enabled", true);
 

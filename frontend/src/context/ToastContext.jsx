@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- context exports provider + hook */
 import { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext(null);

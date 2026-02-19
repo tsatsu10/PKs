@@ -115,3 +115,20 @@
   padding: 0.35rem 0.6rem;
   font-size: 0.8125rem;
 }
+
+@media (max-width: 768px) {
+  .notifications-page {
+    padding: 1rem;
+  }
+  .notifications-toolbar {
+    flex-wrap: wrap;
+  }
+  .notifications-toolbar select {
+    min-width: 0;
+    width: 100%;
+  }
+  .notifications-item {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

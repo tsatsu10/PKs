@@ -55,25 +55,26 @@ function BlockNoteEditor({
   value,
   initialValue,
   onChange,
-  placeholder = 'Write your content… (press / for commands)',
   minHeight = 200,
   id,
   'aria-label': ariaLabel,
 }) {
   const contentForLoad = initialValue !== undefined ? initialValue : (value ?? '');
   const initialValueRef = useRef(contentForLoad);
-  initialValueRef.current = contentForLoad;
   const isInitializingRef = useRef(true);
-  const pasteHandlerRef = useRef(createPasteHandler());
-  const editorOptions = useMemo(
-    () => ({ pasteHandler: pasteHandlerRef.current }),
-    []
-  );
+  const editorOptions = useMemo(() => ({ pasteHandler: createPasteHandler() }), []);
 
   const editor = useCreateBlockNote(editorOptions);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
   const [initialContentReady, setInitialContentReady] = useState(false);
+
+  useEffect(() => {
+    initialValueRef.current = contentForLoad;
+  }, [contentForLoad]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     let mounted = true;

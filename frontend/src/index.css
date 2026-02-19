@@ -58,6 +58,11 @@
   --active-highlight-bg: rgba(236, 72, 153, 0.12);
   --highlight-subtle: rgba(236, 72, 153, 0.06);
 
+  /* Responsive breakpoints (use in media queries: (max-width: var(--bp-md)) etc.) */
+  --bp-sm: 600px;
+  --bp-md: 768px;
+  --bp-lg: 900px;
+
   /* Typography */
   font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -157,6 +162,7 @@ a:focus-visible {
 }
 
 /* Minimum touch target size (44px) for primary controls on touch devices */
+/* Mobile / touch: minimum 44px tap targets for primary actions (WCAG 2.5.5) */
 @media (pointer: coarse) {
   .btn {
     min-height: 44px;
@@ -166,6 +172,14 @@ a:focus-visible {
   .object-list-link {
     min-height: 44px;
     padding: 0.75rem 1rem;
+  }
+  .app-layout-nav-link,
+  .app-layout-logout {
+    min-height: 44px;
+  }
+  .object-card {
+    min-height: 44px;
+    box-sizing: border-box;
   }
 }
 

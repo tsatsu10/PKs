@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- context exports provider + hook */
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const THEME_KEY = 'pks-theme';
@@ -34,7 +35,7 @@ export function ThemeProvider({ children }) {
     document.documentElement.setAttribute('data-theme', resolvedTheme);
     try {
       localStorage.setItem(THEME_KEY, theme);
-    } catch (_) {}
+    } catch (_e) { void _e; }
   }, [theme, resolvedTheme]);
 
   const setTheme = (value) => {

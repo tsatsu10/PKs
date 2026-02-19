@@ -777,3 +777,22 @@
   background: #b91c1c;
   border-color: #b91c1c;
 }
+
+@media (max-width: 768px) {
+  .templates-page {
+    padding: 1rem;
+  }
+  .templates-modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+  .templates-modal {
+    width: calc(100% - 1rem);
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0));
+  }
+  .templates-editor-form {
+    min-width: 0;
+  }
+}

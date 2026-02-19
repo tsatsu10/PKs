@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useIsMobile } from '../breakpoints';
 import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
@@ -75,16 +76,33 @@ export default function AppLayout({ children }) {
     }
   });
 
+  const isMobile = useIsMobile(768);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   useEffect(() => {
     try {
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, JSON.stringify(collapsed));
-    } catch (_) {}
+    } catch (_e) { void _e; }
   }, [collapsed]);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''}`}>
-      <aside className="app-layout-sidebar" aria-label="Main navigation">
+    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''}`}>
+      <aside className="app-layout-sidebar" aria-label="Main navigation" aria-hidden={isMobile && !mobileMenuOpen}>
         <div className="app-layout-sidebar-top">
+          <button
+            type="button"
+            className="app-layout-sidebar-close"
+            aria-label="Close menu"
+            onClick={closeMobileMenu}
+          >
+            ✕
+          </button>
           <Link to="/" className="app-layout-brand" title="Personal Knowledge System">
             <img src="/pks-logo.svg" alt="" className="app-layout-logo" width="32" height="32" />
             {!collapsed && (
@@ -127,6 +145,7 @@ export default function AppLayout({ children }) {
                         className={`app-layout-nav-link ${isActive ? 'active' : ''}`}
                         aria-current={isActive ? 'page' : undefined}
                         title={collapsed ? label : undefined}
+                        onClick={closeMobileMenu}
                       >
                         <span className="app-layout-nav-icon" aria-hidden>{icon}</span>
                         {!collapsed && <span className="app-layout-nav-label">{label}</span>}
@@ -153,7 +172,7 @@ export default function AppLayout({ children }) {
           </div>
           <div className="app-layout-sidebar-user">
             {!collapsed && <span className="app-layout-user-email" aria-hidden>{user?.email}</span>}
-            <button type="button" onClick={logout} className="app-layout-logout" aria-label="Sign out" title={collapsed ? 'Sign out' : undefined}>
+            <button type="button" onClick={() => { closeMobileMenu(); logout(); }} className="app-layout-logout" aria-label="Sign out" title={collapsed ? 'Sign out' : undefined}>
               <span className="app-layout-nav-icon" aria-hidden>⎋</span>
               {!collapsed && <span className="app-layout-nav-label">Sign out</span>}
             </button>
@@ -169,7 +188,23 @@ export default function AppLayout({ children }) {
           {collapsed ? '▶' : '◀'}
         </button>
       </aside>
+      <div
+        className={`app-layout-backdrop ${mobileMenuOpen ? 'app-layout-backdrop-visible' : ''}`}
+        aria-hidden="true"
+        onClick={closeMobileMenu}
+      />
       <main className="app-layout-main" id="main-content" role="main">
+        <div className="app-layout-mobile-header">
+          <button
+            type="button"
+            className="app-layout-mobile-menu-btn"
+            aria-label="Open menu"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            ☰
+          </button>
+        </div>
         {children}
       </main>
       <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">

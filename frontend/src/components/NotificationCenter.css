@@ -48,7 +48,7 @@
   margin-top: 0.5rem;
   width: 360px;
   max-width: calc(100vw - 2rem);
-  max-height: 420px;
+  max-height: min(420px, calc(100vh - 2rem - env(safe-area-inset-top)));
   display: flex;
   flex-direction: column;
   background: var(--glass-bg);
@@ -58,6 +58,7 @@
   border-radius: 16px;
   box-shadow: var(--modal-shadow);
   z-index: 100;
+  margin-right: env(safe-area-inset-right, 0);
 }
 
 .notification-panel-header {

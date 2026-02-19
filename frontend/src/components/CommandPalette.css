@@ -6,13 +6,15 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 15vh 1rem 0;
+  padding: max(15vh, env(safe-area-inset-top)) 1rem 0;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
   z-index: 10000;
 }
 
 .command-palette {
   width: 100%;
-  max-width: 480px;
+  max-width: min(480px, calc(100vw - 2rem));
   background: var(--surface-elevated);
   border: 1px solid var(--glass-border);
   border-radius: 16px;

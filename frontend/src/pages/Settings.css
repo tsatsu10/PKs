@@ -125,3 +125,19 @@
 .settings-list .btn-danger:hover:not(:disabled) {
   box-shadow: 0 2px 12px rgba(220, 38, 38, 0.35);
 }
+
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 1rem;
+  }
+  .settings-form {
+    flex-direction: column;
+  }
+  .settings-form input {
+    min-width: 0;
+    width: 100%;
+  }
+  .settings-section {
+    width: 100%;
+  }
+}

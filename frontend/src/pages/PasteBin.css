@@ -30,8 +30,15 @@
 }
 
 @media (max-width: 768px) {
+  .paste-bin-page {
+    padding: 1rem;
+  }
   .paste-bin-layout {
     grid-template-columns: 1fr;
+  }
+  .paste-bin-list-item {
+    min-height: 44px;
+    box-sizing: border-box;
   }
 }
 

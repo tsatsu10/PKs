@@ -24,11 +24,11 @@ export function getDraft(key) {
 export function setDraft(key, data) {
   try {
     sessionStorage.setItem(key, JSON.stringify(data));
-  } catch (_) {}
+  } catch (_e) { void _e; }
 }
 
 export function clearDraft(key) {
   try {
     sessionStorage.removeItem(key);
-  } catch (_) {}
+  } catch (_e) { void _e; }
 }

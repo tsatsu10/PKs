@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './CommandPalette.css';
 
 const QUICK_ACTIONS = [
@@ -22,7 +22,6 @@ export default function CommandPalette({ open, onClose }) {
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const searchOnDashboard = query.trim();
   const filteredActions = searchOnDashboard
@@ -33,12 +32,16 @@ export default function CommandPalette({ open, onClose }) {
       )
     : QUICK_ACTIONS;
 
-  const searchItem = searchOnDashboard
-    ? [{ label: `Search on Dashboard for "${searchOnDashboard.slice(0, 30)}${searchOnDashboard.length > 30 ? '…' : ''}"`, path: `/?q=${encodeURIComponent(searchOnDashboard)}`, isSearch: true }]
-    : [];
-  const items = [...searchItem, ...filteredActions];
+  const items = useMemo(() => {
+    const searchItem = searchOnDashboard
+      ? [{ label: `Search on Dashboard for "${searchOnDashboard.slice(0, 30)}${searchOnDashboard.length > 30 ? '…' : ''}"`, path: `/?q=${encodeURIComponent(searchOnDashboard)}`, isSearch: true }]
+      : [];
+    return [...searchItem, ...filteredActions];
+  }, [searchOnDashboard, filteredActions]);
   const maxIndex = items.length - 1;
 
+  /* Reset when palette opens; clamp highlight to list length (intentional setState in effect) */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -50,6 +53,7 @@ export default function CommandPalette({ open, onClose }) {
   useEffect(() => {
     setHighlight((h) => (h > maxIndex ? maxIndex : h < 0 ? 0 : h));
   }, [maxIndex]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     function handleKeyDown(e) {

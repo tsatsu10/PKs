@@ -241,3 +241,36 @@
   color: var(--polar-muted);
   border: 1px solid var(--glass-border);
 }
+
+@media (max-width: 768px) {
+  .journal-page {
+    padding: 1rem;
+  }
+  .journal-calendar-nav {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .journal-calendar-title {
+    font-size: 1.125rem;
+    width: 100%;
+    text-align: center;
+  }
+  .journal-calendar-cell {
+    min-height: 36px;
+    font-size: 0.75rem;
+    padding: 0.25rem;
+  }
+  .journal-calendar-head {
+    font-size: 0.6875rem;
+    padding: 0.35rem;
+  }
+  .journal-entry-block {
+    width: 100%;
+    max-width: 100%;
+  }
+  .journal-entry-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

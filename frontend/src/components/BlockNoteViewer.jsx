@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useEffect } from 'react';
 import '@blocknote/core/fonts/inter.css';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -10,14 +10,11 @@ import './BlockNoteEditor.css';
  * Matches the editor's block rendering (todos, callouts, etc.).
  */
 export default function BlockNoteViewer({ content, className = '' }) {
-  const contentRef = useRef(content);
-  contentRef.current = content;
-
   const editor = useCreateBlockNote();
 
   useEffect(() => {
     let mounted = true;
-    const md = (contentRef.current ?? '').trim();
+    const md = (content ?? '').trim();
     if (!md) return;
     async function load() {
       try {

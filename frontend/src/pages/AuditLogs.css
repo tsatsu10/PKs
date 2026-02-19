@@ -125,6 +125,18 @@
 }
 
 @media (max-width: 768px) {
+  .audit-logs-page {
+    padding: 1rem;
+  }
+  .audit-logs-filters label {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .audit-logs-filters select,
+  .audit-logs-filters input {
+    width: 100%;
+    min-width: 0;
+  }
   .audit-logs-item {
     flex-direction: column;
     align-items: flex-start;

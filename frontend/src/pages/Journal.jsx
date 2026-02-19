@@ -32,13 +32,14 @@ export default function Journal() {
   const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
   const [entryDates, setEntryDates] = useState(new Set()); // dates that have entries
   const [loadingDates, setLoadingDates] = useState(false);
-  const [entry, setEntry] = useState(null); // { id, content, ... } or null
+  // entry state kept in sync with loaded row; content is the editable copy
+  const [entry, setEntry] = useState(null); // eslint-disable-line no-unused-vars -- used for reset/sync
   const [content, setContent] = useState('');
   const [loadingEntry, setLoadingEntry] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const { days, startWeekday, lastDate } = useMemo(() => getDaysInMonth(year, month), [year, month]);
+  const { days, startWeekday } = useMemo(() => getDaysInMonth(year, month), [year, month]);
 
   useEffect(() => {
     if (!user?.id) return;

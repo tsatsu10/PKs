@@ -231,7 +231,7 @@ export default function ObjectDetail() {
     setShowRunPanel(true);
     try {
       sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
-    } catch {}
+    } catch (_e) { void _e; }
     setSearchParams((prev) => {
       prev = new URLSearchParams(prev);
       prev.delete('runPrompt');
