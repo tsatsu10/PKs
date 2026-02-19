@@ -32,3 +32,6 @@ pnpm-debug.log*
 
 # Supabase
 .supabase/
+
+# Markdown (excluded from repo)
+*.md
