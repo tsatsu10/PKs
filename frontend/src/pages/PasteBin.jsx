@@ -141,7 +141,12 @@ export default function PasteBin() {
           {loading ? (
             <p className="paste-bin-muted">Loading…</p>
           ) : pastes.length === 0 ? (
-            <p className="paste-bin-muted">No pastes yet. Create one with &quot;New paste&quot;.</p>
+            <div className="paste-bin-empty">
+              <p className="paste-bin-empty-desc">No pastes yet. Store snippets, code, or text you want to reuse.</p>
+              <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+                Create your first paste
+              </button>
+            </div>
           ) : (
             <ul className="paste-bin-list-ul" role="list">
               {pastes.map((p) => (

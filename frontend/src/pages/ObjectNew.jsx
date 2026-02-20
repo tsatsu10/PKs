@@ -9,7 +9,8 @@ import { createNotification } from '../lib/notifications';
 import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
-import { OBJECT_TYPES } from '../constants';
+import { OBJECT_TYPES, OBJECT_STATUSES } from '../constants';
+import { slugify } from '../lib/slugify';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 
@@ -32,6 +33,9 @@ export default function ObjectNew() {
     source: '',
     content: '',
     summary: '',
+    status: 'active',
+    due_at: '',
+    remind_at: '',
     domainIds: [],
     tagIds: [],
   });
@@ -134,6 +138,8 @@ export default function ObjectNew() {
           if (parts.length) content = parts.join('\n\n');
         }
       }
+      const baseSlug = slugify(title || 'Untitled') || 'untitled';
+      const slug = baseSlug ? `${baseSlug}-${Date.now().toString(36)}` : `untitled-${Date.now().toString(36)}`;
       const { data, error: err } = await supabase
         .from('knowledge_objects')
         .insert({
@@ -143,6 +149,10 @@ export default function ObjectNew() {
           source: form.source.trim() || null,
           content,
           summary: summary || null,
+          status: form.status || 'active',
+          due_at: form.due_at ? new Date(form.due_at).toISOString() : null,
+          remind_at: form.remind_at ? new Date(form.remind_at).toISOString() : null,
+          slug,
         })
         .select('id')
         .single();
@@ -298,6 +308,20 @@ export default function ObjectNew() {
                   />
                 </div>
 
+                {form.type === 'bookmark' && (
+                  <div className="notion-bookmark-url-block">
+                    <label className="notion-bookmark-url-label">URL</label>
+                    <input
+                      type="url"
+                      className="notion-bookmark-url-input"
+                      value={form.source}
+                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
+                      placeholder="https://…"
+                      aria-label="Bookmark URL"
+                    />
+                  </div>
+                )}
+
                 <div className="notion-summary-block">
                   <input
                     type="text"
@@ -336,14 +360,35 @@ export default function ObjectNew() {
                     </select>
                   </div>
                   <div className="notion-prop">
-                    <span className="notion-prop-label">Source</span>
+                    <span className="notion-prop-label">Status</span>
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                      className="notion-prop-select"
+                      aria-label="Status"
+                    >
+                      {OBJECT_STATUSES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="notion-prop">
+                    <span className="notion-prop-label">Due date</span>
+                    <input type="datetime-local" value={form.due_at} onChange={(e) => setForm((f) => ({ ...f, due_at: e.target.value }))} className="notion-prop-input" aria-label="Due date" />
+                  </div>
+                  <div className="notion-prop">
+                    <span className="notion-prop-label">Remind at</span>
+                    <input type="datetime-local" value={form.remind_at} onChange={(e) => setForm((f) => ({ ...f, remind_at: e.target.value }))} className="notion-prop-input" aria-label="Remind at" />
+                  </div>
+                  <div className={`notion-prop notion-prop-source ${form.type === 'bookmark' ? 'notion-prop-bookmark-url' : ''}`}>
+                    <span className="notion-prop-label">{form.type === 'bookmark' ? 'URL' : 'Source'}</span>
                     <input
-                      type="text"
+                      type={form.type === 'bookmark' ? 'url' : 'text'}
                       value={form.source}
                       onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                      placeholder="URL or reference"
+                      placeholder={form.type === 'bookmark' ? 'https://…' : 'URL or reference'}
                       className="notion-prop-input"
-                      aria-label="Source"
+                      aria-label={form.type === 'bookmark' ? 'Bookmark URL' : 'Source'}
                     />
                   </div>
                   {domains.length > 0 && (
@@ -418,9 +463,25 @@ export default function ObjectNew() {
                   ))}
                 </select>
               </div>
-              <div className="notion-prop notion-prop-source">
-                <span className="notion-prop-label">Source</span>
-                <input type="text" value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} placeholder="URL or reference" className="notion-prop-input" />
+              <div className="notion-prop">
+                <span className="notion-prop-label">Status</span>
+                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className="notion-prop-select">
+                  {OBJECT_STATUSES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="notion-prop">
+                <span className="notion-prop-label">Due date</span>
+                <input type="datetime-local" value={form.due_at} onChange={(e) => setForm((f) => ({ ...f, due_at: e.target.value }))} className="notion-prop-input" aria-label="Due date" />
+              </div>
+              <div className="notion-prop">
+                <span className="notion-prop-label">Remind at</span>
+                <input type="datetime-local" value={form.remind_at} onChange={(e) => setForm((f) => ({ ...f, remind_at: e.target.value }))} className="notion-prop-input" aria-label="Remind at" />
+              </div>
+              <div className={`notion-prop notion-prop-source ${form.type === 'bookmark' ? 'notion-prop-bookmark-url' : ''}`}>
+                <span className="notion-prop-label">{form.type === 'bookmark' ? 'URL' : 'Source'}</span>
+                <input type={form.type === 'bookmark' ? 'url' : 'text'} value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} placeholder={form.type === 'bookmark' ? 'https://…' : 'URL or reference'} className="notion-prop-input" aria-label={form.type === 'bookmark' ? 'Bookmark URL' : 'Source'} />
               </div>
               {domains.length > 0 && (
                 <div className="notion-prop notion-prop-chips">

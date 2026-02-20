@@ -3,7 +3,7 @@ import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
-import { OBJECT_TYPES, OBJECT_TYPE_ICONS } from '../constants';
+import { OBJECT_TYPE_ICONS, OBJECT_TYPES, OBJECT_STATUSES } from '../constants';
 import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
@@ -11,28 +11,52 @@ import { useToast } from '../context/ToastContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
 import JSZip from 'jszip';
+import { useDashboardSearch } from '../hooks/useDashboardSearch';
+import DashboardFilterPanel from '../components/DashboardFilterPanel';
+import DashboardQuickAddForm from '../components/DashboardQuickAddForm';
+import DashboardStats from '../components/DashboardStats';
 import './Dashboard.css';
 
-const PAGE_SIZE = 20;
+function bulkErrorMessage(err, fallback) {
+  return err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : fallback);
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
-  const [objects, setObjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [domainFilter, setDomainFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
+  const {
+    objects,
+    loading,
+    error,
+    setError,
+    searchQuery,
+    setSearchQuery,
+    typeFilter,
+    setTypeFilter,
+    statusFilter,
+    setStatusFilter,
+    domainFilter,
+    setDomainFilter,
+    tagFilter,
+    setTagFilter,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    dueFrom,
+    setDueFrom,
+    dueTo,
+    setDueTo,
+    runSearch,
+    clearFilters,
+    domains,
+    tags,
+    hasMore,
+    loadingMore,
+    handleLoadMore,
+    hasActiveFilters,
+  } = useDashboardSearch({ userId: user?.id ?? null });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'card'
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -45,9 +69,11 @@ export default function Dashboard() {
   const [quickAddContent, setQuickAddContent] = useState('');
   const [quickAddSaving, setQuickAddSaving] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
-  const [bulkModal, setBulkModal] = useState(null); // 'add_domain' | 'add_tag' | 'remove_domain' | 'remove_tag' | 'delete'
+  const [bulkModal, setBulkModal] = useState(null); // 'add_domain' | 'add_tag' | 'remove_domain' | 'remove_tag' | 'delete' | 'change_type' | 'set_status'
   const [bulkDomainId, setBulkDomainId] = useState('');
   const [bulkTagId, setBulkTagId] = useState('');
+  const [bulkType, setBulkType] = useState('note');
+  const [bulkStatus, setBulkStatus] = useState('active');
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const qFromUrl = searchParams.get('q') ?? '';
@@ -56,10 +82,57 @@ export default function Dashboard() {
   const bulkMenuRef = useRef(null);
   const location = useLocation();
   const [runPromptTemplate, setRunPromptTemplate] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return localStorage.getItem('pks-onboarding-dismissed') !== 'true'; } catch { return false; }
+  });
 
   useEffect(() => {
     if (qFromUrl !== searchQuery) setSearchQuery(qFromUrl);
-  }, [qFromUrl]);
+  }, [qFromUrl, searchQuery, setSearchQuery]);
+
+  const dueSoonFromParams = searchParams.get('due') === 'soon';
+  const typeFromParams = searchParams.get('type') ?? '';
+  const statusFromParams = searchParams.get('status') ?? '';
+  const updatedFromParams = searchParams.get('updated') ?? '';
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const hasAnyParam = dueSoonFromParams || typeFromParams || statusFromParams || updatedFromParams;
+    if (hasAnyParam) {
+      if (dueSoonFromParams) {
+        const today = new Date();
+        const in7 = new Date(today);
+        in7.setDate(in7.getDate() + 7);
+        setDueFrom(today.toISOString().slice(0, 10));
+        setDueTo(in7.toISOString().slice(0, 10));
+      } else {
+        setDueFrom('');
+        setDueTo('');
+      }
+      setTypeFilter(typeFromParams || '');
+      setStatusFilter(statusFromParams || '');
+      if (updatedFromParams === '7d') {
+        const today = new Date();
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        setDateFrom(weekAgo.toISOString().slice(0, 10));
+        setDateTo(today.toISOString().slice(0, 10));
+      } else {
+        setDateFrom('');
+        setDateTo('');
+      }
+      setShowFilters(true);
+    } else {
+      setTypeFilter('');
+      setStatusFilter('');
+      setDateFrom('');
+      setDateTo('');
+      setDueFrom('');
+      setDueTo('');
+    }
+    const t = setTimeout(() => runSearch(0), 0);
+    return () => clearTimeout(t);
+  }, [user?.id, dueSoonFromParams, typeFromParams, statusFromParams, updatedFromParams]);
 
   useEffect(() => {
     try {
@@ -72,57 +145,14 @@ export default function Dashboard() {
     }
   }, []);
 
+  useEffect(() => {
+    if (user?.id && qFromUrl) runSearch(0, qFromUrl);
+  }, [user?.id, qFromUrl, runSearch]);
+
   function dismissRunPromptBanner() {
     sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
     setRunPromptTemplate(null);
   }
-
-  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
-    if (!user?.id) return;
-    const isLoadMore = nextOffset > 0;
-    const q = queryOverride !== null && queryOverride !== undefined ? String(queryOverride).trim() : searchQuery.trim();
-    const dom = filtersOverride && 'domain_id_f' in filtersOverride ? filtersOverride.domain_id_f : domainFilter;
-    if (!isLoadMore) setLoading(true);
-    else setLoadingMore(true);
-    setError('');
-    try {
-      const { data, error: err } = await supabase.rpc('search_knowledge_objects', {
-        search_query: q || null,
-        type_filter: typeFilter || null,
-        domain_id_f: dom || null,
-        tag_id_f: tagFilter || null,
-        date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
-        date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
-        limit_n: PAGE_SIZE,
-        offset_n: nextOffset,
-      });
-      if (err) throw err;
-      const list = data || [];
-      if (isLoadMore) {
-        setObjects((prev) => [...prev, ...list]);
-      } else {
-        setObjects(list);
-      }
-      setHasMore(list.length === PAGE_SIZE);
-      setOffset(nextOffset + list.length);
-    } catch (e) {
-      setError(e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Search failed'));
-      if (!isLoadMore) setObjects([]);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [user?.id, searchQuery, typeFilter, domainFilter, tagFilter, dateFrom, dateTo]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    runSearch(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: run search only when user becomes available
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id && qFromUrl) runSearch(0, qFromUrl);
-  }, [user?.id, qFromUrl]);
 
   const closeQuickAdd = useCallback(() => {
     setShowQuickAdd(false);
@@ -151,35 +181,8 @@ export default function Dashboard() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [location.pathname, showQuickAdd, closeQuickAdd]);
 
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const [dRes, tRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-      ]);
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-    })();
-  }, [user?.id]);
-
   function handleSearchSubmit(e) {
     e.preventDefault();
-    runSearch(0);
-  }
-
-  function handleLoadMore() {
-    runSearch(offset);
-  }
-
-  function clearFilters() {
-    setSearchQuery('');
-    setTypeFilter('');
-    setDomainFilter('');
-    setTagFilter('');
-    setDateFrom('');
-    setDateTo('');
     runSearch(0);
   }
 
@@ -348,7 +351,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk add domain failed');
+      const msg = bulkErrorMessage(err, 'Bulk add domain failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -372,7 +375,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk add tag failed');
+      const msg = bulkErrorMessage(err, 'Bulk add tag failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -399,7 +402,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk remove domain failed');
+      const msg = bulkErrorMessage(err, 'Bulk remove domain failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -426,7 +429,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk remove tag failed');
+      const msg = bulkErrorMessage(err, 'Bulk remove tag failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -450,7 +453,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Bulk delete failed');
+      const msg = bulkErrorMessage(err, 'Bulk delete failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -458,9 +461,73 @@ export default function Dashboard() {
     }
   }
 
+  async function bulkChangeType() {
+    if (selectedIds.size === 0 || !bulkType) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_objects')
+        .update({ type: bulkType })
+        .in('id', Array.from(selectedIds));
+      if (err) throw err;
+      addToast('success', `Type set to "${bulkType}" for ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = bulkErrorMessage(err, 'Bulk change type failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  async function bulkSetStatus() {
+    if (selectedIds.size === 0 || !bulkStatus) return;
+    setBulkActionLoading(true);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_objects')
+        .update({ status: bulkStatus })
+        .in('id', Array.from(selectedIds));
+      if (err) throw err;
+      addToast('success', `Status set to "${bulkStatus}" for ${selectedIds.size} object(s)`);
+      setBulkModal(null);
+      setShowBulkMenu(false);
+      clearSelection();
+      runSearch(0);
+    } catch (err) {
+      const msg = bulkErrorMessage(err, 'Bulk set status failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
+
+  const dismissOnboarding = () => {
+    try { localStorage.setItem('pks-onboarding-dismissed', 'true'); } catch (_e) { void _e; }
+    setShowOnboarding(false);
+  };
+
   return (
     <div className="dashboard">
       <main className="dashboard-main" aria-busy={loading} aria-live="polite">
+        {showOnboarding && (
+          <div className="dashboard-onboarding" role="region" aria-label="Getting started">
+            <h3 className="dashboard-onboarding-title">Getting started</h3>
+            <ol className="dashboard-onboarding-steps">
+              <li><Link to="/objects/new">Create your first object</Link> — a note or reference.</li>
+              <li><Link to="/settings">Add a domain or tag</Link> in Settings to organize later.</li>
+              <li><Link to="/quick">Try Quick capture</Link> to dump a thought in seconds.</li>
+            </ol>
+            <button type="button" className="btn btn-secondary btn-small" onClick={dismissOnboarding}>Got it</button>
+          </div>
+        )}
         {runPromptTemplate && (
           <div className="dashboard-run-prompt-banner" role="status">
             <span className="dashboard-run-prompt-banner-text">
@@ -471,6 +538,7 @@ export default function Dashboard() {
             </button>
           </div>
         )}
+        <DashboardStats userId={user?.id ?? null} />
         <section className="dashboard-actions">
           <h2>Knowledge objects</h2>
           <div className="dashboard-actions-right">
@@ -494,6 +562,8 @@ export default function Dashboard() {
                       <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('add_tag'); setBulkTagId(tags[0]?.id ?? ''); setShowBulkMenu(false); }}>Add tag…</button>
                       <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('remove_domain'); setBulkDomainId(domains[0]?.id ?? ''); setShowBulkMenu(false); }}>Remove domain…</button>
                       <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('remove_tag'); setBulkTagId(tags[0]?.id ?? ''); setShowBulkMenu(false); }}>Remove tag…</button>
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('change_type'); setBulkType('note'); setShowBulkMenu(false); }}>Change type…</button>
+                      <button type="button" className="dashboard-bulk-menu-item" role="menuitem" onClick={() => { setBulkModal('set_status'); setBulkStatus('active'); setShowBulkMenu(false); }}>Set status…</button>
                       <button type="button" className="dashboard-bulk-menu-item dashboard-bulk-menu-item-danger" role="menuitem" onClick={() => { setBulkModal('delete'); setShowBulkMenu(false); }}>Delete selected</button>
                     </div>
                   )}
@@ -555,49 +625,28 @@ export default function Dashboard() {
         )}
 
         {showFilters && (
-          <div className="filter-panel" role="group" aria-label="Search filters">
-            <label>
-              Type
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                <option value="">Any</option>
-                {OBJECT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Domain
-              <select value={domainFilter} onChange={(e) => setDomainFilter(e.target.value)}>
-                <option value="">Any</option>
-                {domains.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Tag
-              <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
-                <option value="">Any</option>
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Updated from
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </label>
-            <label>
-              Updated to
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </label>
-            <button type="button" className="btn btn-secondary" onClick={() => runSearch(0)}>
-              Apply
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-              Clear
-            </button>
-          </div>
+          <DashboardFilterPanel
+            typeFilter={typeFilter}
+            setTypeFilter={setTypeFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            domainFilter={domainFilter}
+            setDomainFilter={setDomainFilter}
+            tagFilter={tagFilter}
+            setTagFilter={setTagFilter}
+            dateFrom={dateFrom}
+            setDateFrom={setDateFrom}
+            dateTo={dateTo}
+            setDateTo={setDateTo}
+            dueFrom={dueFrom}
+            setDueFrom={setDueFrom}
+            dueTo={dueTo}
+            setDueTo={setDueTo}
+            domains={domains}
+            tags={tags}
+            onApply={() => runSearch(0)}
+            onClear={clearFilters}
+          />
         )}
 
         {!showQuickAdd ? (
@@ -612,35 +661,16 @@ export default function Dashboard() {
             <span className="dashboard-quick-add-hint">or press /</span>
           </button>
         ) : (
-          <form onSubmit={handleQuickAddCreate} className="dashboard-quick-add-form">
-            <div className="dashboard-quick-add-row">
-              <input
-                ref={quickAddInputRef}
-                type="text"
-                value={quickAddTitle}
-                onChange={(e) => setQuickAddTitle(e.target.value)}
-                placeholder="Title"
-                className="dashboard-quick-add-title"
-                required
-                aria-label="Title"
-              />
-              <div className="dashboard-quick-add-actions">
-                <button type="button" className="btn btn-ghost" onClick={closeQuickAdd}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={quickAddSaving}>
-                  {quickAddSaving ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </div>
-            <textarea
-              value={quickAddContent}
-              onChange={(e) => setQuickAddContent(e.target.value)}
-              placeholder="Content…"
-              className="dashboard-quick-add-content"
-              rows={3}
-              required
-              aria-label="Content"
-            />
-          </form>
+          <DashboardQuickAddForm
+            title={quickAddTitle}
+            content={quickAddContent}
+            onTitleChange={setQuickAddTitle}
+            onContentChange={setQuickAddContent}
+            onSubmit={handleQuickAddCreate}
+            onCancel={closeQuickAdd}
+            saving={quickAddSaving}
+            inputRef={quickAddInputRef}
+          />
         )}
 
         {error && (
@@ -652,9 +682,17 @@ export default function Dashboard() {
           <SkeletonList lines={8} />
         ) : objects.length === 0 ? (
           <section className="dashboard-empty" aria-label="No results">
-            <p className="dashboard-empty-value">Turn what you learn into reusable knowledge — capture once, use everywhere.</p>
-            <p className="dashboard-muted">No objects match. Try different search terms or adjust the filters above.</p>
-            <Link to="/objects/new" className="btn btn-primary">Create your first object</Link>
+            {hasActiveFilters ? (
+              <>
+                <p className="dashboard-empty-value">No objects match. Try different search terms or clear filters.</p>
+                <button type="button" className="btn btn-primary" onClick={clearFilters}>Clear filters</button>
+              </>
+            ) : (
+              <>
+                <p className="dashboard-empty-value">No objects yet. Create your first note or reference to get started.</p>
+                <Link to="/objects/new" className="btn btn-primary">Create your first object</Link>
+              </>
+            )}
           </section>
         ) : (
           <>
@@ -666,12 +704,13 @@ export default function Dashboard() {
                       <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                     </label>
                     <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
+                      {obj.cover_url && <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />}
                       <span className="object-card-type" title={obj.type}>
                         <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
                         {obj.type}
                       </span>
-                      <span className="object-card-title">{obj.title}</span>
-                      {obj.summary && <span className="object-card-summary">{obj.summary}</span>}
+                      <span className="object-card-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
+                      {(obj.snippet || obj.summary) && <span className="object-card-summary">{obj.snippet || obj.summary}</span>}
                       <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
                     </Link>
                   </div>
@@ -689,8 +728,8 @@ export default function Dashboard() {
                         <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
                         {obj.type}
                       </span>
-                      <span className="object-list-title">{obj.title}</span>
-                      {obj.summary && <span className="object-list-summary">{obj.summary}</span>}
+                      <span className="object-list-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
+                      {(obj.snippet || obj.summary) && <span className="object-list-summary">{obj.snippet || obj.summary}</span>}
                       <span className="object-list-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
                     </Link>
                   </li>
@@ -841,6 +880,50 @@ export default function Dashboard() {
                 <button type="button" className="btn btn-secondary" onClick={() => setBulkModal(null)} disabled={bulkActionLoading}>Cancel</button>
                 <button type="button" className="btn btn-danger" onClick={bulkDelete} disabled={bulkActionLoading}>
                   {bulkActionLoading ? 'Deleting…' : 'Delete selected'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'change_type' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-change-type-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-change-type-title">Change type for {selectedIds.size} object(s)</h2>
+              <label className="dashboard-modal-label">
+                Type
+                <select value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
+                  {OBJECT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkType('note'); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkChangeType} disabled={bulkActionLoading}>
+                  {bulkActionLoading ? 'Updating…' : 'Change type'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkModal === 'set_status' && (
+          <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-set-status-title">
+            <div className="dashboard-modal">
+              <h2 id="bulk-set-status-title">Set status for {selectedIds.size} object(s)</h2>
+              <label className="dashboard-modal-label">
+                Status
+                <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+                  {OBJECT_STATUSES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dashboard-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setBulkModal(null); setBulkStatus('active'); }} disabled={bulkActionLoading}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={bulkSetStatus} disabled={bulkActionLoading}>
+                  {bulkActionLoading ? 'Updating…' : 'Set status'}
                 </button>
               </div>
             </div>

@@ -1,0 +1,73 @@
+.import-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image: radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.08), transparent 50%);
+}
+
+.import-page > * {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.import-header { margin-bottom: 1.5rem; }
+.import-header .breadcrumbs a, .import-header .breadcrumbs span { color: var(--polar-dim); font-size: 0.875rem; }
+.import-title { font-size: 1.5rem; font-weight: 700; margin: 0.35rem 0 0.25rem; }
+.import-desc { font-size: 0.9375rem; color: var(--polar-dim); margin: 0; }
+
+.import-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.import-mode { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.import-mode label { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.9375rem; }
+.import-mode input { accent-color: var(--cosmic-pink); }
+
+.import-inputs { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+.import-file-label { display: inline-block; }
+.import-file-input { position: absolute; width: 0; height: 0; opacity: 0; }
+.import-or { font-size: 0.8125rem; color: var(--polar-faint); }
+.import-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 0.75rem 1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--polar-white);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.import-textarea:focus { outline: none; border-color: var(--cosmic-pink); }
+.import-textarea::placeholder { color: var(--polar-faint); }
+
+.import-error { padding: 0.75rem; background: var(--danger-bg); color: var(--error-text); border-radius: 12px; margin-bottom: 0.75rem; font-size: 0.875rem; }
+.import-result { font-size: 0.9375rem; color: var(--polar-muted); margin: 0 0 0.75rem 0; }
+.import-footer { margin-top: 1rem; }
+.import-back { color: var(--polar-dim); text-decoration: none; font-size: 0.9375rem; }
+.import-back:hover { color: var(--cosmic-pink); }
+
+@media (max-width: 768px) {
+  .import-page {
+    padding: 1rem;
+  }
+  .import-page > * {
+    width: 100%;
+    max-width: 100%;
+  }
+  .import-section {
+    padding: 1rem;
+  }
+  .import-mode {
+    flex-wrap: wrap;
+  }
+}

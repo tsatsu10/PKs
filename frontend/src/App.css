@@ -93,7 +93,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-width: 360px;
+  max-width: min(360px, calc(100vw - 2rem));
   pointer-events: none;
 }
 

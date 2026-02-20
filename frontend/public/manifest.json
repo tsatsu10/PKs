@@ -1,0 +1,18 @@
+{
+  "name": "PKS — Personal Knowledge System",
+  "short_name": "PKS",
+  "description": "Your second brain. Capture, organize, and synthesize knowledge.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#ec4899",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pks-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

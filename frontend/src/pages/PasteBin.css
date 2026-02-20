@@ -33,12 +33,20 @@
   .paste-bin-page {
     padding: 1rem;
   }
+  .paste-bin-page .paste-bin-layout {
+    width: 100%;
+    max-width: 100%;
+  }
   .paste-bin-layout {
     grid-template-columns: 1fr;
   }
   .paste-bin-list-item {
     min-height: 44px;
     box-sizing: border-box;
+  }
+  .paste-bin-title-input {
+    min-width: 0;
+    width: 100%;
   }
 }
 
@@ -56,6 +64,20 @@
   font-weight: 600;
   color: var(--polar-muted);
   margin: 0 0 0.75rem 0;
+}
+
+.paste-bin-empty {
+  padding: 1rem 0;
+}
+
+.paste-bin-empty-desc {
+  font-size: 0.875rem;
+  color: var(--polar-dim);
+  margin: 0 0 0.75rem 0;
+}
+
+.paste-bin-empty .btn {
+  width: 100%;
 }
 
 .paste-bin-muted {

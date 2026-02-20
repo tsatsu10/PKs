@@ -4,6 +4,7 @@ import './CommandPalette.css';
 
 const QUICK_ACTIONS = [
   { label: 'Go to Dashboard', path: '/', keywords: ['home', 'dashboard'] },
+  { label: 'Search objects', path: '/search', keywords: ['search', 'find', 'query'] },
   { label: 'Quick capture', path: '/quick', keywords: ['quick', 'capture', 'add'] },
   { label: 'New object', path: '/objects/new', keywords: ['new', 'create', 'object'] },
   { label: 'Paste bin', path: '/paste', keywords: ['paste', 'pastebin', 'snippet', 'code'] },
@@ -13,6 +14,9 @@ const QUICK_ACTIONS = [
   { label: 'Notifications', path: '/notifications', keywords: ['notifications', 'notify'] },
   { label: 'Audit logs', path: '/audit-logs', keywords: ['audit', 'logs', 'history'] },
   { label: 'Integrations', path: '/integrations', keywords: ['integrations', 'integrate'] },
+  { label: 'Import', path: '/import', keywords: ['import', 'upload', 'csv', 'markdown'] },
+  { label: 'About PKS', path: '/about', keywords: ['about', 'help', 'pks', 'project'] },
+  { label: 'Trash', path: '/trash', keywords: ['trash', 'deleted', 'restore'] },
   { label: 'Settings', path: '/settings', keywords: ['settings', 'preferences'] },
 ];
 
@@ -33,10 +37,13 @@ export default function CommandPalette({ open, onClose }) {
     : QUICK_ACTIONS;
 
   const items = useMemo(() => {
-    const searchItem = searchOnDashboard
-      ? [{ label: `Search on Dashboard for "${searchOnDashboard.slice(0, 30)}${searchOnDashboard.length > 30 ? '…' : ''}"`, path: `/?q=${encodeURIComponent(searchOnDashboard)}`, isSearch: true }]
+    const searchItems = searchOnDashboard
+      ? [
+          { label: `Search objects for "${searchOnDashboard.slice(0, 28)}${searchOnDashboard.length > 28 ? '…' : ''}"`, path: `/search?q=${encodeURIComponent(searchOnDashboard)}`, isSearch: true },
+          { label: `Search on Dashboard for "${searchOnDashboard.slice(0, 28)}${searchOnDashboard.length > 28 ? '…' : ''}"`, path: `/?q=${encodeURIComponent(searchOnDashboard)}`, isSearch: true },
+        ]
       : [];
-    return [...searchItem, ...filteredActions];
+    return [...searchItems, ...filteredActions];
   }, [searchOnDashboard, filteredActions]);
   const maxIndex = items.length - 1;
 

@@ -237,6 +237,44 @@
   margin-top: 0;
 }
 
+.notion-bookmark-url-block {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--active-highlight-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+}
+
+.notion-bookmark-url-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cosmic-pink);
+  margin-bottom: 0.35rem;
+}
+
+.notion-bookmark-url-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--polar-white);
+  outline: none;
+}
+
+.notion-bookmark-url-input:focus {
+  border-color: var(--cosmic-pink);
+}
+
+.notion-prop-bookmark-url .notion-prop-label {
+  color: var(--cosmic-pink);
+  font-weight: 600;
+}
+
 .notion-summary-block {
   margin-bottom: 0.75rem;
   flex-shrink: 0;

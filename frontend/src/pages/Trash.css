@@ -1,0 +1,90 @@
+.trash-page {
+  max-width: var(--content-max-width, 56rem);
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.trash-header {
+  margin-bottom: 1.5rem;
+}
+
+.trash-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.trash-desc {
+  color: var(--polar-dim);
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.trash-error {
+  color: var(--error-text);
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--danger-bg);
+  border-radius: var(--input-radius);
+}
+
+.trash-empty {
+  padding: 2rem;
+  text-align: center;
+  background: var(--surface);
+  border-radius: var(--input-radius);
+}
+
+.trash-empty-text {
+  margin: 0 0 1rem;
+  color: var(--polar-dim);
+}
+
+.trash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trash-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-radius: var(--input-radius);
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.trash-item-type {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.trash-item-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.trash-item-meta {
+  color: var(--polar-faint);
+  font-size: 0.875rem;
+}
+
+.trash-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .trash-page {
+    padding: 1rem;
+  }
+  .trash-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

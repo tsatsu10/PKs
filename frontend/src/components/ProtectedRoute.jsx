@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from './AppLayout';
+import { DeckProvider } from './MainMenuDeck';
 
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -21,5 +22,9 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <DeckProvider>
+      <AppLayout>{children}</AppLayout>
+    </DeckProvider>
+  );
 }

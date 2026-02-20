@@ -782,6 +782,10 @@
   .templates-page {
     padding: 1rem;
   }
+  .templates-page > * {
+    width: 100%;
+    max-width: 100%;
+  }
   .templates-modal-overlay {
     padding: 0.5rem;
     align-items: flex-end;
@@ -794,5 +798,16 @@
   }
   .templates-editor-form {
     min-width: 0;
+  }
+  .templates-fields-block {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .templates-example-table {
+    min-width: 280px;
   }
 }

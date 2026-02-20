@@ -1,0 +1,182 @@
+/* About PKS — project overview page */
+
+.about-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--space-black);
+  color: var(--polar-white);
+  padding: 1.5rem;
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.08), transparent 50%),
+    radial-gradient(ellipse 50% 30% at 80% 20%, rgba(236, 72, 153, 0.04), transparent 50%);
+}
+
+.about-page > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.about-header {
+  margin-bottom: 2rem;
+}
+
+.about-header .breadcrumbs a,
+.about-header .breadcrumbs span {
+  color: var(--polar-dim);
+  font-size: 0.875rem;
+}
+
+.about-header .breadcrumbs a:hover {
+  color: var(--polar-white);
+}
+
+.about-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.35rem 0 0.5rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--polar-white) 0%, var(--polar-muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.about-tagline {
+  font-size: 1rem;
+  color: var(--polar-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.about-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.about-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  backdrop-filter: blur(12px);
+}
+
+.about-section h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--cosmic-pink);
+  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.02em;
+}
+
+.about-section p {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--polar-muted);
+  margin: 0;
+}
+
+.about-section p + p {
+  margin-top: 0.75rem;
+}
+
+.about-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.about-list li {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--polar-muted);
+  padding: 0.35rem 0;
+  padding-left: 1.25rem;
+  position: relative;
+}
+
+.about-list li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--cosmic-pink);
+  font-weight: 700;
+}
+
+.about-list li strong {
+  color: var(--polar-white);
+}
+
+.about-footer {
+  margin-top: 0.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.about-back {
+  font-size: 0.9375rem;
+  color: var(--polar-dim);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.about-back:hover {
+  color: var(--cosmic-pink);
+}
+
+.about-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0;
+}
+
+.about-flow-step {
+  font-size: 0.9375rem;
+  color: var(--polar-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.about-flow-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--cosmic-pink);
+  color: var(--badge-on-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.about-flow-arrow {
+  color: var(--polar-faint);
+  font-size: 1rem;
+}
+
+.about-link {
+  color: var(--cosmic-pink);
+  text-decoration: none;
+}
+
+.about-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .about-page {
+    padding: 1rem;
+  }
+  .about-section {
+    padding: 1.25rem 1rem;
+  }
+  .about-title {
+    font-size: 1.5rem;
+  }
+}

@@ -1,11 +1,11 @@
 -- =============================================================================
 -- PKS: Verify database is up to date (run in Supabase SQL Editor)
 -- =============================================================================
--- READ-ONLY. Expect: 20 tables, 5 functions. If you see fewer, run the
+-- READ-ONLY. Expect: 22 tables, 6 functions. If you see fewer, run the
 -- missing migration(s) from supabase/migrations/ in order.
 -- =============================================================================
 
--- 1) Tables that exist (you should see 20 rows)
+-- 1) Tables that exist (you should see 22 rows)
 SELECT 'table' AS kind, table_name AS name
 FROM information_schema.tables
 WHERE table_schema = 'public'
@@ -29,7 +29,9 @@ WHERE table_schema = 'public'
     'share_permissions',
     'audit_logs',
     'integrations',
-    'import_items'
+    'import_items',
+    'journal_entries',
+    'paste_bin'
   )
 ORDER BY table_name;
 
@@ -39,7 +41,7 @@ SELECT unnest(ARRAY[
   'knowledge_object_domains','knowledge_object_tags','link_edges','files',
   'knowledge_object_files','templates','prompt_templates','prompt_runs',
   'export_jobs','export_job_items','notifications','share_permissions',
-  'audit_logs','integrations','import_items'
+  'audit_logs','integrations','import_items','journal_entries','paste_bin'
 ]) AS expected_table
 EXCEPT
 SELECT table_name::text
@@ -50,16 +52,17 @@ WHERE table_schema = 'public'
     'knowledge_object_domains','knowledge_object_tags','link_edges','files',
     'knowledge_object_files','templates','prompt_templates','prompt_runs',
     'export_jobs','export_job_items','notifications','share_permissions',
-    'audit_logs','integrations','import_items'
+    'audit_logs','integrations','import_items','journal_entries','paste_bin'
   );
 
--- 3) Key functions (you should see 5 rows)
+-- 3) Key functions (you should see 6 rows)
 SELECT 'function' AS kind, routine_name AS name
 FROM information_schema.routines
 WHERE routine_schema = 'public'
   AND routine_type = 'FUNCTION'
   AND routine_name IN (
     'search_knowledge_objects',
+    'search_knowledge_objects_with_snippets',
     'suggest_tags_for_object',
     'suggest_tags_for_object_fallback',
     'suggest_linked_objects',

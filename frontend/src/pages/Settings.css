@@ -35,6 +35,22 @@
   font-weight: 600;
 }
 
+.settings-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--polar-muted);
+  margin-top: 0.5rem;
+}
+
+.settings-toggle-label input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--cosmic-pink);
+}
+
 .settings-theme-toggle {
   display: flex;
   gap: 0.5rem;
@@ -60,6 +76,12 @@
   font-size: 0.875rem;
   color: var(--polar-dim);
   margin: 0 0 0.75rem 0;
+}
+
+.settings-muted {
+  font-size: 0.875rem;
+  color: var(--polar-faint);
+  margin: 0.5rem 0 0;
 }
 
 .settings-form {
@@ -133,11 +155,19 @@
   .settings-form {
     flex-direction: column;
   }
-  .settings-form input {
+  .settings-form input,
+  .settings-form select {
     min-width: 0;
     width: 100%;
   }
   .settings-section {
     width: 100%;
+  }
+  .settings-list li {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .settings-list li span {
+    min-width: 0;
   }
 }

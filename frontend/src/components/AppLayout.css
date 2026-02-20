@@ -2,6 +2,8 @@
   display: flex;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
   background: var(--space-black);
   color: var(--polar-white);
   background-image:
@@ -373,6 +375,7 @@
   flex: 1;
   margin-left: 248px;
   min-width: 0;
+  max-width: 100%;
   transition: margin-left 0.2s ease;
 }
 
@@ -436,6 +439,11 @@
 /* Mobile: hide sidebar, show bottom nav, hamburger + drawer */
 .app-layout-bottom-nav {
   display: none;
+}
+
+/* When menu deck (wheel) is enabled, reserve space above the trigger */
+.app-layout-deck-enabled .app-layout-main {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
 }
 
 @media (max-width: 768px) {

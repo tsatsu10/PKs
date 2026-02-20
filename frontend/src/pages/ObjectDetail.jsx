@@ -6,8 +6,9 @@ import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS } from '../lib/export';
+import { slugify } from '../lib/slugify';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
-import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
+import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { useToast } from '../context/ToastContext';
 import NotificationCenter from '../components/NotificationCenter';
 import { SkeletonDetail } from '../components/Skeleton';
@@ -15,7 +16,11 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_TYPE_ICONS, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
+import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
+import { useObjectDetail } from '../hooks/useObjectDetail';
+import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
+import ObjectDetailExportPanel from '../components/ObjectDetailExportPanel';
+import ObjectDetailRunPromptPanel from '../components/ObjectDetailRunPromptPanel';
 import './ObjectDetail.css';
 
 export default function ObjectDetail() {
@@ -25,21 +30,43 @@ export default function ObjectDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
-  const [object, setObject] = useState(null);
-  const [versions, setVersions] = useState([]);
-  const [objectDomains, setObjectDomains] = useState([]);
-  const [objectTags, setObjectTags] = useState([]);
-  const [allDomains, setAllDomains] = useState([]);
-  const [allTags, setAllTags] = useState([]);
-  const [outgoingLinks, setOutgoingLinks] = useState([]);
-  const [incomingLinks, setIncomingLinks] = useState([]);
-  const [otherObjects, setOtherObjects] = useState([]);
-  const [attachedFiles, setAttachedFiles] = useState([]);
+  const {
+    object,
+    setObject,
+    loading,
+    error,
+    setError,
+    reload,
+    draft,
+    versions,
+    setVersions,
+    objectDomains,
+    setObjectDomains,
+    objectTags,
+    setObjectTags,
+    allDomains,
+    allTags,
+    outgoingLinks,
+    setOutgoingLinks,
+    incomingLinks,
+    setIncomingLinks,
+    otherObjects,
+    attachedFiles,
+    setAttachedFiles,
+    promptTemplates,
+    promptRuns,
+    setPromptRuns,
+    suggestedTags,
+    suggestedLinkedObjects,
+    myShare,
+  } = useObjectDetail({ id, userId: user?.id ?? undefined });
+
   const [uploading, setUploading] = useState(false);
-  const [promptTemplates, setPromptTemplates] = useState([]);
-  const [promptRuns, setPromptRuns] = useState([]);
   const [runTemplateId, setRunTemplateId] = useState('');
   const [runPromptText, setRunPromptText] = useState('');
+  const [runAiModel, setRunAiModel] = useState('gpt-4.1-mini');
+  const [runAiProviderId, setRunAiProviderId] = useState(null);
+  const [aiProviders, setAiProviders] = useState([]);
   const [runPromptSource, setRunPromptSource] = useState('bank');
   const [runPromptEditFromBank, setRunPromptEditFromBank] = useState(false);
   const [runOutput, setRunOutput] = useState('');
@@ -51,20 +78,18 @@ export default function ObjectDetail() {
   const [exportFormat, setExportFormat] = useState('md');
   const [exportTemplate, setExportTemplate] = useState('full');
   const [exportInclude, setExportInclude] = useState({ content: true, summary: true, key_points: true, tags: true, domains: true, links: true });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [pinning, setPinning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', content: '', summary: '', source: '' });
+  const [duplicating, setDuplicating] = useState(false);
+  const [restoringVersion, setRestoringVersion] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', content: '', summary: '', source: '', status: 'active', due_at: '', remind_at: '', cover_url: '' });
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [shares, setShares] = useState([]);
   const [shareEmail, setShareEmail] = useState('');
   const [shareRole, setShareRole] = useState('viewer');
   const [sharing, setSharing] = useState(false);
-  const [myShare, setMyShare] = useState(null);
-  const [suggestedTags, setSuggestedTags] = useState([]);
-  const [suggestedLinkedObjects, setSuggestedLinkedObjects] = useState([]);
   const [recentExportJobs, setRecentExportJobs] = useState([]);
   const [linkSearchQuery, setLinkSearchQuery] = useState('');
   const [linkSearchResults, setLinkSearchResults] = useState([]);
@@ -73,92 +98,33 @@ export default function ObjectDetail() {
   const linkSearchRef = useRef(null);
 
   useEffect(() => {
-    if (!id || !user?.id) return;
-    let cancelled = false;
-    async function load() {
-      const { data: obj, error: e1 } = await supabase
-        .from('knowledge_objects')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (cancelled) return;
-      if (e1 || !obj) {
-        setError(e1?.message ?? e1?.error_description ?? 'Not found');
-        setObject(null);
-        setLoading(false);
-        return;
-      }
-      if (obj.is_deleted) {
-        setError('This object has been deleted');
-        setObject(null);
-        setLoading(false);
-        return;
-      }
-      setObject(obj);
-      setEditForm({ title: obj.title, content: obj.content || '', summary: obj.summary || '', source: obj.source || '' });
-      const draft = id ? getDraft(DRAFT_KEYS.object(id)) : null;
-      if (!cancelled && draft && (draft.title !== undefined || draft.content !== undefined || draft.summary !== undefined)) {
-        editInitialContentRef.current = draft.content ?? obj.content ?? '';
-        setEditForm((prev) => ({ ...prev, ...draft }));
-        setEditing(true);
-        addToast('Draft restored');
-      }
+    if (!object) return;
+    setEditForm({
+      title: object.title,
+      content: object.content || '',
+      summary: object.summary || '',
+      source: object.source || '',
+      status: object.status || 'active',
+      due_at: object.due_at ? object.due_at.slice(0, 16) : '',
+      remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '',
+      cover_url: object.cover_url || '',
+    });
+  }, [object?.id]);
 
-      const myShareRes = await supabase.from('share_permissions').select('id, role').eq('knowledge_object_id', id).eq('shared_with_user_id', user.id).maybeSingle();
-      if (!cancelled) setMyShare(myShareRes.data || null);
-
-      const [versRes, kodRes, kotRes, domRes, tagRes, outRes, inRes, othersRes, kofRes, ptRes, prRes] = await Promise.all([
-        supabase.from('knowledge_object_versions').select('id, version, title, created_at, edited_by').eq('knowledge_object_id', id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('knowledge_object_domains').select('domain_id, domains(id, name)').eq('knowledge_object_id', id),
-        supabase.from('knowledge_object_tags').select('tag_id, tags(id, name)').eq('knowledge_object_id', id),
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('link_edges').select('id, to_object_id, relationship_type').eq('from_object_id', id),
-        supabase.from('link_edges').select('id, from_object_id, relationship_type').eq('to_object_id', id),
-        supabase.from('knowledge_objects').select('id, title, type').eq('user_id', user.id).eq('is_deleted', false).neq('id', id).order('title').limit(200),
-        supabase.from('knowledge_object_files').select('file_id, files(id, filename, mime_type, size_bytes, storage_key)').eq('knowledge_object_id', id),
-        supabase.from('prompt_templates').select('id, name, applies_to_types, prompt_text').eq('user_id', user.id).order('name'),
-        supabase.from('prompt_runs').select('id, prompt_template_id, status, output, created_at').eq('knowledge_object_id', id).order('created_at', { ascending: false }).limit(20),
-      ]);
-      if (cancelled) return;
-      setAttachedFiles((kofRes.data || []).map((r) => r.files).filter(Boolean));
-      setPromptTemplates(ptRes.data || []);
-      setPromptRuns(prRes.data || []);
-      setVersions(versRes.data || []);
-      setObjectDomains((kodRes.data || []).map((r) => r.domains).filter(Boolean));
-      setObjectTags((kotRes.data || []).map((r) => r.tags).filter(Boolean));
-      setAllDomains(domRes.data || []);
-      setAllTags(tagRes.data || []);
-
-      const outRows = outRes.data || [];
-      const inRows = inRes.data || [];
-      const toIds = [...new Set(outRows.map((r) => r.to_object_id))];
-      const fromIds = [...new Set(inRows.map((r) => r.from_object_id))];
-      const allLinkIds = [...new Set([...toIds, ...fromIds])];
-      let targetMap = {};
-      if (allLinkIds.length > 0) {
-        const { data: objs } = await supabase.from('knowledge_objects').select('id, title, type').in('id', allLinkIds);
-        targetMap = (objs || []).reduce((acc, o) => ({ ...acc, [o.id]: o }), {});
-      }
-      setOutgoingLinks(outRows.map((r) => ({ id: r.id, to_object_id: r.to_object_id, relationship_type: r.relationship_type || 'references', target: targetMap[r.to_object_id] })));
-      setIncomingLinks(inRows.map((r) => ({ id: r.id, from_object_id: r.from_object_id, relationship_type: r.relationship_type || 'references', source: targetMap[r.from_object_id] })));
-
-      setOtherObjects(othersRes.data || []);
-
-      const [sugTagsRes, sugLinkRes] = await Promise.all([
-        supabase.rpc('suggest_tags_for_object', { p_object_id: id }),
-        supabase.rpc('suggest_linked_objects', { p_object_id: id, limit_n: 10 }),
-      ]);
-      if (!cancelled) {
-        const tagSuggestions = sugTagsRes.data?.length ? sugTagsRes.data : (await supabase.rpc('suggest_tags_for_object_fallback', { p_object_id: id })).data || [];
-        setSuggestedTags(tagSuggestions);
-        setSuggestedLinkedObjects(sugLinkRes.data || []);
-      }
-      setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [id, user?.id]);
+  const draftAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!object || !id || draftAppliedRef.current) return;
+    const d = draft && (draft.title !== undefined || draft.content !== undefined || draft.summary !== undefined) ? draft : null;
+    if (!d) return;
+    draftAppliedRef.current = true;
+    editInitialContentRef.current = d.content ?? object.content ?? '';
+    setEditForm((prev) => ({ ...prev, ...d }));
+    setEditing(true);
+    addToast('Draft restored');
+  }, [object, id, draft, addToast]);
+  useEffect(() => {
+    if (!id) draftAppliedRef.current = false;
+  }, [id]);
 
   const editDraftTimerRef = useRef(null);
   useEffect(() => {
@@ -219,6 +185,22 @@ export default function ObjectDetail() {
     const template = promptTemplates.find((t) => t.id === runTemplateId);
     if (template?.prompt_text != null) setRunPromptText(template.prompt_text);
   }, [showRunPanel, runPromptSource, runTemplateId, runPromptEditFromBank, promptTemplates]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name').then(({ data }) => {
+      if (!cancelled) setAiProviders(data || []);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Clear provider selection if the selected provider was removed (e.g. in another tab)
+  useEffect(() => {
+    if (runAiProviderId && aiProviders.length > 0 && !aiProviders.some((p) => p.id === runAiProviderId)) {
+      setRunAiProviderId(null);
+    }
+  }, [runAiProviderId, aiProviders]);
 
   useEffect(() => {
     if (!runPromptFromUrl || !object || !promptTemplates?.length) return;
@@ -286,6 +268,7 @@ export default function ObjectDetail() {
     setSaving(true);
     setError('');
     try {
+      const newSlug = slugify(editForm.title.trim()) || null;
       const { error: err } = await supabase
         .from('knowledge_objects')
         .update({
@@ -293,6 +276,11 @@ export default function ObjectDetail() {
           content: editForm.content.trim() || null,
           summary: editForm.summary.trim() || null,
           source: editForm.source.trim() || null,
+          status: editForm.status || 'active',
+          due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
+          remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
+          cover_url: editForm.cover_url?.trim() || null,
+          slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : null,
         })
         .eq('id', object.id);
       if (err) throw err;
@@ -302,6 +290,11 @@ export default function ObjectDetail() {
         content: editForm.content.trim() || null,
         summary: editForm.summary.trim() || null,
         source: editForm.source.trim() || null,
+        status: editForm.status || 'active',
+        due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
+        remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
+        cover_url: editForm.cover_url?.trim() || null,
+        slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : o.slug,
         updated_at: new Date().toISOString(),
         current_version: o.current_version + 1,
       }));
@@ -323,6 +316,80 @@ export default function ObjectDetail() {
       setError(msg);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleRestoreVersion(ver) {
+    if (!object || !user || !ver?.id) return;
+    setRestoringVersion(ver.id);
+    setError('');
+    try {
+      const { error: err } = await supabase
+        .from('knowledge_objects')
+        .update({
+          title: ver.title,
+          content: ver.content ?? null,
+          summary: ver.summary ?? null,
+          key_points: ver.key_points ?? [],
+        })
+        .eq('id', object.id)
+        .eq('user_id', user.id);
+      if (err) throw err;
+      addToast('success', `Restored to v${ver.version}`);
+      reload();
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Restore failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setRestoringVersion(null);
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!object || !user) return;
+    setDuplicating(true);
+    setError('');
+    try {
+      const title = `Copy of ${object.title}`.slice(0, 500);
+      const { data: newObj, error: insErr } = await supabase
+        .from('knowledge_objects')
+        .insert({
+          user_id: user.id,
+          type: object.type,
+          title,
+          source: object.source || null,
+          content: object.content || null,
+          summary: object.summary || null,
+          key_points: object.key_points ?? [],
+          status: object.status || 'active',
+          due_at: object.due_at || null,
+          remind_at: object.remind_at || null,
+          cover_url: object.cover_url || null,
+        })
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+      const newId = newObj.id;
+      if (objectDomains.length) {
+        await supabase.from('knowledge_object_domains').insert(
+          objectDomains.map((d) => ({ knowledge_object_id: newId, domain_id: d.id }))
+        );
+      }
+      if (objectTags.length) {
+        await supabase.from('knowledge_object_tags').insert(
+          objectTags.map((t) => ({ knowledge_object_id: newId, tag_id: t.id }))
+        );
+      }
+      logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, newId, { title, duplicated_from: object.id });
+      addToast('success', 'Object duplicated');
+      navigate(`/objects/${newId}`);
+    } catch (err) {
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Duplicate failed');
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setDuplicating(false);
     }
   }
 
@@ -510,19 +577,53 @@ export default function ObjectDetail() {
     }
     setError('');
     setGeneratingAI(true);
+    let runId = null;
     try {
+      const { data: runRow, error: insertErr } = await supabase
+        .from('prompt_runs')
+        .insert({
+          user_id: user.id,
+          prompt_template_id: runTemplateId || null,
+          knowledge_object_id: object.id,
+          status: 'running',
+          output: null,
+        })
+        .select('id')
+        .single();
+      if (insertErr) throw insertErr;
+      runId = runRow?.id;
+
       const { data, error: fnErr } = await supabase.functions.invoke('run-prompt', {
         body: {
           promptText: promptToUse,
           objectTitle: object.title,
           objectContent: object.content || '',
+          model: runAiModel || 'gpt-4.1-mini',
+          user_provider_id: runAiProviderId || undefined,
         },
       });
-      if (fnErr) throw new Error(fnErr?.message ?? fnErr?.error_description ?? 'Function failed');
+      if (fnErr) {
+        let msg = fnErr?.message ?? fnErr?.error_description ?? 'Function failed';
+        if (fnErr?.context && typeof fnErr.context?.json === 'function') {
+          try {
+            const body = await fnErr.context.json();
+            msg = body.hint || body.error || msg;
+          } catch (_) {}
+        }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.hint || data.error);
-      setRunOutput(data?.output ?? '');
+      const outputText = data?.output ?? '';
+      setRunOutput(outputText);
+      if (runId) {
+        await supabase.from('prompt_runs').update({ status: 'completed', output: outputText }).eq('id', runId);
+      }
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'AI generation failed.'));
+      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'AI generation failed.');
+      setError(msg);
+      if (runId) {
+        await supabase.from('prompt_runs').update({ status: 'failed', output: msg }).eq('id', runId);
+      }
     } finally {
       setGeneratingAI(false);
     }
@@ -922,7 +1023,15 @@ export default function ObjectDetail() {
           </div>
         )}
         <div className="detail-actions">
+          {isOwner && (
+            <button type="button" className={`btn btn-secondary ${object.is_pinned ? 'active' : ''}`} onClick={async () => { setPinning(true); const { error: e } = await supabase.from('knowledge_objects').update({ is_pinned: !object.is_pinned }).eq('id', object.id).eq('user_id', user.id); if (!e) setObject((o) => ({ ...o, is_pinned: !o.is_pinned })); setPinning(false); }} disabled={pinning} title={object.is_pinned ? 'Unpin from top' : 'Pin to top'} aria-label={object.is_pinned ? 'Unpin' : 'Pin'}>
+              {object.is_pinned ? '📌 Unpin' : 'Pin'}
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={() => setShowExportPanel((v) => !v)}>Export</button>
+          {isOwner && (
+            <button type="button" className="btn btn-secondary" onClick={handleDuplicate} disabled={duplicating} title="Duplicate (copy domains and tags)">{duplicating ? 'Duplicating…' : 'Duplicate'}</button>
+          )}
           {isOwner && (
             <button type="button" className="btn btn-secondary" onClick={() => { setShowSharePanel((v) => !v); if (!showSharePanel) loadShares(); }}>Share</button>
           )}
@@ -933,7 +1042,7 @@ export default function ObjectDetail() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm({ title: object.title, content: object.content || '', summary: object.summary || '' }); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
+              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm({ title: object.title, content: object.content || '', summary: object.summary || '', source: object.source || '', status: object.status || 'active', due_at: object.due_at ? object.due_at.slice(0, 16) : '', remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '', cover_url: object.cover_url || '' }); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
               <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </>
           )}
@@ -942,94 +1051,33 @@ export default function ObjectDetail() {
       {error && <div className="form-error" role="alert">{error}</div>}
 
       {showSharePanel && isOwner && (
-        <section className="share-panel">
-          <h2>Share object</h2>
-          <form onSubmit={handleAddShare} className="share-form">
-            <label>
-              Email
-              <input type="email" value={shareEmail} onChange={(e) => setShareEmail(e.target.value)} placeholder="collaborator@example.com" required />
-            </label>
-            <label>
-              Role
-              <select value={shareRole} onChange={(e) => setShareRole(e.target.value)}>
-                <option value="viewer">Viewer (read only)</option>
-                <option value="editor">Editor (can edit content)</option>
-              </select>
-            </label>
-            <button type="submit" className="btn btn-primary" disabled={sharing}>{sharing ? 'Adding…' : 'Add'}</button>
-          </form>
-          <h3>Shared with</h3>
-          {shares.length === 0 ? <p className="share-empty">Not shared with anyone yet.</p> : (
-            <ul className="share-list">
-              {shares.map((s) => (
-                <li key={s.id}>
-                  <span className="share-email">{s.shared_with_email || '—'}</span>
-                  <span className="share-role">{s.role}</span>
-                  <button type="button" className="btn btn-danger btn-small" onClick={() => handleRevokeShare(s.id)}>Revoke</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="share-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowSharePanel(false)}>Close</button>
-          </div>
-        </section>
+        <ObjectDetailSharePanel
+          shares={shares}
+          shareEmail={shareEmail}
+          setShareEmail={setShareEmail}
+          shareRole={shareRole}
+          setShareRole={setShareRole}
+          sharing={sharing}
+          onAddShare={handleAddShare}
+          onRevokeShare={handleRevokeShare}
+          onClose={() => setShowSharePanel(false)}
+        />
       )}
 
       {showExportPanel && (
-        <section className="export-panel">
-          <h2>Export object</h2>
-          <div className="export-options">
-            <label>Format <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}><option value="txt">TXT</option><option value="md">Markdown</option><option value="html">HTML</option><option value="json">JSON</option><option value="docx">DOCX</option><option value="pdf">PDF (print)</option></select></label>
-            <label>Template <select value={exportTemplate} onChange={(e) => { const v = e.target.value; setExportTemplate(v); applyExportTemplate(v); }}><option value="raw">Raw (content only)</option><option value="brief">Brief (summary + key points)</option><option value="full">Full</option><option value="stakeholder">Stakeholder (condensed)</option></select></label>
-          </div>
-          <div className="export-include">
-            <span className="export-include-label">Include:</span>
-            {['content', 'summary', 'key_points', 'tags', 'domains', 'links'].map((k) => (
-              <label key={k} className="checkbox-label">
-                <input type="checkbox" checked={exportInclude[k]} onChange={(e) => setExportInclude((prev) => ({ ...prev, [k]: e.target.checked }))} />
-                {k.replace('_', ' ')}
-              </label>
-            ))}
-          </div>
-          {recentExportJobs.length > 0 && (
-            <div className="export-recent">
-              <h3 className="export-recent-title">Recent exports</h3>
-              <ul className="export-jobs-list">
-                {recentExportJobs.map((j) => (
-                  <li key={j.id} className="export-job-item">
-                    <span className={`export-job-status ${j.status}`}>
-                      {j.status === 'processing' || j.status === 'queued' ? (
-                        <span className="export-job-spinner" aria-hidden="true" />
-                      ) : j.status === 'completed' ? (
-                        '✓ Ready'
-                      ) : j.status === 'failed' ? (
-                        'Failed'
-                      ) : (
-                        j.status
-                      )}
-                    </span>
-                    <span className="export-job-meta">
-                      {(EXPORT_FORMAT_LABELS[j.format] || j.format).toUpperCase()}
-                      {' · '}
-                      {new Date(j.created_at).toLocaleString()}
-                      {j.error_message && ` — ${j.error_message}`}
-                    </span>
-                    {j.status === 'failed' && (
-                      <span className="export-job-actions">
-                        <button type="button" className="btn btn-secondary" onClick={() => retryExport(j)}>Retry</button>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="export-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowExportPanel(false)}>Cancel</button>
-            <button type="button" className="btn btn-primary" onClick={() => handleExport()}>Export</button>
-          </div>
-        </section>
+        <ObjectDetailExportPanel
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          exportTemplate={exportTemplate}
+          setExportTemplate={setExportTemplate}
+          exportInclude={exportInclude}
+          setExportInclude={setExportInclude}
+          applyExportTemplate={applyExportTemplate}
+          recentExportJobs={recentExportJobs}
+          onExport={() => handleExport()}
+          onRetryExport={retryExport}
+          onClose={() => setShowExportPanel(false)}
+        />
       )}
 
       <div className="detail-layout">
@@ -1040,13 +1088,26 @@ export default function ObjectDetail() {
                 <span className="detail-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[object.type] ?? '📄'}</span>
                 {object.type}
               </span>
+              {(object.status || 'active') !== 'active' && (
+                <span className="detail-status" title="Status">{object.status}</span>
+              )}
+              {object.due_at && (
+                <span className="detail-due" title="Due date">Due {new Date(object.due_at).toLocaleString()}</span>
+              )}
+              {object.remind_at && (
+                <span className="detail-remind" title="Remind at">Remind {new Date(object.remind_at).toLocaleString()}</span>
+              )}
               <span className="detail-updated">Updated {new Date(object.updated_at).toLocaleString()}</span>
               <span className="detail-version">v{object.current_version}</span>
             </div>
             {editing ? (
         <div className="detail-edit" key={`edit-${object?.id}`}>
           <label>Title <input type="text" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} required /></label>
-          <label>Reference / URL <input type="text" value={editForm.source} onChange={(e) => setEditForm((f) => ({ ...f, source: e.target.value }))} placeholder="e.g. https://… or book, article" /></label>
+          <label>Status <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} aria-label="Status">{OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+          <label>Due date <input type="datetime-local" value={editForm.due_at} onChange={(e) => setEditForm((f) => ({ ...f, due_at: e.target.value }))} aria-label="Due date" /></label>
+          <label>Remind at <input type="datetime-local" value={editForm.remind_at} onChange={(e) => setEditForm((f) => ({ ...f, remind_at: e.target.value }))} aria-label="Remind at" /></label>
+          <label>Cover URL <input type="url" value={editForm.cover_url} onChange={(e) => setEditForm((f) => ({ ...f, cover_url: e.target.value }))} placeholder="https://…" /></label>
+          <label>{object.type === 'bookmark' ? 'URL' : 'Reference / URL'} <input type={object.type === 'bookmark' ? 'url' : 'text'} value={editForm.source} onChange={(e) => setEditForm((f) => ({ ...f, source: e.target.value }))} placeholder={object.type === 'bookmark' ? 'https://…' : 'e.g. https://… or book, article'} /></label>
           <label>Summary <textarea value={editForm.summary} onChange={(e) => setEditForm((f) => ({ ...f, summary: e.target.value }))} rows={2} /></label>
           <div className="detail-edit-field">
             <span className="detail-edit-label">Content</span>
@@ -1056,15 +1117,27 @@ export default function ObjectDetail() {
       ) : (
         <>
           <h1 className="detail-title">{object.title}</h1>
+          {object.cover_url && (
+            <figure className="detail-cover-wrap">
+              <img src={object.cover_url} alt="" className="detail-cover" />
+            </figure>
+          )}
           {object.source && (
-            <p className="detail-reference">
-              <span className="detail-reference-label">Reference / URL</span>
-              {/^https?:\/\//i.test(object.source.trim()) ? (
-                <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="detail-reference-link">{object.source}</a>
-              ) : (
-                <span className="detail-reference-text">{object.source}</span>
-              )}
-            </p>
+            <div className={object.type === 'bookmark' ? 'detail-bookmark-url' : 'detail-reference-wrap'}>
+              <p className="detail-reference">
+                <span className="detail-reference-label">{object.type === 'bookmark' ? 'URL' : 'Reference / URL'}</span>
+                {/^https?:\/\//i.test(object.source.trim()) ? (
+                  <>
+                    <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="detail-reference-link">{object.source}</a>
+                    {object.type === 'bookmark' && (
+                      <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-small detail-open-link">Open link</a>
+                    )}
+                  </>
+                ) : (
+                  <span className="detail-reference-text">{object.source}</span>
+                )}
+              </p>
+            </div>
           )}
           {object.summary && <p className="detail-summary">{object.summary}</p>}
           {isOwner && (
@@ -1183,6 +1256,20 @@ export default function ObjectDetail() {
               </>
             )}
           </div>
+          {isOwner && versions.length > 0 && (
+            <div className="detail-section-card">
+              <h3 className="detail-section-card-title">Version history</h3>
+              <ul className="version-history-list">
+                {versions.map((v) => (
+                  <li key={v.id}>
+                    <span className="version-history-meta">v{v.version} · {new Date(v.created_at).toLocaleString()}</span>
+                    <span className="version-history-title">{v.title || 'Untitled'}</span>
+                    <button type="button" className="btn btn-secondary btn-small" onClick={() => handleRestoreVersion(v)} disabled={restoringVersion === v.id}>{restoringVersion === v.id ? 'Restoring…' : 'Restore'}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {isOwner && (
             <div className="detail-section-card">
               <h3 className="detail-section-card-title">Run prompt</h3>
@@ -1288,65 +1375,35 @@ export default function ObjectDetail() {
       </div>
 
       {showRunPanel && (
-        <div className="run-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="run-prompt-title">
-          <div className="run-prompt-overlay-backdrop" onClick={() => { setShowRunPanel(false); setRunOutput(''); }} />
-          <div className="run-prompt-overlay-panel">
-            <header className="run-prompt-overlay-header">
-              <h2 id="run-prompt-title" className="run-prompt-overlay-title">Run prompt</h2>
-              <button type="button" className="run-prompt-overlay-close" onClick={() => { setShowRunPanel(false); setRunOutput(''); }} aria-label="Close">×</button>
-            </header>
-            <div className="run-prompt-overlay-body">
-              <div className="run-prompt-source-row">
-                <span className="run-prompt-source-label">Source</span>
-                <div className="run-prompt-source-tabs">
-                  <button type="button" className={`run-prompt-source-tab ${runPromptSource === 'bank' ? 'active' : ''}`} onClick={() => { setRunPromptSource('bank'); if (runTemplateId) { const t = promptTemplates.find((x) => x.id === runTemplateId); if (t?.prompt_text != null) setRunPromptText(t.prompt_text); } setRunPromptEditFromBank(false); }}>Prompt Bank</button>
-                  <button type="button" className={`run-prompt-source-tab ${runPromptSource === 'custom' ? 'active' : ''}`} onClick={() => { setRunPromptSource('custom'); setRunTemplateId(''); setRunPromptText(''); setRunPromptEditFromBank(false); }}>Custom prompt</button>
-                </div>
-              </div>
-              {runPromptSource === 'bank' && (
-                <div className="run-prompt-bank-row">
-                  <label className="run-prompt-select-label">Template</label>
-                  <select value={runTemplateId} onChange={(e) => setRunTemplateId(e.target.value)} className="run-prompt-template-select">
-                    <option value="">Select a prompt</option>
-                    {applicableTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                  {runTemplateId && (
-                    <label className="run-prompt-edit-check">
-                      <input type="checkbox" checked={runPromptEditFromBank} onChange={(e) => { const checked = e.target.checked; setRunPromptEditFromBank(checked); const t = promptTemplates.find((x) => x.id === runTemplateId); if (t?.prompt_text != null) setRunPromptText(t.prompt_text); }} />
-                      Edit before running
-                    </label>
-                  )}
-                </div>
-              )}
-              <div className="run-prompt-prompt-block">
-                <label className="run-prompt-prompt-label">Prompt</label>
-                <textarea value={runPromptText} onChange={(e) => setRunPromptText(e.target.value)} className="run-prompt-prompt-input" rows={runPromptSource === 'custom' ? 6 : 5} placeholder={runPromptSource === 'custom' ? 'Type your prompt…' : 'Select a template or enable “Edit before running”.'} disabled={runPromptSource === 'bank' && !runPromptEditFromBank && !!runTemplateId} />
-              </div>
-              <details className="run-prompt-context-details" open={runContextOpen} onToggle={(e) => setRunContextOpen(e.target.open)}>
-                <summary className="run-prompt-context-summary">Context: object used for this run</summary>
-                <div className="run-prompt-context-body">
-                  <p className="run-prompt-context-title">Object: {object?.title ?? '—'}</p>
-                  <div className="run-prompt-context-preview">{(object?.content ?? '').slice(0, 800)}{(object?.content?.length ?? 0) > 800 ? '…' : ''}</div>
-                </div>
-              </details>
-              {error && <p className="run-prompt-overlay-error" role="alert">{error}</p>}
-              <div className="run-prompt-generate-row">
-                <button type="button" className="btn btn-primary run-prompt-generate-btn" onClick={handleGenerateWithAI} disabled={generatingAI}>{generatingAI ? 'Generating…' : 'Generate with AI'}</button>
-              </div>
-              <div className="run-prompt-output-block">
-                <label className="run-prompt-output-label">Output</label>
-                <textarea value={runOutput} onChange={(e) => setRunOutput(e.target.value)} className="run-prompt-output-input" rows={8} placeholder="Generate with AI or paste your own…" />
-              </div>
-              <div className="run-prompt-overlay-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowRunPanel(false); setRunOutput(''); }}>Cancel</button>
-                <button type="button" className="btn btn-secondary" onClick={handleSaveRun} disabled={savingRun}>Save run only</button>
-                <button type="button" className="btn btn-primary" onClick={handleSaveOutputAsObject} disabled={savingRun || !runOutput.trim()}>{savingRun ? 'Saving…' : 'Save as new object'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ObjectDetailRunPromptPanel
+          object={object}
+          runPromptSource={runPromptSource}
+          setRunPromptSource={setRunPromptSource}
+          runTemplateId={runTemplateId}
+          setRunTemplateId={setRunTemplateId}
+          runPromptText={runPromptText}
+          setRunPromptText={setRunPromptText}
+          runPromptEditFromBank={runPromptEditFromBank}
+          setRunPromptEditFromBank={setRunPromptEditFromBank}
+          aiProviders={aiProviders}
+          runAiProviderId={runAiProviderId}
+          setRunAiProviderId={setRunAiProviderId}
+          runAiModel={runAiModel}
+          setRunAiModel={setRunAiModel}
+          promptTemplates={promptTemplates}
+          applicableTemplates={applicableTemplates}
+          runContextOpen={runContextOpen}
+          setRunContextOpen={setRunContextOpen}
+          error={error}
+          generatingAI={generatingAI}
+          runOutput={runOutput}
+          setRunOutput={setRunOutput}
+          savingRun={savingRun}
+          onGenerateWithAI={handleGenerateWithAI}
+          onSaveRun={handleSaveRun}
+          onSaveOutputAsObject={handleSaveOutputAsObject}
+          onClose={() => { setShowRunPanel(false); setRunOutput(''); }}
+        />
       )}
 
     </div>

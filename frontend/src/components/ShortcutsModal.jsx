@@ -5,10 +5,11 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(na
 const mod = isMac ? '⌘' : 'Ctrl';
 
 const SHORTCUTS = [
-  { keys: '/', description: 'Quick add (Dashboard) or focus search' },
-  { keys: `${mod}+K`, description: 'Command palette' },
+  { keys: `${mod}+K`, description: 'Command palette (search & go anywhere)' },
   { keys: `${mod}+N`, description: 'New object' },
   { keys: `${mod}+Shift+Q`, description: 'Quick capture' },
+  { keys: `${mod}+Shift+S`, description: 'Search page' },
+  { keys: '/', description: 'Quick add (Dashboard) or focus search' },
   { keys: `${mod}+Shift+R`, description: 'Run prompt (on object page)' },
   { keys: '?', description: 'Show this shortcuts help' },
   { keys: 'Esc', description: 'Close panel or modal' },

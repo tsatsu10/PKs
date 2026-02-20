@@ -6,6 +6,7 @@ import { useIsMobile } from '../breakpoints';
 import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
+import MainMenuDeck, { useDeckEnabled } from './MainMenuDeck';
 import './AppLayout.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'pks-sidebar-collapsed';
@@ -15,6 +16,7 @@ const navGroups = [
     label: 'Main',
     items: [
       { to: '/', label: 'Dashboard', icon: '⌂' },
+      { to: '/search', label: 'Search', icon: '🔍' },
       { to: '/quick', label: 'Quick capture', icon: '⚡' },
       { to: '/objects/new', label: 'New object', icon: '+' },
     ],
@@ -29,6 +31,8 @@ const navGroups = [
       { to: '/notifications', label: 'Notifications', icon: '◉' },
       { to: '/audit-logs', label: 'Audit logs', icon: '▤' },
       { to: '/integrations', label: 'Integrations', icon: '◈' },
+      { to: '/import', label: 'Import', icon: '↓' },
+      { to: '/about', label: 'About PKS', icon: 'ℹ' },
       { to: '/settings', label: 'Settings', icon: '⚙' },
     ],
   },
@@ -59,6 +63,11 @@ export default function AppLayout({ children }) {
         navigate('/quick');
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        navigate('/search');
+        return;
+      }
       if (e.key === '?' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
         e.preventDefault();
         setShortcutsOpen(true);
@@ -78,6 +87,7 @@ export default function AppLayout({ children }) {
 
   const isMobile = useIsMobile(768);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { deckEnabled } = useDeckEnabled();
 
   useEffect(() => {
     try {
@@ -92,7 +102,7 @@ export default function AppLayout({ children }) {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
-    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''}`}>
+    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''} ${deckEnabled ? 'app-layout-deck-enabled' : ''}`}>
       <aside className="app-layout-sidebar" aria-label="Main navigation" aria-hidden={isMobile && !mobileMenuOpen}>
         <div className="app-layout-sidebar-top">
           <button
@@ -207,24 +217,28 @@ export default function AppLayout({ children }) {
         </div>
         {children}
       </main>
-      <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">
-        <Link to="/" className={`app-layout-bottom-link ${location.pathname === '/' ? 'active' : ''}`} aria-current={location.pathname === '/' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>⌂</span>
-          <span className="app-layout-bottom-label">Home</span>
-        </Link>
-        <Link to="/objects/new" className={`app-layout-bottom-link ${location.pathname === '/objects/new' ? 'active' : ''}`} aria-current={location.pathname === '/objects/new' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>+</span>
-          <span className="app-layout-bottom-label">New</span>
-        </Link>
-        <Link to="/notifications" className={`app-layout-bottom-link ${location.pathname === '/notifications' ? 'active' : ''}`} aria-current={location.pathname === '/notifications' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>◉</span>
-          <span className="app-layout-bottom-label">Alerts</span>
-        </Link>
-        <Link to="/settings" className={`app-layout-bottom-link ${location.pathname === '/settings' ? 'active' : ''}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>⚙</span>
-          <span className="app-layout-bottom-label">Settings</span>
-        </Link>
-      </nav>
+      {deckEnabled ? (
+        <MainMenuDeck />
+      ) : (
+        <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">
+          <Link to="/" className={`app-layout-bottom-link ${location.pathname === '/' ? 'active' : ''}`} aria-current={location.pathname === '/' ? 'page' : undefined}>
+            <span className="app-layout-bottom-icon" aria-hidden>⌂</span>
+            <span className="app-layout-bottom-label">Home</span>
+          </Link>
+          <Link to="/objects/new" className={`app-layout-bottom-link ${location.pathname === '/objects/new' ? 'active' : ''}`} aria-current={location.pathname === '/objects/new' ? 'page' : undefined}>
+            <span className="app-layout-bottom-icon" aria-hidden>+</span>
+            <span className="app-layout-bottom-label">New</span>
+          </Link>
+          <Link to="/notifications" className={`app-layout-bottom-link ${location.pathname === '/notifications' ? 'active' : ''}`} aria-current={location.pathname === '/notifications' ? 'page' : undefined}>
+            <span className="app-layout-bottom-icon" aria-hidden>◉</span>
+            <span className="app-layout-bottom-label">Alerts</span>
+          </Link>
+          <Link to="/settings" className={`app-layout-bottom-link ${location.pathname === '/settings' ? 'active' : ''}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+            <span className="app-layout-bottom-icon" aria-hidden>⚙</span>
+            <span className="app-layout-bottom-label">Settings</span>
+          </Link>
+        </nav>
+      )}
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>

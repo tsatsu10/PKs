@@ -11,6 +11,11 @@ import AuditLogs from './pages/AuditLogs';
 import Integrations from './pages/Integrations';
 import PasteBin from './pages/PasteBin';
 import Journal from './pages/Journal';
+import About from './pages/About';
+import Search from './pages/Search';
+import Trash from './pages/Trash';
+import ObjectBySlug from './pages/ObjectBySlug';
+import Import from './pages/Import';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -29,6 +34,7 @@ export const routeConfig = [
   { path: '/reset-password', element: <ResetPassword /> },
   { path: '/', element: withProtected(<Dashboard />) },
   { path: '/objects/new', element: withProtected(<ObjectNew />) },
+  { path: '/objects/by-slug/:slug', element: withProtected(<ObjectBySlug />) },
   { path: '/quick', element: withProtected(<QuickCapture />) },
   { path: '/objects/:id', element: withProtected(<ObjectDetail />) },
   { path: '/settings', element: withProtected(<Settings />) },
@@ -39,4 +45,8 @@ export const routeConfig = [
   { path: '/integrations', element: withProtected(<Integrations />) },
   { path: '/paste', element: withProtected(<PasteBin />) },
   { path: '/journal', element: withProtected(<Journal />) },
+  { path: '/about', element: withProtected(<About />) },
+  { path: '/search', element: withProtected(<Search />) },
+  { path: '/trash', element: withProtected(<Trash />) },
+  { path: '/import', element: withProtected(<Import />) },
 ];
