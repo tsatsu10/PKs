@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { INTEGRATION_TYPES, WEBHOOK_EVENTS } from '../constants';
 import Breadcrumbs from '../components/Breadcrumbs';
+import { SkeletonList } from '../components/Skeleton';
 import './Integrations.css';
 
 export default function Integrations() {
@@ -136,7 +137,19 @@ export default function Integrations() {
     }
   }
 
-  if (loading) return <div className="integrations-page" id="main-content" role="main"><p role="status" aria-live="polite">Loading…</p></div>;
+  if (loading) {
+    return (
+      <div className="integrations-page" id="main-content" role="main">
+        <header className="integrations-header">
+          <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
+          <h1>Integrations</h1>
+        </header>
+        <div role="status" aria-live="polite">
+          <SkeletonList lines={5} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="integrations-page" id="main-content" role="main">

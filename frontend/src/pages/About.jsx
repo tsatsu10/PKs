@@ -92,7 +92,7 @@ export default function About() {
             <li>Main menu deck on Dashboard (toggle in Settings).</li>
             <li>Dedicated Search page and global search from command palette (⌘K).</li>
             <li>Export &amp; backup: download all objects as JSON or Markdown ZIP (Settings).</li>
-            <li>PWA: install app on device (Settings → Install app).</li>
+            <li>PWA: install app on device for quick access and cached/offline support (Settings → Install app).</li>
             <li>Getting started tips on first visit to Dashboard.</li>
             <li>Clearer empty states and feedback link below.</li>
           </ul>

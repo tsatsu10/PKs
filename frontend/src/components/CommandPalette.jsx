@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useFocusTrap } from '@mantine/hooks';
 import './CommandPalette.css';
 
 const QUICK_ACTIONS = [
@@ -25,6 +26,8 @@ export default function CommandPalette({ open, onClose }) {
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const prevFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const focusTrapRef = useFocusTrap(open);
   const navigate = useNavigate();
 
   const searchOnDashboard = query.trim();
@@ -46,6 +49,17 @@ export default function CommandPalette({ open, onClose }) {
     return [...searchItems, ...filteredActions];
   }, [searchOnDashboard, filteredActions]);
   const maxIndex = items.length - 1;
+
+  /* Save focus when opening; restore when closing */
+  useEffect(() => {
+    if (open) {
+      prevFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    } else {
+      const prev = prevFocusRef.current;
+      prevFocusRef.current = null;
+      if (prev && typeof prev.focus === 'function') prev.focus();
+    }
+  }, [open]);
 
   /* Reset when palette opens; clamp highlight to list length (intentional setState in effect) */
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -101,7 +115,7 @@ export default function CommandPalette({ open, onClose }) {
 
   return (
     <div className="command-palette-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="Command palette">
-      <div className="command-palette" onClick={(e) => e.stopPropagation()}>
+      <div ref={focusTrapRef} className="command-palette" onClick={(e) => e.stopPropagation()}>
         <div className="command-palette-input-wrap">
           <span className="command-palette-icon" aria-hidden>⌘</span>
           <input

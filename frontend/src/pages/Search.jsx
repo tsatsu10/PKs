@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import { OBJECT_TYPE_ICONS } from '../constants';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
+import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
 
 const PAGE_SIZE = 20;
@@ -32,6 +34,14 @@ export default function Search() {
   const [domains, setDomains] = useState([]);
   const [tags, setTags] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+
+  const listVirtualizer = useVirtualizer({
+    count: objects.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
 
   useEffect(() => {
     setQuery(qFromUrl);
@@ -171,24 +181,44 @@ export default function Search() {
       {error && <div className="search-error" role="alert">{error}</div>}
 
       {loading ? (
-        <p className="search-loading">Searching…</p>
+        <div className="search-loading" role="status" aria-live="polite">
+          <SkeletonList lines={8} />
+        </div>
       ) : (
         <>
-          <ul className="search-results">
-            {objects.map((o) => (
-              <li key={o.id}>
-                <Link to={`/objects/${o.id}`} className="search-result-link">
-                  <span className="search-result-type" aria-hidden>
-                    {OBJECT_TYPE_ICONS[o.type] ?? '•'}
-                  </span>
-                  <span className="search-result-title">{o.title || 'Untitled'}</span>
-                  {(o.snippet || o.summary) && (
-                    <span className="search-result-summary">{o.snippet || o.summary}</span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {objects.length > 0 && (
+            <div ref={listScrollRef} className="search-results-scroll" style={{ maxHeight: 'calc(100vh - 260px)', overflow: 'auto' }} role="list" aria-label="Search results">
+              <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                {listVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const o = objects[virtualRow.index];
+                  return (
+                    <div
+                      key={o.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      role="listitem"
+                    >
+                      <Link to={`/objects/${o.id}`} className="search-result-link">
+                        <span className="search-result-type" aria-hidden>
+                          {OBJECT_TYPE_ICONS[o.type] ?? '•'}
+                        </span>
+                        <span className="search-result-title">{o.title || 'Untitled'}</span>
+                        {(o.snippet || o.summary) && (
+                          <span className="search-result-summary">{o.snippet || o.summary}</span>
+                        )}
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {!loading && objects.length === 0 && query.trim() && (
             <section className="search-empty-state" aria-label="No results">
               <p className="search-empty">No objects found. Try different keywords or filters.</p>

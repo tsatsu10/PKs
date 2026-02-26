@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { SkeletonList } from '../components/Skeleton';
 import './Notifications.css';
 
 const PAGE_SIZE = 30;
@@ -76,7 +77,9 @@ export default function Notifications() {
         </div>
       </header>
       {loading ? (
-        <p className="notifications-loading" role="status" aria-live="polite">Loading…</p>
+        <div className="notifications-loading" role="status" aria-live="polite">
+          <SkeletonList lines={6} />
+        </div>
       ) : list.length === 0 ? (
         <p className="notifications-empty" role="status">No notifications.</p>
       ) : (

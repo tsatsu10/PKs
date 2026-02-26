@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@mantine/hooks';
 import './ShortcutsModal.css';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
@@ -16,6 +17,19 @@ const SHORTCUTS = [
 ];
 
 export default function ShortcutsModal({ open, onClose }) {
+  const prevFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const focusTrapRef = useFocusTrap(open);
+
+  useEffect(() => {
+    if (open) {
+      prevFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    } else {
+      const prev = prevFocusRef.current;
+      prevFocusRef.current = null;
+      if (prev && typeof prev.focus === 'function') prev.focus();
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e) {
@@ -32,7 +46,7 @@ export default function ShortcutsModal({ open, onClose }) {
 
   return (
     <div className="shortcuts-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div className="shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={focusTrapRef} className="shortcuts-modal" onClick={(e) => e.stopPropagation()}>
         <div className="shortcuts-modal-header">
           <h2>Keyboard shortcuts</h2>
           <button type="button" className="shortcuts-modal-close" onClick={onClose} aria-label="Close">×</button>

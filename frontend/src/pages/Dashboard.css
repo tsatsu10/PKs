@@ -541,10 +541,20 @@
   transition: background 0.15s ease;
 }
 
+.dashboard-object-list-scroll .object-list-item-with-checkbox,
 .object-list-item-with-checkbox {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.dashboard-object-list-scroll .object-list-item-with-checkbox {
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0 0.25rem;
+}
+
+.dashboard-object-list-scroll .object-card-wrapper {
+  padding: 0.25rem 0;
 }
 
 .object-list-checkbox {

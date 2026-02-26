@@ -180,6 +180,64 @@ export default function Settings() {
     }
   }
 
+  /** Full account export: objects, journal, paste bin, domains, tags as one JSON. */
+  async function downloadFullAccountData() {
+    setBackupError('');
+    setBackupLoading(true);
+    try {
+      const [objsRes, journalRes, pasteRes, domainsRes, tagsRes] = await Promise.all([
+        supabase.from('knowledge_objects').select('*').eq('user_id', user.id).eq('is_deleted', false).order('updated_at', { ascending: false }),
+        supabase.from('journal_entries').select('*').eq('user_id', user.id).order('entry_date', { ascending: false }),
+        supabase.from('paste_bin').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
+        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
+      ]);
+      if (objsRes.error) throw objsRes.error;
+      if (journalRes.error) throw journalRes.error;
+      if (pasteRes.error) throw pasteRes.error;
+      if (domainsRes.error) throw domainsRes.error;
+      if (tagsRes.error) throw tagsRes.error;
+      const objs = objsRes.data || [];
+      const ids = objs.map((o) => o.id);
+      const [kodRes, kotRes] = ids.length
+        ? await Promise.all([
+            supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', ids),
+            supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', ids),
+          ])
+        : [{ data: [] }, { data: [] }];
+      const domainsByObj = {};
+      (kodRes.data || []).forEach((r) => {
+        if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
+        if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
+      });
+      const tagsByObj = {};
+      (kotRes.data || []).forEach((r) => {
+        if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
+        if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
+      });
+      const objects = objs.map((o) => ({ ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] }));
+      const payload = {
+        exported_at: new Date().toISOString(),
+        version: 1,
+        objects,
+        journal_entries: journalRes.data || [],
+        paste_bin: pasteRes.data || [],
+        domains: domainsRes.data || [],
+        tags: tagsRes.data || [],
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      setBackupError(err?.message ?? 'Export failed');
+    } finally {
+      setBackupLoading(false);
+    }
+  }
+
   async function downloadBackupJson() {
     setBackupError('');
     setBackupLoading(true);
@@ -378,7 +436,7 @@ export default function Settings() {
 
       <section className="settings-section">
         <h2>Install app</h2>
-        <p className="settings-desc">Install PKS on your device for quick access and offline use (when supported).</p>
+        <p className="settings-desc">Install PKS on your device for quick access. The app caches assets for faster loads and basic offline support when installed.</p>
         {installPrompt && !installed && (
           <button type="button" className="btn btn-primary" onClick={handleInstallClick}>
             Install PKS app
@@ -390,14 +448,17 @@ export default function Settings() {
 
       <section className="settings-section">
         <h2>Export &amp; backup</h2>
-        <p className="settings-desc">Download all your objects as a backup. JSON is one file; Markdown ZIP is one file per object.</p>
+        <p className="settings-desc">Download your data as a portable backup. &quot;Download my data&quot; includes knowledge objects, journal entries, paste bin, domains, and tags in one JSON file.</p>
         {backupError && <div className="form-error" role="alert">{backupError}</div>}
         <div className="settings-form" style={{ gap: '0.5rem' }}>
+          <button type="button" className="btn btn-primary" onClick={downloadFullAccountData} disabled={backupLoading}>
+            {backupLoading ? 'Preparing…' : 'Download my data (full JSON)'}
+          </button>
           <button type="button" className="btn btn-secondary" onClick={downloadBackupJson} disabled={backupLoading}>
-            {backupLoading ? 'Preparing…' : 'Download backup (JSON)'}
+            {backupLoading ? 'Preparing…' : 'Objects only (JSON)'}
           </button>
           <button type="button" className="btn btn-secondary" onClick={downloadBackupMarkdownZip} disabled={backupLoading}>
-            {backupLoading ? 'Preparing…' : 'Download backup (Markdown ZIP)'}
+            {backupLoading ? 'Preparing…' : 'Objects as Markdown (ZIP)'}
           </button>
         </div>
       </section>

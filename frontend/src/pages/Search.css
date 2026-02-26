@@ -85,8 +85,14 @@
   margin: 0;
 }
 
-.search-results li {
+.search-results li,
+.search-results-scroll [role="listitem"] {
   border-bottom: 1px solid var(--glass-border);
+}
+
+.search-results-scroll [role="listitem"] .search-result-link {
+  display: block;
+  padding: 1rem 0;
 }
 
 .search-result-link {

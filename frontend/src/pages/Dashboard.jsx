@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
@@ -80,15 +81,24 @@ export default function Dashboard() {
   const searchInputRef = useRef(null);
   const quickAddInputRef = useRef(null);
   const bulkMenuRef = useRef(null);
+  const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const location = useLocation();
+
+  const listVirtualizer = useVirtualizer({
+    count: objects.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => (viewMode === 'card' ? 220 : 72),
+    overscan: 5,
+  });
   const [runPromptTemplate, setRunPromptTemplate] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return localStorage.getItem('pks-onboarding-dismissed') !== 'true'; } catch { return false; }
   });
 
+  // Sync search input from URL only when the URL query changes (e.g. navigation), not when user types
   useEffect(() => {
-    if (qFromUrl !== searchQuery) setSearchQuery(qFromUrl);
-  }, [qFromUrl, searchQuery, setSearchQuery]);
+    setSearchQuery(qFromUrl);
+  }, [qFromUrl]);
 
   const dueSoonFromParams = searchParams.get('due') === 'soon';
   const typeFromParams = searchParams.get('type') ?? '';
@@ -145,9 +155,11 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Run search with URL query only when URL or user changes, not when user types (runSearch identity changes with searchQuery)
   useEffect(() => {
     if (user?.id && qFromUrl) runSearch(0, qFromUrl);
-  }, [user?.id, qFromUrl, runSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only react to URL/user, not runSearch
+  }, [user?.id, qFromUrl]);
 
   function dismissRunPromptBanner() {
     sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
@@ -696,46 +708,59 @@ export default function Dashboard() {
           </section>
         ) : (
           <>
-            {viewMode === 'card' ? (
-              <div className="object-grid" aria-label="Knowledge objects">
-                {objects.map((obj) => (
-                  <div key={obj.id} className="object-card-wrapper">
-                    <label className="object-card-checkbox">
-                      <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
-                    </label>
-                    <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
-                      {obj.cover_url && <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />}
-                      <span className="object-card-type" title={obj.type}>
-                        <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                        {obj.type}
-                      </span>
-                      <span className="object-card-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
-                      {(obj.snippet || obj.summary) && <span className="object-card-summary">{obj.snippet || obj.summary}</span>}
-                      <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
-                    </Link>
-                  </div>
-                ))}
+            <div ref={listScrollRef} className="dashboard-object-list-scroll" style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects">
+              <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                {listVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const obj = objects[virtualRow.index];
+                  return (
+                    <div
+                      key={obj.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      {viewMode === 'card' ? (
+                        <div className="object-card-wrapper">
+                          <label className="object-card-checkbox">
+                            <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
+                          </label>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
+                            {obj.cover_url && <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />}
+                            <span className="object-card-type" title={obj.type}>
+                              <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
+                              {obj.type}
+                            </span>
+                            <span className="object-card-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
+                            {(obj.snippet || obj.summary) && <span className="object-card-summary">{obj.snippet || obj.summary}</span>}
+                            <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="object-list-item-with-checkbox" role="listitem">
+                          <label className="object-list-checkbox">
+                            <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
+                          </label>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
+                            <span className="object-list-type" title={obj.type}>
+                              <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
+                              {obj.type}
+                            </span>
+                            <span className="object-list-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
+                            {(obj.snippet || obj.summary) && <span className="object-list-summary">{obj.snippet || obj.summary}</span>}
+                            <span className="object-list-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ) : (
-              <ul className="object-list" aria-label="Knowledge objects">
-                {objects.map((obj) => (
-                  <li key={obj.id} className="object-list-item-with-checkbox">
-                    <label className="object-list-checkbox">
-                      <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
-                    </label>
-                    <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
-                      <span className="object-list-type" title={obj.type}>
-                        <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                        {obj.type}
-                      </span>
-                      <span className="object-list-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
-                      {(obj.snippet || obj.summary) && <span className="object-list-summary">{obj.snippet || obj.summary}</span>}
-                      <span className="object-list-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+            </div>
             {hasMore && (
               <div className="load-more">
                 <button type="button" className="btn btn-secondary" onClick={handleLoadMore} disabled={loadingMore}>

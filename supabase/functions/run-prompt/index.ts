@@ -203,6 +203,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           error: "AI request failed",
           code: useDeepSeek ? "DEEPSEEK_ERROR" : "OPENAI_ERROR",
+          hint: "Check your API key in Settings → AI API keys, or try another model.",
           detail: detail.slice(0, 500),
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -219,6 +220,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: "Server error",
+        hint: "Something went wrong on the server. Try again in a moment.",
         detail: message.slice(0, 300),
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

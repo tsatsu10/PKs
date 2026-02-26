@@ -603,12 +603,25 @@ export default function ObjectDetail() {
         },
       });
       if (fnErr) {
-        let msg = fnErr?.message ?? fnErr?.error_description ?? 'Function failed';
-        if (fnErr?.context && typeof fnErr.context?.json === 'function') {
-          try {
-            const body = await fnErr.context.json();
-            msg = body.hint || body.error || msg;
-          } catch (_) {}
+        let msg = fnErr?.message ?? fnErr?.error_description ?? 'AI request failed';
+        const genericMsg = /non-2xx|Edge Function returned|Function failed/i.test(msg);
+        try {
+          const ctx = fnErr?.context;
+          if (ctx) {
+            const body = typeof ctx.json === 'function'
+              ? await ctx.json()
+              : typeof ctx.text === 'function'
+                ? JSON.parse(await ctx.text())
+                : null;
+            if (body && typeof body === 'object') {
+              const fromBody = body.hint || body.error || body.detail;
+              if (fromBody) msg = fromBody;
+              else if (genericMsg) msg = body.code ? `${body.code}: see Settings → AI API keys or server config` : 'AI request failed. Check Settings → AI API keys or Edge Function secrets.';
+            }
+          }
+        } catch (_) {}
+        if (genericMsg && msg === (fnErr?.message ?? fnErr?.error_description)) {
+          msg = 'AI request failed. Check your API key in Settings → AI API keys, or server secrets for default provider.';
         }
         throw new Error(msg);
       }

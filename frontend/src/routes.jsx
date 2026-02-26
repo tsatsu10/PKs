@@ -1,31 +1,42 @@
+import { lazy, Suspense } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
-import Dashboard from './pages/Dashboard';
-import ObjectNew from './pages/ObjectNew';
-import QuickCapture from './pages/QuickCapture';
-import ObjectDetail from './pages/ObjectDetail';
-import Settings from './pages/Settings';
-import PromptBank from './pages/PromptBank';
-import Templates from './pages/Templates';
-import Notifications from './pages/Notifications';
-import AuditLogs from './pages/AuditLogs';
-import Integrations from './pages/Integrations';
-import PasteBin from './pages/PasteBin';
-import Journal from './pages/Journal';
-import About from './pages/About';
-import Search from './pages/Search';
-import Trash from './pages/Trash';
-import ObjectBySlug from './pages/ObjectBySlug';
-import Import from './pages/Import';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
+
+const PageLoadFallback = () => (
+  <div className="loading-screen" role="status" aria-live="polite" aria-label="Loading">
+    <div className="loading-screen-logo-wrap">
+      <img src="/pks-logo.svg" alt="" className="loading-screen-logo" width="64" height="64" />
+    </div>
+    <p className="loading-screen-text">Loading…</p>
+  </div>
+);
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ObjectNew = lazy(() => import('./pages/ObjectNew'));
+const QuickCapture = lazy(() => import('./pages/QuickCapture'));
+const ObjectDetail = lazy(() => import('./pages/ObjectDetail'));
+const Settings = lazy(() => import('./pages/Settings'));
+const PromptBank = lazy(() => import('./pages/PromptBank'));
+const Templates = lazy(() => import('./pages/Templates'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const Integrations = lazy(() => import('./pages/Integrations'));
+const PasteBin = lazy(() => import('./pages/PasteBin'));
+const Journal = lazy(() => import('./pages/Journal'));
+const About = lazy(() => import('./pages/About'));
+const Search = lazy(() => import('./pages/Search'));
+const Trash = lazy(() => import('./pages/Trash'));
+const ObjectBySlug = lazy(() => import('./pages/ObjectBySlug'));
+const Import = lazy(() => import('./pages/Import'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 const withProtected = (children) => <ProtectedRoute>{children}</ProtectedRoute>;
 
 /**
  * Route configuration: path, element.
- * Centralizing routes here keeps App.jsx minimal and makes adding/removing routes easier.
+ * Heavy pages are lazy-loaded for smaller initial bundle.
  */
 export const routeConfig = [
   { path: '/login', element: <Login /> },
@@ -50,3 +61,5 @@ export const routeConfig = [
   { path: '/trash', element: withProtected(<Trash />) },
   { path: '/import', element: withProtected(<Import />) },
 ];
+
+export { PageLoadFallback };

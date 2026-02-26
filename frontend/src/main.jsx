@@ -1,8 +1,13 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerCustomProtocol, init } from 'linkifyjs'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
+
+if (typeof registerSW === 'function') {
+  registerSW({ immediate: true })
+}
 
 // Initialize linkify once with default schemes so BlockNote/Tiptap Link extension
 // does not trigger "already initialized" warnings when multiple editors mount.

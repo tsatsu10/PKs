@@ -4,6 +4,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { AUDIT_ACTION_LIST } from '../constants';
+import { SkeletonList } from '../components/Skeleton';
 import './AuditLogs.css';
 
 const PAGE_SIZE = 50;
@@ -66,9 +67,14 @@ export default function AuditLogs() {
         </div>
       </header>
       {loading ? (
-        <p className="audit-logs-loading">Loading…</p>
+        <div className="audit-logs-loading" role="status" aria-live="polite">
+          <SkeletonList lines={8} />
+        </div>
       ) : list.length === 0 ? (
-        <p className="audit-logs-empty">No audit entries match your filters.</p>
+        <section className="audit-logs-empty" aria-label="No audit entries">
+          <p>No audit entries match your filters.</p>
+          <Link to="/">Back to Dashboard</Link>
+        </section>
       ) : (
         <ul className="audit-logs-list">
           {list.map((entry) => (

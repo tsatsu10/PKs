@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import AuthLayout from '../components/AuthLayout';
@@ -10,11 +10,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { user, login } = useAuth();
+  const { user, login, clearSessionExpired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const reason = searchParams.get('reason');
+  const sessionExpiredMessage = reason === 'session_expired';
   const formRef = useRef(null);
   const firstInputRef = useRef(null);
+
+  useEffect(() => {
+    if (sessionExpiredMessage && clearSessionExpired) clearSessionExpired();
+  }, [sessionExpiredMessage, clearSessionExpired]);
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -81,7 +88,7 @@ export default function Login() {
   return (
     <AuthLayout
       title="Sign in"
-      hint={location.state?.from ? 'Please sign in to continue.' : null}
+      hint={sessionExpiredMessage ? 'Your session expired. Please sign in again.' : (location.state?.from ? 'Please sign in to continue.' : null)}
       footer={
         <>
           <Link to="/forgot-password">Forgot password?</Link>

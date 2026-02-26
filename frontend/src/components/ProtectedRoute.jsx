@@ -4,7 +4,7 @@ import AppLayout from './AppLayout';
 import { DeckProvider } from './MainMenuDeck';
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionExpired } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -19,7 +19,10 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const to = sessionExpired
+      ? { pathname: '/login', search: '?reason=session_expired', state: { from: location } }
+      : { pathname: '/login', state: { from: location } };
+    return <Navigate to={to} replace />;
   }
 
   return (

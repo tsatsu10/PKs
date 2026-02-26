@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -27,6 +27,9 @@ async function fetchProfile(userId) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  /** When session is lost after we had a user (expired/invalid), show re-auth message on login page. */
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const hadUserRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +48,7 @@ export function AuthProvider({ children }) {
           return;
         }
         if (session?.user) {
+          hadUserRef.current = true;
           const profilePromise = fetchProfile(session.user.id);
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('profile_timeout')), 4000)
@@ -79,9 +83,14 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
+          hadUserRef.current = true;
           const profile = await fetchProfile(session.user.id).catch(() => null);
           setUser(mapUser(session.user, profile));
         } else {
+          if (hadUserRef.current) {
+            setSessionExpired(true);
+            hadUserRef.current = false;
+          }
           setUser(null);
         }
         setLoading(false);
@@ -104,8 +113,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const clearSessionExpired = () => setSessionExpired(false);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, supabase }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, supabase, sessionExpired, clearSessionExpired }}>
       {children}
     </AuthContext.Provider>
   );
