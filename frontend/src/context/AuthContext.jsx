@@ -113,10 +113,18 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  /** Refetch profile from public.users and update context (e.g. after editing display name or timezone). */
+  const refreshUser = async () => {
+    const { data: { user: au } } = await supabase.auth.getUser();
+    if (!au) return;
+    const profile = await fetchProfile(au.id);
+    setUser(mapUser(au, profile ?? null));
+  };
+
   const clearSessionExpired = () => setSessionExpired(false);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, supabase, sessionExpired, clearSessionExpired }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, supabase, sessionExpired, clearSessionExpired }}>
       {children}
     </AuthContext.Provider>
   );

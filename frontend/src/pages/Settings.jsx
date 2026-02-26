@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { useDeckEnabled } from '../components/MainMenuDeck';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
@@ -10,8 +11,9 @@ import JSZip from 'jszip';
 import './Settings.css';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { addToast } = useToast();
   const [domains, setDomains] = useState([]);
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +33,16 @@ export default function Settings() {
   const [aiProviderType, setAiProviderType] = useState('openai');
   const [aiProviderKey, setAiProviderKey] = useState('');
   const [addingAiProvider, setAddingAiProvider] = useState(false);
+  const [profileDisplayName, setProfileDisplayName] = useState('');
+  const [profileTimezone, setProfileTimezone] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -51,6 +63,98 @@ export default function Settings() {
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') setInstalled(true);
     setInstallPrompt(null);
+  }
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setProfileDisplayName(user.displayName ?? '');
+    setProfileTimezone(user.timezone ?? 'Africa/Accra');
+  }, [user?.id, user?.displayName, user?.timezone]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    async function load() {
+      const [dRes, tRes, pRes] = await Promise.all([
+        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
+        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
+        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name'),
+      ]);
+      if (cancelled) return;
+      setDomains(dRes.data || []);
+      setTags(tRes.data || []);
+      setAiProviders(pRes.data || []);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  async function saveProfile(e) {
+    e.preventDefault();
+    setProfileError('');
+    setProfileSaving(true);
+    try {
+      const { error: err } = await supabase
+        .from('users')
+        .update({
+          display_name: profileDisplayName.trim() || null,
+          timezone: profileTimezone.trim() || 'Africa/Accra',
+        })
+        .eq('id', user.id);
+      if (err) throw err;
+      await refreshUser();
+      addToast('success', 'Profile updated');
+    } catch (err) {
+      setProfileError(err?.message ?? 'Failed to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function changePassword(e) {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters');
+      return;
+    }
+    const email = user?.email;
+    if (!email) {
+      setPasswordError('Email not found. Sign out and sign in again.');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (signInErr) {
+        if (signInErr.message?.toLowerCase().includes('invalid')) {
+          setPasswordError('Current password is incorrect');
+        } else {
+          setPasswordError(signInErr.message ?? 'Verification failed');
+        }
+        return;
+      }
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      addToast('success', 'Password updated');
+    } catch (err) {
+      setPasswordError(err?.message ?? 'Failed to update password');
+    } finally {
+      setPasswordSaving(false);
+    }
   }
 
   useEffect(() => {
@@ -323,6 +427,104 @@ export default function Settings() {
         <h1>Settings</h1>
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}
+
+      <section className="settings-section" aria-labelledby="account-heading">
+        <h2 id="account-heading">Account</h2>
+        <p className="settings-desc">Your display name and timezone. Used across the app for dates and identification.</p>
+        {profileError && <div className="form-error" role="alert">{profileError}</div>}
+        <form onSubmit={saveProfile} className="settings-form form">
+          <label>
+            Email
+            <input type="text" value={user?.email ?? ''} readOnly disabled className="settings-input-readonly" aria-describedby="account-email-hint" />
+            <span id="account-email-hint" className="settings-desc">Email cannot be changed here. Use your auth provider or contact support.</span>
+          </label>
+          <label>
+            Display name
+            <input
+              type="text"
+              value={profileDisplayName}
+              onChange={(e) => setProfileDisplayName(e.target.value)}
+              placeholder="Your name"
+              disabled={profileSaving}
+              aria-label="Display name"
+            />
+          </label>
+          <label>
+            Timezone
+            <input
+              type="text"
+              value={profileTimezone}
+              onChange={(e) => setProfileTimezone(e.target.value)}
+              placeholder="e.g. Africa/Accra, America/New_York"
+              disabled={profileSaving}
+              aria-label="Timezone"
+              list="timezone-suggestions"
+            />
+            <datalist id="timezone-suggestions">
+              <option value="Africa/Accra" />
+              <option value="America/New_York" />
+              <option value="America/Los_Angeles" />
+              <option value="Europe/London" />
+              <option value="Europe/Paris" />
+              <option value="Asia/Tokyo" />
+              <option value="UTC" />
+            </datalist>
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={profileSaving}>
+            {profileSaving ? 'Saving…' : 'Save profile'}
+          </button>
+        </form>
+      </section>
+
+      <section className="settings-section" aria-labelledby="password-heading">
+        <h2 id="password-heading">Change password</h2>
+        <p className="settings-desc">Enter your current password, then choose a new one (min 8 characters).</p>
+        {passwordError && <div className="form-error" role="alert">{passwordError}</div>}
+        {passwordSuccess && <p className="settings-muted" role="status">Password updated. You can sign in with the new password next time.</p>}
+        <form onSubmit={changePassword} className="settings-form form">
+          <label>
+            Current password
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={passwordSaving}
+              autoComplete="current-password"
+              aria-label="Current password"
+            />
+          </label>
+          <label>
+            New password
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Min 8 characters"
+              disabled={passwordSaving}
+              minLength={8}
+              autoComplete="new-password"
+              aria-label="New password"
+            />
+          </label>
+          <label>
+            Confirm new password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={passwordSaving}
+              minLength={8}
+              autoComplete="new-password"
+              aria-label="Confirm new password"
+            />
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}>
+            {passwordSaving ? 'Updating…' : 'Update password'}
+          </button>
+        </form>
+      </section>
 
       <section className="settings-section">
         <h2>Bottom menu</h2>
