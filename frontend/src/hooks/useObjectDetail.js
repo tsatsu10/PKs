@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getDraft, DRAFT_KEYS } from '../lib/draftStorage';
+import { getErrorMessage } from '../lib/errors';
 
 /**
  * Loads a single knowledge object and all related data (versions, domains, tags, links, files, prompts, suggestions).
@@ -35,14 +36,17 @@ export function useObjectDetail({ id, userId }) {
     setLoading(true);
     setError('');
     try {
-      const { data: obj, error: e1 } = await supabase
-        .from('knowledge_objects')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Fetch object without content (smaller payload); fetch content in parallel for large docs.
+      const OBJECT_COLS = 'id, user_id, type, title, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at';
+      const [objRes, contentRes] = await Promise.all([
+        supabase.from('knowledge_objects').select(OBJECT_COLS).eq('id', id).single(),
+        supabase.from('knowledge_objects').select('content').eq('id', id).single(),
+      ]);
       if (cancelled) return;
+      const e1 = objRes.error;
+      const obj = objRes.data;
       if (e1 || !obj) {
-        setError(e1?.message ?? e1?.error_description ?? 'Not found');
+        setError(getErrorMessage(e1, 'Not found'));
         setObject(null);
         setLoading(false);
         return;
@@ -53,6 +57,7 @@ export function useObjectDetail({ id, userId }) {
         setLoading(false);
         return;
       }
+      obj.content = contentRes.data?.content ?? null;
       setObject(obj);
 
       const myShareRes = await supabase
@@ -126,8 +131,15 @@ export function useObjectDetail({ id, userId }) {
       const allLinkIds = [...new Set([...toIds, ...fromIds])];
       let targetMap = {};
       if (allLinkIds.length > 0) {
-        const { data: objs } = await supabase.from('knowledge_objects').select('id, title, type').in('id', allLinkIds);
+        const { data: objs, error: objsErr } = await supabase.from('knowledge_objects').select('id, title, type').in('id', allLinkIds);
+        if (objsErr) {
+          if (import.meta.env.DEV) console.warn('Link targets fetch failed:', objsErr);
+        }
         targetMap = (objs || []).reduce((acc, o) => ({ ...acc, [o.id]: o }), {});
+        // When fetch failed or RLS hid some rows, show "Unknown" instead of raw UUID
+        for (const linkId of allLinkIds) {
+          if (!targetMap[linkId]) targetMap[linkId] = { id: linkId, title: 'Unknown', type: '' };
+        }
       }
       setOutgoingLinks(
         outRows.map((r) => ({
@@ -161,7 +173,7 @@ export function useObjectDetail({ id, userId }) {
       }
     } catch (e) {
       if (!cancelled) {
-        setError(e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Load failed'));
+        setError(getErrorMessage(e, 'Load failed'));
         setObject(null);
       }
     } finally {
@@ -173,16 +185,6 @@ export function useObjectDetail({ id, userId }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const initialEditForm =
-    object == null
-      ? { title: '', content: '', summary: '', source: '' }
-      : {
-          title: object.title,
-          content: object.content || '',
-          summary: object.summary || '',
-          source: object.source || '',
-        };
 
   const draft = id ? getDraft(DRAFT_KEYS.object(id)) : null;
 

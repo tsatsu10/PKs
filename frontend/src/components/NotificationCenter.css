@@ -41,6 +41,7 @@
   box-shadow: 0 0 12px var(--cosmic-pink-glow);
 }
 
+/* Dropdown-style panel (kept for any reuse); side panel uses .notification-panel-side */
 .notification-panel {
   position: absolute;
   top: 100%;
@@ -61,12 +62,83 @@
   margin-right: env(safe-area-inset-right, 0);
 }
 
+/* Side panel: fixed to right edge of screen, slides in */
+.notification-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  animation: notification-backdrop-in 0.2s ease-out;
+}
+
+@keyframes notification-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.notification-panel-side {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, calc(100vw - 2rem));
+  max-width: 100%;
+  margin: 0;
+  margin-top: 0;
+  border-radius: 0;
+  border-left: 1px solid var(--glass-border);
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: notification-panel-slide-in 0.25s ease-out;
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+@keyframes notification-panel-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.notification-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .notification-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.notification-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.notification-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--polar-dim);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  border-radius: 8px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.notification-panel-close:hover {
+  color: var(--polar-white);
+  background: var(--glass-bg);
 }
 
 .notification-panel-header h3 {
@@ -194,6 +266,7 @@
   padding: 0.5rem 1rem;
   border-top: 1px solid var(--glass-border);
   text-align: center;
+  flex-shrink: 0;
 }
 
 .notification-panel-footer a {

@@ -4,6 +4,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
+import { formatObjectTypeLabel } from '../constants';
 import './Notifications.css';
 
 const PAGE_SIZE = 30;
@@ -91,7 +92,7 @@ export default function Notifications() {
                   <span className="notifications-title">{n.title}</span>
                   {n.body && <span className="notifications-body">{n.body}</span>}
                   <span className="notifications-meta">
-                    {n.type.replace('_', ' ')} · {new Date(n.created_at).toLocaleString()}
+                    {formatObjectTypeLabel(n.type)} · {new Date(n.created_at).toLocaleString()}
                   </span>
                 </div>
                 <div className="notifications-item-actions">

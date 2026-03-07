@@ -19,7 +19,7 @@ export function useIsMobile(threshold = BP.md) {
   useEffect(() => {
     const m = getMatchMedia(`(max-width: ${threshold}px)`);
     if (!m) return;
-    setMatches(m.matches);
+    queueMicrotask(() => setMatches(m.matches));
     const listener = () => setMatches(m.matches);
     m.addEventListener('change', listener);
     return () => m.removeEventListener('change', listener);

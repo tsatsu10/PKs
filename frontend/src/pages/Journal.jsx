@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import './Journal.css';
@@ -55,8 +56,9 @@ export default function Journal() {
       .eq('user_id', user.id)
       .gte('entry_date', startStr)
       .lte('entry_date', endStr)
-      .then(({ data }) => {
+      .then(({ data, error: e }) => {
         if (cancelled) return;
+        if (e && import.meta.env.DEV) console.warn('Journal dates fetch failed:', e);
         setEntryDates(new Set((data || []).map((r) => r.entry_date)));
         setLoadingDates(false);
       });
@@ -95,7 +97,7 @@ export default function Journal() {
       .then(({ data, error: e }) => {
         setEntry(data || null);
         setContent(data?.content ?? '');
-        setError(e?.message ?? '');
+        setError(getErrorMessage(e, ''));
         setLoadingEntry(false);
       });
   }, [view, selectedDate, user?.id]);
@@ -118,7 +120,7 @@ export default function Journal() {
       setEntryDates((prev) => new Set([...prev, selectedDate]));
       addToast('success', 'Entry saved');
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to save');
+      const msg = getErrorMessage(err, 'Failed to save');
       addToast('error', msg);
       setError(msg);
     } finally {

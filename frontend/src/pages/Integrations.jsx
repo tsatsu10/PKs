@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { INTEGRATION_TYPES, WEBHOOK_EVENTS } from '../constants';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonList } from '../components/Skeleton';
@@ -58,7 +59,7 @@ export default function Integrations() {
       setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       setForm({ name: '', type: 'generic', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add integration'));
+      setError(getErrorMessage(err, 'Failed to add integration'));
     } finally {
       setAdding(false);
     }
@@ -106,7 +107,7 @@ export default function Integrations() {
       setEditingConfigId(null);
       setEditConfig({ url: '', events: [], secret: '' });
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to update webhook config'));
+      setError(getErrorMessage(err, 'Failed to update webhook config'));
     }
   }
 
@@ -121,7 +122,7 @@ export default function Integrations() {
       if (err) throw err;
       setList((prev) => prev.map((i) => (i.id === id ? { ...i, enabled } : i)));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to update'));
+      setError(getErrorMessage(err, 'Failed to update'));
     }
   }
 
@@ -133,7 +134,7 @@ export default function Integrations() {
       if (err) throw err;
       setList((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete'));
+      setError(getErrorMessage(err, 'Failed to delete'));
     }
   }
 

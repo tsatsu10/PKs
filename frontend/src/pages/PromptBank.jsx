@@ -4,6 +4,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { OBJECT_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
 import './PromptBank.css';
 const OUTPUT_FORMATS = ['text', 'markdown', 'json'];
@@ -171,7 +172,7 @@ export default function PromptBank() {
       }
       closeEditor();
     } catch (e) {
-      const msg = e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Save failed');
+      const msg = getErrorMessage(e, 'Save failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -193,7 +194,7 @@ export default function PromptBank() {
       setDeleteConfirmId(null);
       addToast('success', 'Prompt deleted');
     } catch (e) {
-      const msg = e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Delete failed');
+      const msg = getErrorMessage(e, 'Delete failed');
       setError(msg);
       addToast('error', msg);
     }
@@ -275,16 +276,16 @@ export default function PromptBank() {
           )}
 
           {templates.length === 0 ? (
-            <div className="prompt-bank-empty">
+            <section className="prompt-bank-empty empty-state" aria-label="No prompts">
               <div className="prompt-bank-empty-icon" aria-hidden="true">💬</div>
-              <p className="prompt-bank-empty-title">No prompts yet</p>
-              <p className="prompt-bank-empty-desc">
+              <p className="empty-state-title">No prompts yet</p>
+              <p className="empty-state-desc">
                 Save prompts you collect so you can copy them anytime or run them on a knowledge object.
               </p>
               <button type="button" className="btn btn-primary" onClick={openNew}>
                 Save your first prompt
               </button>
-            </div>
+            </section>
           ) : (
             <ul className="prompt-bank-list" role="list">
               {filteredTemplates.map((t) => {

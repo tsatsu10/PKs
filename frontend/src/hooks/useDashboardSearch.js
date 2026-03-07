@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
+import { getErrorMessage } from '../lib/errors';
 
 const PAGE_SIZE = 20;
 
@@ -70,7 +71,7 @@ export function useDashboardSearch({ userId }) {
         setOffset(nextOffset + list.length);
       } catch (e) {
         setError(
-          e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Search failed')
+          getErrorMessage(e, 'Search failed')
         );
         if (!isLoadMore) setObjects([]);
       } finally {

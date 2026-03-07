@@ -1,4 +1,4 @@
-import { OBJECT_TYPES, OBJECT_STATUSES } from '../constants';
+import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 
 /**
  * Filter panel for dashboard search: type, status, domain, tag, date range.
@@ -32,7 +32,7 @@ export default function DashboardFilterPanel({
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">Any</option>
           {OBJECT_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
           ))}
         </select>
       </label>

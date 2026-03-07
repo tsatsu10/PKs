@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import './PasteBin.css';
@@ -28,7 +29,7 @@ export default function PasteBin() {
         .order('created_at', { ascending: false })
         .limit(100);
       if (cancelled) return;
-      setError(e?.message ?? e?.error_description ?? '');
+      setError(getErrorMessage(e, ''));
       setPastes(data || []);
       setLoading(false);
     }
@@ -46,6 +47,8 @@ export default function PasteBin() {
       setTitle('');
       setContent('');
     }
+    // Sync from selected paste; use primitives to avoid re-running when selected ref changes but content is same
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id, selected?.title, selected?.content, creating]);
 
   async function handleSave() {
@@ -77,7 +80,7 @@ export default function PasteBin() {
         addToast('success', 'Paste created');
       }
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to save');
+      const msg = getErrorMessage(err, 'Failed to save');
       addToast('error', msg);
       setError(msg);
     } finally {
@@ -98,7 +101,7 @@ export default function PasteBin() {
       setContent('');
       addToast('success', 'Paste deleted');
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete');
+      const msg = getErrorMessage(err, 'Failed to delete');
       addToast('error', msg);
       setError(msg);
     }
@@ -141,8 +144,9 @@ export default function PasteBin() {
           {loading ? (
             <p className="paste-bin-muted">Loading…</p>
           ) : pastes.length === 0 ? (
-            <div className="paste-bin-empty">
-              <p className="paste-bin-empty-desc">No pastes yet. Store snippets, code, or text you want to reuse.</p>
+            <div className="paste-bin-empty empty-state">
+              <p className="empty-state-title">No pastes yet</p>
+              <p className="empty-state-desc">Store snippets, code, or text you want to reuse.</p>
               <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
                 Create your first paste
               </button>

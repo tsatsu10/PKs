@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './MainMenuDeck.css';
 
@@ -31,56 +31,13 @@ function getWheelPosition(index) {
   };
 }
 
-export const MAIN_MENU_DECK_KEY = 'pks-main-menu-deck';
-
-export function getMainMenuDeckEnabled() {
-  try {
-    const v = localStorage.getItem(MAIN_MENU_DECK_KEY);
-    return v !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-export function setMainMenuDeckEnabled(enabled) {
-  try {
-    localStorage.setItem(MAIN_MENU_DECK_KEY, enabled ? 'true' : 'false');
-  } catch (_e) {
-    void _e;
-  }
-}
-
-const DeckEnabledContext = createContext({
-  deckEnabled: true,
-  setDeckEnabled: () => {},
-});
-
-export function DeckProvider({ children }) {
-  const [deckEnabled, setDeckEnabledState] = useState(getMainMenuDeckEnabled);
-
-  function setDeckEnabled(enabled) {
-    setMainMenuDeckEnabled(enabled);
-    setDeckEnabledState(enabled);
-  }
-
-  return (
-    <DeckEnabledContext.Provider value={{ deckEnabled, setDeckEnabled }}>
-      {children}
-    </DeckEnabledContext.Provider>
-  );
-}
-
-export function useDeckEnabled() {
-  return useContext(DeckEnabledContext);
-}
-
 export default function MainMenuDeck() {
   const [open, setOpen] = useState(false);
   const wheelRef = useRef(null);
   const location = useLocation();
 
   useEffect(() => {
-    setOpen(false);
+    queueMicrotask(() => setOpen(false));
   }, [location.pathname]);
 
   useEffect(() => {

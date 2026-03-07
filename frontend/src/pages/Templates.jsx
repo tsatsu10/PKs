@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import './Templates.css';
 
@@ -70,13 +71,20 @@ export default function Templates() {
 
   function openEdit(t) {
     setEditingId(t.id);
+    let schemaVal = defaultSchema;
+    if (t.schema && typeof t.schema === 'object') {
+      schemaVal = t.schema;
+    } else if (t.schema) {
+      try {
+        schemaVal = JSON.parse(t.schema || JSON.stringify(defaultSchema));
+      } catch {
+        schemaVal = defaultSchema;
+      }
+    }
     setForm({
       name: t.name,
       description: t.description || '',
-      schema:
-        t.schema && typeof t.schema === 'object'
-          ? t.schema
-          : JSON.parse(t.schema || JSON.stringify(defaultSchema)),
+      schema: schemaVal,
     });
     setError('');
   }
@@ -209,8 +217,7 @@ export default function Templates() {
       closeEditor();
     } catch (e) {
       if (import.meta.env.DEV) console.error('Template save failed:', e);
-      const msg =
-        e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Save failed');
+      const msg = getErrorMessage(e, 'Save failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -241,8 +248,7 @@ export default function Templates() {
       openEdit(data);
       addToast('success', 'Template duplicated');
     } catch (e) {
-      const msg =
-        e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Duplicate failed');
+      const msg = getErrorMessage(e, 'Duplicate failed');
       setError(msg);
       addToast('error', msg);
     }
@@ -262,8 +268,7 @@ export default function Templates() {
       setDeleteConfirmId(null);
       addToast('success', 'Template deleted');
     } catch (e) {
-      const msg =
-        e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Delete failed');
+      const msg = getErrorMessage(e, 'Delete failed');
       setError(msg);
       addToast('error', msg);
     }
@@ -324,19 +329,19 @@ export default function Templates() {
           </div>
 
           {list.length === 0 ? (
-            <div className="templates-empty-state">
+            <section className="templates-empty-state empty-state" aria-label="No templates">
               <div className="templates-empty-icon" aria-hidden="true">
                 📋
               </div>
-              <p className="templates-empty-title">No templates yet</p>
-              <p className="templates-empty-desc">
+              <p className="empty-state-title">No templates yet</p>
+              <p className="empty-state-desc">
                 Create a template to get a guided form when adding new objects—e.g. meeting notes,
                 reports, or SOPs.
               </p>
               <button type="button" className="btn btn-primary" onClick={openNew}>
                 Create your first template
               </button>
-            </div>
+            </section>
           ) : (
             <ul className="templates-list" role="list">
               {filteredList.map((t) => {

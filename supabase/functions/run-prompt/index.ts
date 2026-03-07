@@ -10,29 +10,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// In-memory rate limit: per user, per instance (for global limits use Redis/KV).
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 30;
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const entry = rateLimitMap.get(userId);
-  if (!entry) {
-    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true };
-  }
-  if (now >= entry.resetAt) {
-    entry.count = 1;
-    entry.resetAt = now + RATE_LIMIT_WINDOW_MS;
-    return { allowed: true };
-  }
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
-  }
-  entry.count += 1;
-  return { allowed: true };
-}
+// Rate limit: per user, per minute, via DB (works across all edge instances).
+const RATE_LIMIT_PER_MINUTE = 20;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -60,20 +39,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const rl = checkRateLimit(user.id);
-    if (!rl.allowed) {
+    const { data: rlData, error: rlError } = await supabase.rpc("increment_run_prompt_rate_limit", {
+      p_limit_per_minute: RATE_LIMIT_PER_MINUTE,
+    });
+    if (rlError) {
+      return new Response(
+        JSON.stringify({
+          error: "Rate limit check failed",
+          code: "RATE_LIMIT_ERROR",
+          hint: "Try again in a moment.",
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const rl = rlData as { count?: number; limited?: boolean; retry_after_sec?: number; error?: string } | null;
+    if (rl?.error === "unauthorized" || (rl?.limited === true)) {
+      const retryAfter = typeof rl?.retry_after_sec === "number" ? rl.retry_after_sec : 60;
       return new Response(
         JSON.stringify({
           error: "Too many requests",
           code: "RATE_LIMITED",
-          retryAfter: rl.retryAfter,
+          hint: `Limit: ${RATE_LIMIT_PER_MINUTE} Run prompt requests per minute. Try again in ${retryAfter}s.`,
+          retryAfter,
         }),
         {
           status: 429,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
-            ...(rl.retryAfter != null ? { "Retry-After": String(rl.retryAfter) } : {}),
+            "Retry-After": String(retryAfter),
           },
         }
       );

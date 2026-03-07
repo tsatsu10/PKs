@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
@@ -47,7 +48,7 @@ export default function Login() {
         password,
       });
       if (err) {
-        const msg = err?.message ?? err?.error_description ?? 'Login failed';
+        const msg = getErrorMessage(err, 'Login failed');
         if (msg.toLowerCase().includes('email not confirmed')) {
           throw new Error('Please check your email and click the confirmation link before signing in.');
         }
@@ -79,7 +80,7 @@ export default function Login() {
       });
       setTimeout(() => navigate('/', { replace: true }), 50);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Login failed'));
+      setError(getErrorMessage(err, 'Login failed'));
     } finally {
       setSubmitting(false);
     }

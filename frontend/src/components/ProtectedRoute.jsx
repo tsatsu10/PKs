@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from './AppLayout';
-import { DeckProvider } from './MainMenuDeck';
+import { DeckProvider } from './MainMenuDeckContext';
 
 export default function ProtectedRoute({ children }) {
   const { user, loading, sessionExpired } = useAuth();

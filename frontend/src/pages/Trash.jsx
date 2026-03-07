@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { OBJECT_TYPE_ICONS } from '../constants';
+import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import { SkeletonList } from '../components/Skeleton';
 import './Trash.css';
 
@@ -31,7 +32,7 @@ export default function Trash() {
       if (err) throw err;
       setObjects(data || []);
     } catch (e) {
-      setError(e?.message ?? 'Failed to load trash');
+      setError(getErrorMessage(e, 'Failed to load trash'));
       setObjects([]);
     } finally {
       setLoading(false);
@@ -55,7 +56,7 @@ export default function Trash() {
       addToast('success', 'Restored');
       setObjects((prev) => prev.filter((o) => o.id !== id));
     } catch (e) {
-      addToast('error', e?.message ?? 'Restore failed');
+      addToast('error', getErrorMessage(e, 'Restore failed'));
     } finally {
       setRestoringId(null);
     }
@@ -75,7 +76,7 @@ export default function Trash() {
       addToast('success', 'Permanently deleted');
       setObjects((prev) => prev.filter((o) => o.id !== id));
     } catch (e) {
-      addToast('error', e?.message ?? 'Delete failed');
+      addToast('error', getErrorMessage(e, 'Delete failed'));
     } finally {
       setDeletingId(null);
     }
@@ -94,15 +95,16 @@ export default function Trash() {
       {loading ? (
         <SkeletonList lines={6} />
       ) : objects.length === 0 ? (
-        <section className="trash-empty" aria-label="Trash empty">
-          <p className="trash-empty-text">Nothing in trash. Deleted objects will appear here.</p>
+        <section className="trash-empty empty-state" aria-label="Trash empty">
+          <p className="empty-state-title">Nothing in trash</p>
+          <p className="empty-state-desc">Deleted objects will appear here. You can restore or permanently delete them.</p>
           <Link to="/" className="btn btn-primary">Back to Dashboard</Link>
         </section>
       ) : (
         <ul className="trash-list" aria-label="Deleted objects">
           {objects.map((o) => (
             <li key={o.id} className="trash-item">
-              <span className="trash-item-type" title={o.type} aria-hidden>
+              <span className="trash-item-type" title={formatObjectTypeLabel(o.type)} aria-hidden>
                 {OBJECT_TYPE_ICONS[o.type] ?? '•'}
               </span>
               <span className="trash-item-title">{o.title || 'Untitled'}</span>

@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
-import { OBJECT_TYPE_ICONS, OBJECT_TYPES, OBJECT_STATUSES } from '../constants';
+import { OBJECT_TYPE_ICONS, OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
@@ -16,10 +16,18 @@ import { useDashboardSearch } from '../hooks/useDashboardSearch';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import DashboardQuickAddForm from '../components/DashboardQuickAddForm';
 import DashboardStats from '../components/DashboardStats';
+import { getErrorMessage } from '../lib/errors';
 import './Dashboard.css';
 
-function bulkErrorMessage(err, fallback) {
-  return err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : fallback);
+const VIEW_MODE_KEY = 'pks-dashboard-view';
+const DENSITY_KEY = 'pks-dashboard-density';
+const SEARCH_DEBOUNCE_MS = 300;
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 export default function Dashboard() {
@@ -59,13 +67,25 @@ export default function Dashboard() {
     hasActiveFilters,
   } = useDashboardSearch({ userId: user?.id ?? null });
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'card'
+  const [viewMode, setViewMode] = useState(() => {
+    try { return (localStorage.getItem(VIEW_MODE_KEY) || 'list'); } catch { return 'list'; }
+  });
+  const [listDensity, setListDensity] = useState(() => {
+    try { return (localStorage.getItem(DENSITY_KEY) || 'comfortable'); } catch { return 'comfortable'; }
+  });
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportScope, setExportScope] = useState('selected'); // 'selected' | 'filtered'
   const [exportFormat, setExportFormat] = useState('md');
   const [exportTemplate, setExportTemplate] = useState('full');
   const [exporting, setExporting] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState('');
+  const [commandPaletteSelected, setCommandPaletteSelected] = useState(0);
+  const commandPaletteInputRef = useRef(null);
+  const commandPaletteFilteredLengthRef = useRef(0);
+  const commandPaletteActionsRef = useRef([]);
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [quickAddContent, setQuickAddContent] = useState('');
   const [quickAddSaving, setQuickAddSaving] = useState(false);
@@ -84,21 +104,25 @@ export default function Dashboard() {
   const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const location = useLocation();
 
+  const listRowHeight = viewMode === 'card'
+    ? (listDensity === 'compact' ? 220 : 280)
+    : (listDensity === 'compact' ? 56 : 72);
   const listVirtualizer = useVirtualizer({
     count: objects.length,
     getScrollElement: () => listScrollRef.current,
-    estimateSize: () => (viewMode === 'card' ? 220 : 72),
+    estimateSize: () => listRowHeight,
     overscan: 5,
   });
   const [runPromptTemplate, setRunPromptTemplate] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return localStorage.getItem('pks-onboarding-dismissed') !== 'true'; } catch { return false; }
   });
+  const [heroStats, setHeroStats] = useState(null);
 
   // Sync search input from URL only when the URL query changes (e.g. navigation), not when user types
   useEffect(() => {
     setSearchQuery(qFromUrl);
-  }, [qFromUrl]);
+  }, [qFromUrl, setSearchQuery]);
 
   const dueSoonFromParams = searchParams.get('due') === 'soon';
   const typeFromParams = searchParams.get('type') ?? '';
@@ -142,6 +166,8 @@ export default function Dashboard() {
     }
     const t = setTimeout(() => runSearch(0), 0);
     return () => clearTimeout(t);
+    // Intentionally only depend on URL params so we don't re-run when setters/runSearch identity changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, dueSoonFromParams, typeFromParams, statusFromParams, updatedFromParams]);
 
   useEffect(() => {
@@ -161,6 +187,69 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only react to URL/user, not runSearch
   }, [user?.id, qFromUrl]);
 
+  // Persist list/card view and density
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* ignore */ }
+  }, [viewMode]);
+  useEffect(() => {
+    try { localStorage.setItem(DENSITY_KEY, listDensity); } catch { /* ignore */ }
+  }, [listDensity]);
+
+  // Debounced live search (skip first mount to avoid double run with hook)
+  const searchDebounceInitialRef = useRef(true);
+  useEffect(() => {
+    if (!user?.id) return;
+    if (searchDebounceInitialRef.current) {
+      searchDebounceInitialRef.current = false;
+      return;
+    }
+    const t = setTimeout(() => runSearch(0), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchQuery, user?.id]);
+
+  // Command palette: Cmd/Ctrl+K
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((v) => !v);
+        setCommandPaletteQuery('');
+        setTimeout(() => commandPaletteInputRef.current?.focus(), 0);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+  useEffect(() => {
+    if (!showCommandPalette) return;
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        e.preventDefault();
+        return;
+      }
+      const n = commandPaletteFilteredLengthRef.current;
+      if (e.key === 'ArrowDown') {
+        setCommandPaletteSelected((prev) => Math.min(prev + 1, n - 1));
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        setCommandPaletteSelected((prev) => Math.max(prev - 1, 0));
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Enter') {
+        const actions = commandPaletteActionsRef.current;
+        const idx = Math.min(commandPaletteSelected, Math.max(0, actions.length - 1));
+        if (actions[idx]) actions[idx].run();
+        e.preventDefault();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showCommandPalette, commandPaletteSelected]);
+
   function dismissRunPromptBanner() {
     sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY);
     setRunPromptTemplate(null);
@@ -174,10 +263,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (e.key === 'Escape' && showQuickAdd) {
-        e.preventDefault();
-        closeQuickAdd();
-        return;
+      if (e.key === 'Escape') {
+        if (showQuickAdd) {
+          e.preventDefault();
+          closeQuickAdd();
+          return;
+        }
+        if (selectedIds.size > 0 && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+          e.preventDefault();
+          clearSelection();
+          return;
+        }
       }
       if (e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
         e.preventDefault();
@@ -191,7 +287,7 @@ export default function Dashboard() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [location.pathname, showQuickAdd, closeQuickAdd]);
+  }, [location.pathname, showQuickAdd, closeQuickAdd, selectedIds.size]);
 
   function handleSearchSubmit(e) {
     e.preventDefault();
@@ -247,7 +343,7 @@ export default function Dashboard() {
       runSearch(0);
       navigate(`/objects/${data.id}`);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to create');
+      const msg = getErrorMessage(err, 'Failed to create');
       addToast('error', msg);
       setError(msg);
     } finally {
@@ -255,13 +351,46 @@ export default function Dashboard() {
     }
   }
 
+  async function fetchFilteredIds() {
+    const ids = [];
+    const limit = 100;
+    let offset = 0;
+    const rpcName = searchQuery?.trim() ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
+    while (true) {
+      const { data, error: err } = await supabase.rpc(rpcName, {
+        search_query: searchQuery?.trim() || null,
+        type_filter: typeFilter || null,
+        domain_id_f: domainFilter || null,
+        tag_id_f: tagFilter || null,
+        date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
+        date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
+        status_filter: statusFilter || null,
+        due_from_f: dueFrom ? `${dueFrom}T00:00:00Z` : null,
+        due_to_f: dueTo ? `${dueTo}T23:59:59Z` : null,
+        limit_n: limit,
+        offset_n: offset,
+      });
+      if (err || !data?.length) break;
+      ids.push(...data.map((o) => o.id));
+      if (data.length < limit) break;
+      offset += limit;
+    }
+    return ids;
+  }
+
   async function handleExportSelected() {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
     setExporting(true);
     setError('');
     let jobId = null;
     try {
+      const ids = exportScope === 'filtered'
+        ? await fetchFilteredIds()
+        : Array.from(selectedIds);
+      if (ids.length === 0) {
+        addToast('error', exportScope === 'filtered' ? 'No objects match current filters' : 'Select at least one object');
+        setExporting(false);
+        return;
+      }
       const include = getExportIncludeFromTemplate(exportTemplate, { includeLinks: false });
       const { data: job, error: jobErr } = await supabase.from('export_jobs').insert({
         user_id: user.id,
@@ -307,14 +436,19 @@ export default function Dashboard() {
       });
 
       const zip = new JSZip();
-      ids.forEach((id) => {
-        const obj = objMap[id];
-        if (!obj) return;
-        const slug = obj.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
-        const ext = exportFormat === 'txt' ? 'txt' : 'md';
-        const text = buildObjectMarkdown(obj, include, { asPlainText: exportFormat === 'txt' });
-        zip.file(`${slug}.${ext}`, text);
-      });
+      const ZIP_CHUNK = 20;
+      for (let i = 0; i < ids.length; i += ZIP_CHUNK) {
+        const chunk = ids.slice(i, i + ZIP_CHUNK);
+        for (const id of chunk) {
+          const obj = objMap[id];
+          if (!obj) continue;
+          const slug = obj.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
+          const ext = exportFormat === 'txt' ? 'txt' : 'md';
+          const text = buildObjectMarkdown(obj, include, { asPlainText: exportFormat === 'txt' });
+          zip.file(slug + '.' + ext, text);
+        }
+        if (i + ZIP_CHUNK < ids.length) await new Promise((r) => setTimeout(r, 0));
+      }
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -327,9 +461,9 @@ export default function Dashboard() {
       logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, jobId, { objectCount: ids.length, format: exportFormat });
       addToast('success', `Exported ${ids.length} objects`);
       setShowExportModal(false);
-      clearSelection();
+      if (exportScope === 'selected') clearSelection();
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Export failed');
+      const msg = getErrorMessage(err, 'Export failed');
       if (jobId) await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
       setError(msg);
       addToast('error', msg);
@@ -363,7 +497,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk add domain failed');
+      const msg = getErrorMessage(err, 'Bulk add domain failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -387,7 +521,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk add tag failed');
+      const msg = getErrorMessage(err, 'Bulk add tag failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -414,7 +548,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk remove domain failed');
+      const msg = getErrorMessage(err, 'Bulk remove domain failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -441,7 +575,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk remove tag failed');
+      const msg = getErrorMessage(err, 'Bulk remove tag failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -465,7 +599,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk delete failed');
+      const msg = getErrorMessage(err, 'Bulk delete failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -489,7 +623,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk change type failed');
+      const msg = getErrorMessage(err, 'Bulk change type failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -513,7 +647,7 @@ export default function Dashboard() {
       clearSelection();
       runSearch(0);
     } catch (err) {
-      const msg = bulkErrorMessage(err, 'Bulk set status failed');
+      const msg = getErrorMessage(err, 'Bulk set status failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -526,38 +660,110 @@ export default function Dashboard() {
     setShowOnboarding(false);
   };
 
+  // Single dismissible strip: run-prompt takes priority over onboarding
+  const showBanner = runPromptTemplate || showOnboarding;
+  const bannerKind = runPromptTemplate ? 'run-prompt' : 'onboarding';
+
+  // Active filter summary for display
+  const filterSummaryParts = [];
+  if (typeFilter) filterSummaryParts.push(`Type: ${formatObjectTypeLabel(typeFilter)}`);
+  if (statusFilter) filterSummaryParts.push(`Status: ${statusFilter}`);
+  if (domainFilter) {
+    const d = domains.find((x) => x.id === domainFilter);
+    if (d) filterSummaryParts.push(`Domain: ${d.name}`);
+  }
+  if (tagFilter) {
+    const t = tags.find((x) => x.id === tagFilter);
+    if (t) filterSummaryParts.push(`Tag: ${t.name}`);
+  }
+  if (dateFrom || dateTo) filterSummaryParts.push('Updated: custom range');
+  if (dueFrom || dueTo) filterSummaryParts.push('Due: custom range');
+  const filterSummaryText = filterSummaryParts.join(' · ');
+
   return (
     <div className="dashboard">
       <main className="dashboard-main" aria-busy={loading} aria-live="polite">
-        {showOnboarding && (
-          <div className="dashboard-onboarding" role="region" aria-label="Getting started">
-            <h3 className="dashboard-onboarding-title">Getting started</h3>
-            <ol className="dashboard-onboarding-steps">
-              <li><Link to="/objects/new">Create your first object</Link> — a note or reference.</li>
-              <li><Link to="/settings">Add a domain or tag</Link> in Settings to organize later.</li>
-              <li><Link to="/quick">Try Quick capture</Link> to dump a thought in seconds.</li>
-            </ol>
-            <button type="button" className="btn btn-secondary btn-small" onClick={dismissOnboarding}>Got it</button>
+        {/* Hero / welcome strip */}
+        <section className="dashboard-hero" aria-label="Welcome">
+          <p className="dashboard-hero-greeting">
+            {getGreeting()}{user?.displayName ? `, ${user.displayName}` : ''}
+          </p>
+          <p className="dashboard-hero-context">
+            {heroStats
+              ? (() => {
+                  const total = heroStats.total ?? 0;
+                  const due7 = heroStats.due_next_7_days ?? 0;
+                  const updated7 = heroStats.updated_last_7_days ?? 0;
+                  if (total === 0) return 'Your knowledge base — create your first object to get started.';
+                  const parts = [];
+                  if (total > 0) parts.push(`${total} object${total !== 1 ? 's' : ''}`);
+                  if (due7 > 0) parts.push(`${due7} due this week`);
+                  if (updated7 > 0 && due7 === 0) parts.push(`${updated7} updated in the last 7 days`);
+                  return parts.length ? parts.join(' · ') : 'Your knowledge base';
+                })()
+              : 'Your knowledge base'}
+          </p>
+        </section>
+
+        {/* Single dismissible banner: run-prompt or onboarding */}
+        {showBanner && (
+          <div className="dashboard-banner" role="region" aria-label={bannerKind === 'run-prompt' ? 'Run prompt' : 'Getting started'}>
+            {bannerKind === 'run-prompt' ? (
+              <>
+                <span className="dashboard-banner-text">
+                  Run prompt: <strong>{runPromptTemplate.name}</strong>. Open an object to run this prompt.
+                </span>
+                <button type="button" className="btn btn-ghost btn-small" onClick={dismissRunPromptBanner} aria-label="Dismiss">Dismiss</button>
+              </>
+            ) : (
+              <>
+                <h3 className="dashboard-banner-title">Getting started</h3>
+                <ol className="dashboard-banner-steps">
+                  <li><Link to="/objects/new">Create your first object</Link> — a note or reference.</li>
+                  <li><Link to="/settings">Add a domain or tag</Link> in Settings to organize later.</li>
+                  <li><Link to="/quick">Try Quick capture</Link> to capture a thought in seconds.</li>
+                </ol>
+                <button type="button" className="btn btn-secondary btn-small" onClick={dismissOnboarding}>Got it</button>
+              </>
+            )}
           </div>
         )}
-        {runPromptTemplate && (
-          <div className="dashboard-run-prompt-banner" role="status">
-            <span className="dashboard-run-prompt-banner-text">
-              Run prompt: <strong>{runPromptTemplate.name}</strong>. Click an object to open it and run this prompt.
-            </span>
-            <button type="button" className="btn btn-ghost btn-small" onClick={dismissRunPromptBanner} aria-label="Dismiss">
-              Dismiss
-            </button>
+
+        <DashboardStats userId={user?.id ?? null} onStats={setHeroStats} />
+
+        {/* Continue where you left off */}
+        {!loading && objects.length > 0 && (
+          <div className="dashboard-focus">
+            <Link to={`/objects/${objects[0].id}`} className="dashboard-focus-link">
+              Continue where you left off: <strong>{objects[0].title}</strong>
+            </Link>
           </div>
         )}
-        <DashboardStats userId={user?.id ?? null} />
+
+        {/* Suggested next step when few objects and no domains */}
+        {heroStats && (heroStats.total ?? 0) <= 5 && domains.length === 0 && (heroStats.total ?? 0) > 0 && (
+          <p className="dashboard-suggested-next">
+            <Link to="/settings">Add domains in Settings</Link> to organize by topic.
+          </p>
+        )}
+
         <section className="dashboard-actions">
-          <h2>Knowledge objects</h2>
+          <h2 className="dashboard-actions-heading">
+            Knowledge objects
+            {!loading && (
+              <span className="dashboard-result-count" aria-live="polite">
+                {objects.length === 0
+                  ? ' — No results'
+                  : hasMore
+                    ? ` — ${objects.length}+ objects`
+                    : ` — ${objects.length} object${objects.length !== 1 ? 's' : ''}`}
+              </span>
+            )}
+          </h2>
           <div className="dashboard-actions-right">
             {selectedIds.size > 0 && (
               <span className="dashboard-selection-actions">
                 <span className="muted">{selectedIds.size} selected</span>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowExportModal(true)}>Export selected</button>
                 <div className="dashboard-bulk-dropdown" ref={bulkMenuRef}>
                   <button
                     type="button"
@@ -588,53 +794,113 @@ export default function Dashboard() {
               <button type="button" className={`btn btn-secondary btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view">≡</button>
               <button type="button" className={`btn btn-secondary btn-icon ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')} aria-pressed={viewMode === 'card'} title="Card view">▦</button>
             </div>
+            <div className="density-toggle" role="group" aria-label="List density">
+              <button type="button" className={`btn btn-secondary btn-icon ${listDensity === 'compact' ? 'active' : ''}`} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'} title="Compact rows">Compact</button>
+              <button type="button" className={`btn btn-secondary btn-icon ${listDensity === 'comfortable' ? 'active' : ''}`} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'} title="Comfortable rows">Comfy</button>
+            </div>
             <Link to="/quick" className="btn btn-secondary">Quick capture</Link>
+            <button type="button" className="btn btn-secondary" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
+              Export
+            </button>
             <Link to="/objects/new" className="btn btn-primary">New object</Link>
           </div>
         </section>
 
-        <form onSubmit={handleSearchSubmit} className="search-bar">
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search title, summary, content, tags… (press / to focus)"
-            className="search-input"
-            aria-label="Search"
-          />
-          <button type="submit" className="btn btn-primary">Search</button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShowFilters((s) => !s)}
-            aria-expanded={showFilters}
-          >
-            {showFilters ? 'Hide filters' : 'Filters'}
-          </button>
-        </form>
-
-        {domains.length > 0 && (
-          <nav className="dashboard-quick-filters" aria-label="Filter by domain">
+        <div className="dashboard-search-sticky">
+          <form onSubmit={handleSearchSubmit} className="search-bar">
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search objects… (/)"
+              className="search-input"
+              aria-label="Search"
+            />
+            <button type="submit" className="btn btn-primary">Search</button>
             <button
               type="button"
-              className={`quick-filter-pill ${!domainFilter ? 'active' : ''}`}
-              onClick={() => { setDomainFilter(''); runSearch(0, null, { domain_id_f: null }); }}
+              className="btn btn-secondary"
+              onClick={() => setShowFilters((s) => !s)}
+              aria-expanded={showFilters}
             >
-              All
+              {showFilters ? 'Hide filters' : 'Filters'}
             </button>
-            {domains.slice(0, 8).map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className={`quick-filter-pill ${domainFilter === d.id ? 'active' : ''}`}
-                onClick={() => { setDomainFilter(d.id); runSearch(0, null, { domain_id_f: d.id }); }}
-              >
-                {d.name}
+          </form>
+
+          <div className="dashboard-filter-presets" aria-label="Filter presets">
+            <button
+              type="button"
+              className={`quick-filter-pill ${dueFrom && dueTo ? 'active' : ''}`}
+              onClick={() => {
+                const today = new Date();
+                const in7 = new Date(today);
+                in7.setDate(in7.getDate() + 7);
+                setDueFrom(today.toISOString().slice(0, 10));
+                setDueTo(in7.toISOString().slice(0, 10));
+                setDateFrom('');
+                setDateTo('');
+                runSearch(0);
+                setShowFilters(true);
+              }}
+            >
+              Due soon
+            </button>
+            <button
+              type="button"
+              className={`quick-filter-pill ${dateFrom && dateTo && !dueFrom && !dueTo ? 'active' : ''}`}
+              onClick={() => {
+                const today = new Date();
+                const weekAgo = new Date(today);
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                setDateFrom(weekAgo.toISOString().slice(0, 10));
+                setDateTo(today.toISOString().slice(0, 10));
+                setDueFrom('');
+                setDueTo('');
+                runSearch(0);
+                setShowFilters(true);
+              }}
+            >
+              Recent (7d)
+            </button>
+            {hasActiveFilters && (
+              <button type="button" className="quick-filter-pill dashboard-filter-preset-clear" onClick={clearFilters}>
+                Clear filters
               </button>
-            ))}
-          </nav>
-        )}
+            )}
+          </div>
+
+          {hasActiveFilters && filterSummaryText && (
+            <div className="dashboard-filter-summary">
+              <span className="dashboard-filter-summary-text">{filterSummaryText}</span>
+              <button type="button" className="btn btn-ghost btn-small" onClick={clearFilters}>
+                Clear all
+              </button>
+            </div>
+          )}
+
+          {domains.length > 0 && (
+            <nav className="dashboard-quick-filters" aria-label="Filter by domain">
+              <button
+                type="button"
+                className={`quick-filter-pill ${!domainFilter ? 'active' : ''}`}
+                onClick={() => { setDomainFilter(''); runSearch(0, null, { domain_id_f: null }); }}
+              >
+                All
+              </button>
+              {domains.slice(0, 8).map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={`quick-filter-pill ${domainFilter === d.id ? 'active' : ''}`}
+                  onClick={() => { setDomainFilter(d.id); runSearch(0, null, { domain_id_f: d.id }); }}
+                >
+                  {d.name}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
 
         {showFilters && (
           <DashboardFilterPanel
@@ -685,6 +951,18 @@ export default function Dashboard() {
           />
         )}
 
+        {/* FAB on mobile for quick add */}
+        {!showQuickAdd && (
+          <button
+            type="button"
+            className="dashboard-fab"
+            onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
+            aria-label="Add new object"
+          >
+            +
+          </button>
+        )}
+
         {error && (
           <div className="dashboard-error" role="alert" aria-live="assertive">
             {error}
@@ -693,22 +971,23 @@ export default function Dashboard() {
         {loading ? (
           <SkeletonList lines={8} />
         ) : objects.length === 0 ? (
-          <section className="dashboard-empty" aria-label="No results">
+          <section className="dashboard-empty empty-state" aria-label="No results">
             {hasActiveFilters ? (
               <>
-                <p className="dashboard-empty-value">No objects match. Try different search terms or clear filters.</p>
+                <p className="empty-state-desc">No objects match. Try different search terms or clear filters.</p>
                 <button type="button" className="btn btn-primary" onClick={clearFilters}>Clear filters</button>
               </>
             ) : (
               <>
-                <p className="dashboard-empty-value">No objects yet. Create your first note or reference to get started.</p>
-                <Link to="/objects/new" className="btn btn-primary">Create your first object</Link>
+                <p className="empty-state-title">No objects yet</p>
+                <p className="empty-state-desc">Notes, references, and more — all in one place. Create your first to get started.</p>
+                <Link to="/objects/new" className="btn btn-primary">Create your first object — takes less than a minute</Link>
               </>
             )}
           </section>
         ) : (
           <>
-            <div ref={listScrollRef} className="dashboard-object-list-scroll" style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects">
+            <div ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects">
               <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                 {listVirtualizer.getVirtualItems().map((virtualRow) => {
                   const obj = objects[virtualRow.index];
@@ -726,18 +1005,40 @@ export default function Dashboard() {
                     >
                       {viewMode === 'card' ? (
                         <div className="object-card-wrapper">
-                          <label className="object-card-checkbox">
-                            <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
-                          </label>
-                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
-                            {obj.cover_url && <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />}
-                            <span className="object-card-type" title={obj.type}>
-                              <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                              {obj.type}
-                            </span>
-                            <span className="object-card-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
-                            {(obj.snippet || obj.summary) && <span className="object-card-summary">{obj.snippet || obj.summary}</span>}
-                            <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`}>
+                            <div className="object-card-cover-wrap">
+                              {obj.cover_url ? (
+                                <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />
+                              ) : (
+                                <span className="object-card-cover-fallback" aria-hidden="true">
+                                  <span className="object-card-cover-fallback-icon">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
+                                </span>
+                              )}
+                              <span className="object-card-type object-card-type-overlay" title={formatObjectTypeLabel(obj.type)}>
+                                <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
+                                {formatObjectTypeLabel(obj.type)}
+                              </span>
+                              <label className="object-card-checkbox" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
+                              </label>
+                            </div>
+                            <div className="object-card-body">
+                              <h3 className="object-card-title">
+                                {obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}
+                                {obj.title}
+                              </h3>
+                              {(obj.snippet || obj.summary) && (
+                                <p className="object-card-summary">{obj.snippet || obj.summary}</p>
+                              )}
+                              <footer className="object-card-footer">
+                                <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
+                                {obj.due_at && (
+                                  <span className="object-card-due" title={`Due ${new Date(obj.due_at).toLocaleDateString()}`}>
+                                    Due {new Date(obj.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: new Date(obj.due_at).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}
+                                  </span>
+                                )}
+                              </footer>
+                            </div>
                           </Link>
                         </div>
                       ) : (
@@ -745,10 +1046,10 @@ export default function Dashboard() {
                           <label className="object-list-checkbox">
                             <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                           </label>
-                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${obj.type}, version ${obj.current_version}`}>
-                            <span className="object-list-type" title={obj.type}>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`}>
+                            <span className="object-list-type" title={formatObjectTypeLabel(obj.type)}>
                               <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                              {obj.type}
+                              {formatObjectTypeLabel(obj.type)}
                             </span>
                             <span className="object-list-title">{obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}{obj.title}</span>
                             {(obj.snippet || obj.summary) && <span className="object-list-summary">{obj.snippet || obj.summary}</span>}
@@ -771,11 +1072,73 @@ export default function Dashboard() {
           </>
         )}
 
+        {/* Command palette (Cmd/Ctrl+K) */}
+        {showCommandPalette && (
+          <div
+            className="dashboard-command-palette-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            onClick={(e) => e.target === e.currentTarget && setShowCommandPalette(false)}
+          >
+            <div className="dashboard-command-palette" onClick={(e) => e.stopPropagation()}>
+              <input
+                ref={commandPaletteInputRef}
+                type="text"
+                className="dashboard-command-palette-input"
+                value={commandPaletteQuery}
+                onChange={(e) => { setCommandPaletteQuery(e.target.value); setCommandPaletteSelected(0); }}
+                placeholder="Search or run action…"
+                aria-label="Command palette search"
+                autoComplete="off"
+              />
+              <ul className="dashboard-command-palette-list" role="listbox">
+                {(() => {
+                  const q = commandPaletteQuery.trim().toLowerCase();
+                  const actions = [
+                    { id: 'new', label: 'New object', run: () => { setShowCommandPalette(false); navigate('/objects/new'); } },
+                    { id: 'quick', label: 'Quick capture', run: () => { setShowCommandPalette(false); navigate('/quick'); } },
+                    { id: 'due', label: 'Due soon', run: () => { setShowCommandPalette(false); navigate('/?due=soon'); } },
+                    { id: 'settings', label: 'Settings', run: () => { setShowCommandPalette(false); navigate('/settings'); } },
+                    ...objects.slice(0, 5).map((o) => ({ id: o.id, label: o.title, run: () => { setShowCommandPalette(false); navigate(`/objects/${o.id}`); } })),
+                  ];
+                  const filtered = q ? actions.filter((a) => a.label.toLowerCase().includes(q)) : actions;
+                  commandPaletteFilteredLengthRef.current = filtered.length;
+                  commandPaletteActionsRef.current = filtered;
+                  const selected = Math.min(commandPaletteSelected, Math.max(0, filtered.length - 1));
+                  return filtered.map((a, i) => (
+                    <li key={a.id} role="option" aria-selected={i === selected}>
+                      <button
+                        type="button"
+                        className={`dashboard-command-palette-item ${i === selected ? 'selected' : ''}`}
+                        onMouseEnter={() => setCommandPaletteSelected(i)}
+                        onClick={() => a.run()}
+                      >
+                        {a.label}
+                      </button>
+                    </li>
+                  ));
+                })()}
+              </ul>
+              <p className="dashboard-command-palette-hint">↑↓ navigate · Enter run · Esc close</p>
+            </div>
+          </div>
+        )}
+
         {showExportModal && (
           <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
             <div className="dashboard-modal">
-              <h2 id="export-modal-title">Export {selectedIds.size} objects</h2>
+              <h2 id="export-modal-title">
+                {exportScope === 'filtered' ? 'Export filtered results' : `Export ${selectedIds.size} selected`}
+              </h2>
               <p className="muted">Download as a ZIP with one file per object.</p>
+              <label className="dashboard-export-scope">
+                <span>Scope</span>
+                <select value={exportScope} onChange={(e) => setExportScope(e.target.value)} aria-label="Export scope">
+                  <option value="selected">Selected ({selectedIds.size})</option>
+                  <option value="filtered">All matching current filters</option>
+                </select>
+              </label>
               <label>
                 Format
                 <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>

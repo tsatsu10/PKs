@@ -6,7 +6,8 @@ import { useIsMobile } from '../breakpoints';
 import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
-import MainMenuDeck, { useDeckEnabled } from './MainMenuDeck';
+import MainMenuDeck from './MainMenuDeck';
+import { useDeckEnabled } from './MainMenuDeckContext';
 import './AppLayout.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'pks-sidebar-collapsed';
@@ -96,7 +97,7 @@ export default function AppLayout({ children }) {
   }, [collapsed]);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
+    queueMicrotask(() => setMobileMenuOpen(false));
   }, [location.pathname]);
 
   const closeMobileMenu = () => setMobileMenuOpen(false);

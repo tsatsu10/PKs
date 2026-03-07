@@ -43,7 +43,7 @@ export default function ObjectDetailRunPromptPanel({
 
   useEffect(() => {
     if (!modelInAllowed && allowedModels[0]) setRunAiModel(allowedModels[0].id);
-  }, [modelInAllowed, allowedModels]);
+  }, [modelInAllowed, allowedModels, setRunAiModel]);
 
   const syncTemplateText = () => {
     if (runTemplateId) {

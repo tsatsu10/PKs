@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { OBJECT_TYPE_ICONS } from '../constants';
+import { getErrorMessage } from '../lib/errors';
+import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import './DashboardStats.css';
 
 /**
  * Dashboard overview: fetches and displays stats (total, activity, due) and optional breakdown by type/status.
- * Styled to match the main dashboard (glass cards, cosmic-pink accents, same spacing).
+ * Optional onStats(stats) callback so the parent can use stats (e.g. hero context) without a second request.
  */
-export default function DashboardStats({ userId }) {
+export default function DashboardStats({ userId, onStats }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,24 +17,26 @@ export default function DashboardStats({ userId }) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    setLoading(true);
-    setError('');
-    supabase
-      .rpc('get_dashboard_stats')
-      .then(({ data, error: err }) => {
-        if (cancelled) return;
-        if (err) {
-          setError(err.message);
-          setStats(null);
-          return;
-        }
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError('');
+      }
+    });
+    (async () => {
+      const { data, error: err } = await supabase.rpc('get_dashboard_stats');
+      if (cancelled) return;
+      if (err) {
+        setError(getErrorMessage(err, 'Stats unavailable'));
+        setStats(null);
+      } else {
         setStats(data);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        if (onStats && data) onStats(data);
+      }
+      if (!cancelled) setLoading(false);
+    })();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, onStats]);
 
   if (!userId) return null;
 
@@ -77,7 +80,7 @@ export default function DashboardStats({ userId }) {
             typeKeys
               .sort((a, b) => (byType[b] || 0) - (byType[a] || 0))
               .slice(0, 3)
-              .map((t) => `${t.replace(/_/g, ' ')}: ${byType[t]}`)
+              .map((t) => `${formatObjectTypeLabel(t)}: ${byType[t]}`)
               .join(', '),
           statusKeys.length > 0 &&
             statusKeys
@@ -151,7 +154,7 @@ export default function DashboardStats({ userId }) {
                           <span className="dashboard-overview-breakdown-icon" aria-hidden="true">
                             {OBJECT_TYPE_ICONS[type] ?? '📄'}
                           </span>
-                          <span className="dashboard-overview-breakdown-name">{type.replace(/_/g, ' ')}</span>
+                          <span className="dashboard-overview-breakdown-name">{formatObjectTypeLabel(type)}</span>
                           <span className="dashboard-overview-breakdown-count">{count}</span>
                         </Link>
                       </li>

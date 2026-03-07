@@ -31,6 +31,12 @@ export const OBJECT_TYPES = [
 /** Object status (must match DB CHECK: draft, active, archived) */
 export const OBJECT_STATUSES = ['draft', 'active', 'archived'];
 
+/** Format object type for display: underscores → spaces (e.g. research_paper → "research paper"). */
+export function formatObjectTypeLabel(type) {
+  if (!type || typeof type !== 'string') return '';
+  return type.replace(/_/g, ' ');
+}
+
 /** Icons for object types (emoji for quick visual recognition) */
 export const OBJECT_TYPE_ICONS = {
   note: '📝',

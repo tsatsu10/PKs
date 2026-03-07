@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { createNotification } from '../lib/notifications';
@@ -71,7 +72,7 @@ export default function QuickCapture() {
       clearDraft(DRAFT_KEYS.quick);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to capture');
+      const msg = getErrorMessage(err, 'Failed to capture');
       addToast('error', msg);
       setError(msg);
     } finally {

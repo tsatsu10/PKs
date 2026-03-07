@@ -3,9 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
-import { OBJECT_TYPE_ICONS } from '../constants';
+import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
@@ -79,7 +80,7 @@ export default function Search() {
       setHasMore(list.length === PAGE_SIZE);
       setOffset(nextOffset + list.length);
     } catch (e) {
-      setError(e?.message ?? 'Search failed');
+      setError(getErrorMessage(e, 'Search failed'));
       if (!isLoadMore) setObjects([]);
     } finally {
       measureSearchEnd();
@@ -91,6 +92,8 @@ export default function Search() {
   useEffect(() => {
     if (!user?.id) return;
     runSearch(0, qFromUrl || undefined);
+    // Only run when user or URL query changes, not when runSearch identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, qFromUrl]);
 
   useEffect(() => {
@@ -205,7 +208,7 @@ export default function Search() {
                       role="listitem"
                     >
                       <Link to={`/objects/${o.id}`} className="search-result-link">
-                        <span className="search-result-type" aria-hidden>
+                        <span className="search-result-type" title={formatObjectTypeLabel(o.type)} aria-hidden>
                           {OBJECT_TYPE_ICONS[o.type] ?? '•'}
                         </span>
                         <span className="search-result-title">{o.title || 'Untitled'}</span>
@@ -220,14 +223,15 @@ export default function Search() {
             </div>
           )}
           {!loading && objects.length === 0 && query.trim() && (
-            <section className="search-empty-state" aria-label="No results">
-              <p className="search-empty">No objects found. Try different keywords or filters.</p>
+            <section className="search-empty-state empty-state" aria-label="No results">
+              <p className="empty-state-title">No results</p>
+              <p className="empty-state-desc">No objects found. Try different keywords or filters.</p>
               <Link to="/objects/new" className="btn btn-primary">Create new object</Link>
             </section>
           )}
           {!loading && objects.length === 0 && !query.trim() && (
-            <section className="search-empty-state" aria-label="No query">
-              <p className="search-empty">Enter a search query above to find objects.</p>
+            <section className="search-empty-state empty-state" aria-label="No query">
+              <p className="empty-state-desc">Enter a search query above to find objects.</p>
               <Link to="/" className="btn btn-secondary">Go to Dashboard</Link>
             </section>
           )}

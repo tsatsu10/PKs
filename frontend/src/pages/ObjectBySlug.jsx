@@ -14,7 +14,7 @@ export default function ObjectBySlug() {
 
   useEffect(() => {
     if (!user?.id || !slug) {
-      setStatus('not-found');
+      queueMicrotask(() => setStatus('not-found'));
       return;
     }
     (async () => {

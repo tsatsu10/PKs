@@ -5,6 +5,8 @@
  * and Dashboard (bundle export).
  */
 
+import { formatObjectTypeLabel } from '../constants';
+
 /** Preset keys for export template dropdowns (must match DB export_template enum) */
 export const EXPORT_TEMPLATE_IDS = ['raw', 'brief', 'full', 'stakeholder'];
 
@@ -55,7 +57,7 @@ export function buildObjectMarkdown(obj, include, opts = {}) {
   const nl = () => lines.push('');
   const md = (s) => (asPlainText ? s.replace(/#{1,2}\s/g, '').replace(/\*\*/g, '') : s);
   lines.push(asPlainText ? obj.title : `# ${obj.title}`);
-  lines.push(`${obj.type} · Updated ${new Date(obj.updated_at).toLocaleString()}`);
+  lines.push(`${formatObjectTypeLabel(obj.type)} · Updated ${new Date(obj.updated_at).toLocaleString()}`);
   if (obj.source) lines.push(asPlainText ? `Source: ${obj.source}` : `*Source:* ${obj.source}`);
   nl();
   if (include.summary && obj.summary) {

@@ -34,7 +34,7 @@ describe('useDashboardSearch (integration)', () => {
   });
 
   it('calls search_knowledge_objects with pagination when no query', async () => {
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    renderHook(() => useDashboardSearch({ userId: 'user-1' }));
 
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalled();

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
@@ -35,7 +36,7 @@ export default function Register() {
           data: { display_name: displayName.trim() || undefined, displayName: displayName.trim() || undefined },
         },
       });
-      if (err) throw new Error(err?.message ?? err?.error_description ?? 'Sign up failed');
+      if (err) throw new Error(getErrorMessage(err, 'Sign up failed'));
       if (!data.user) throw new Error('Sign up failed');
       const { data: profile } = await supabase
         .from('users')
@@ -51,7 +52,7 @@ export default function Register() {
       });
       setTimeout(() => navigate('/', { replace: true }), 50);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Registration failed'));
+      setError(getErrorMessage(err, 'Registration failed'));
     } finally {
       setSubmitting(false);
     }

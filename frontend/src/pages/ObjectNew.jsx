@@ -3,13 +3,14 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { createNotification } from '../lib/notifications';
 import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
-import { OBJECT_TYPES, OBJECT_STATUSES } from '../constants';
+import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
@@ -44,7 +45,9 @@ export default function ObjectNew() {
   const schema = selectedTemplate?.schema && typeof selectedTemplate.schema === 'object'
     ? selectedTemplate.schema
     : selectedTemplate?.schema
-      ? (typeof selectedTemplate.schema === 'string' ? JSON.parse(selectedTemplate.schema || '{}') : selectedTemplate.schema)
+      ? (typeof selectedTemplate.schema === 'string'
+          ? (() => { try { return JSON.parse(selectedTemplate.schema || '{}'); } catch { return {}; } })()
+          : selectedTemplate.schema)
       : null;
   const templateFields = schema?.fields || [];
 
@@ -175,7 +178,7 @@ export default function ObjectNew() {
       clearDraft(DRAFT_KEYS.new);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to create object');
+      const msg = getErrorMessage(err, 'Failed to create object');
       addToast('error', msg);
       setError(msg);
     } finally {
@@ -355,7 +358,7 @@ export default function ObjectNew() {
                       aria-label="Type"
                     >
                       {OBJECT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
+                        <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
                       ))}
                     </select>
                   </div>
@@ -459,7 +462,7 @@ export default function ObjectNew() {
                 <span className="notion-prop-label">Type</span>
                 <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="notion-prop-select" required>
                   {OBJECT_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                    <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
                   ))}
                 </select>
               </div>

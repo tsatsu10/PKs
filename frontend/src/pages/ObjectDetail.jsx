@@ -16,7 +16,8 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
+import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, formatObjectTypeLabel } from '../constants';
+import { getErrorMessage } from '../lib/errors';
 import { useObjectDetail } from '../hooks/useObjectDetail';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
 import ObjectDetailExportPanel from '../components/ObjectDetailExportPanel';
@@ -109,6 +110,8 @@ export default function ObjectDetail() {
       remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '',
       cover_url: object.cover_url || '',
     });
+    // Only sync form when we switch to a different object (by id), not on every object field change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [object?.id]);
 
   const draftAppliedRef = useRef(false);
@@ -138,12 +141,17 @@ export default function ObjectDetail() {
 
   const loadRecentExportJobs = useCallback(async () => {
     if (!id || !user?.id) return;
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from('export_jobs')
       .select('id, format, template, status, error_message, completed_at, created_at, include_content, include_summary, include_key_points, include_tags, include_domains, include_links')
       .eq('knowledge_object_id', id)
       .order('created_at', { ascending: false })
       .limit(10);
+    if (err) {
+      if (import.meta.env.DEV) console.warn('Failed to load export jobs:', err);
+      setRecentExportJobs([]);
+      return;
+    }
     setRecentExportJobs(data || []);
   }, [id, user?.id]);
 
@@ -189,9 +197,12 @@ export default function ObjectDetail() {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
-    supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name').then(({ data }) => {
-      if (!cancelled) setAiProviders(data || []);
-    });
+    (async () => {
+      const { data, error: err } = await supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name');
+      if (cancelled) return;
+      if (err && import.meta.env.DEV) console.warn('Failed to load AI providers:', err);
+      setAiProviders(data || []);
+    })();
     return () => { cancelled = true; };
   }, [user?.id]);
 
@@ -309,9 +320,9 @@ export default function ObjectDetail() {
         .order('created_at', { ascending: false })
         .limit(50)
         .then(({ data: vers }) => { if (vers) setVersions(vers); })
-        .catch(() => {});
+        .catch((e) => { if (import.meta.env.DEV) console.warn('Versions refresh failed:', e); });
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Update failed');
+      const msg = getErrorMessage(err, 'Update failed');
       addToast('error', msg);
       setError(msg);
     } finally {
@@ -338,7 +349,7 @@ export default function ObjectDetail() {
       addToast('success', `Restored to v${ver.version}`);
       reload();
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Restore failed');
+      const msg = getErrorMessage(err, 'Restore failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -385,7 +396,7 @@ export default function ObjectDetail() {
       addToast('success', 'Object duplicated');
       navigate(`/objects/${newId}`);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Duplicate failed');
+      const msg = getErrorMessage(err, 'Duplicate failed');
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -408,11 +419,30 @@ export default function ObjectDetail() {
       addToast('success', 'Object deleted');
       navigate('/', { replace: true });
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Delete failed');
+      const msg = getErrorMessage(err, 'Delete failed');
       addToast('error', msg);
       setError(msg);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleTogglePin() {
+    if (!object || !user) return;
+    setPinning(true);
+    setError('');
+    try {
+      const { error: e } = await supabase
+        .from('knowledge_objects')
+        .update({ is_pinned: !object.is_pinned })
+        .eq('id', object.id)
+        .eq('user_id', user.id);
+      if (e) throw e;
+      setObject((o) => ({ ...o, is_pinned: !o.is_pinned }));
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to update pin'));
+    } finally {
+      setPinning(false);
     }
   }
 
@@ -425,7 +455,7 @@ export default function ObjectDetail() {
       const d = allDomains.find((x) => x.id === domainId);
       if (d) setObjectDomains((prev) => [...prev, d].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add domain'));
+      setError(getErrorMessage(err, 'Failed to add domain'));
     }
   }
 
@@ -437,7 +467,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       setObjectDomains((prev) => prev.filter((d) => d.id !== domainId));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to remove domain'));
+      setError(getErrorMessage(err, 'Failed to remove domain'));
     }
   }
 
@@ -450,7 +480,7 @@ export default function ObjectDetail() {
       const t = allTags.find((x) => x.id === tagId);
       if (t) setObjectTags((prev) => [...prev, t].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add tag'));
+      setError(getErrorMessage(err, 'Failed to add tag'));
     }
   }
 
@@ -462,7 +492,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       setObjectTags((prev) => prev.filter((t) => t.id !== tagId));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to remove tag'));
+      setError(getErrorMessage(err, 'Failed to remove tag'));
     }
   }
 
@@ -479,7 +509,7 @@ export default function ObjectDetail() {
       const target = otherObjects.find((o) => o.id === toObjectId);
       setOutgoingLinks((prev) => [...prev, { id: data.id, to_object_id: data.to_object_id, relationship_type: data.relationship_type, target: target || { id: toObjectId, title: '…', type: '' } }]);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add link'));
+      setError(getErrorMessage(err, 'Failed to add link'));
     }
   }
 
@@ -492,7 +522,7 @@ export default function ObjectDetail() {
       if (isOutgoing) setOutgoingLinks((prev) => prev.filter((l) => l.id !== edgeId));
       else setIncomingLinks((prev) => prev.filter((l) => l.id !== edgeId));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to remove link'));
+      setError(getErrorMessage(err, 'Failed to remove link'));
     }
   }
 
@@ -521,7 +551,7 @@ export default function ObjectDetail() {
       if (linkErr) throw linkErr;
       setAttachedFiles((prev) => [...prev, { id: fileRow.id, filename: file.name, mime_type: file.type, size_bytes: file.size }]);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Upload failed'));
+      setError(getErrorMessage(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }
@@ -535,7 +565,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       if (data?.signedUrl) window.open(data.signedUrl, '_blank');
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Download failed'));
+      setError(getErrorMessage(err, 'Download failed'));
     }
   }
 
@@ -547,7 +577,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       setAttachedFiles((prev) => prev.filter((x) => x.id !== fileId));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to remove attachment'));
+      setError(getErrorMessage(err, 'Failed to remove attachment'));
     }
   }
 
@@ -603,7 +633,7 @@ export default function ObjectDetail() {
         },
       });
       if (fnErr) {
-        let msg = fnErr?.message ?? fnErr?.error_description ?? 'AI request failed';
+        let msg = getErrorMessage(fnErr, 'AI request failed');
         const genericMsg = /non-2xx|Edge Function returned|Function failed/i.test(msg);
         try {
           const ctx = fnErr?.context;
@@ -614,13 +644,20 @@ export default function ObjectDetail() {
                 ? JSON.parse(await ctx.text())
                 : null;
             if (body && typeof body === 'object') {
-              const fromBody = body.hint || body.error || body.detail;
-              if (fromBody) msg = fromBody;
-              else if (genericMsg) msg = body.code ? `${body.code}: see Settings → AI API keys or server config` : 'AI request failed. Check Settings → AI API keys or Edge Function secrets.';
+              if (body.code === 'RATE_LIMITED') {
+                const sec = typeof body.retryAfter === 'number' ? body.retryAfter : 60;
+                msg = `Too many requests. Try again in ${sec} second${sec !== 1 ? 's' : ''}.`;
+              } else {
+                const fromBody = body.hint || body.error || body.detail;
+                if (fromBody) msg = fromBody;
+                else if (genericMsg) msg = body.code ? `${body.code}: see Settings → AI API keys or server config` : 'AI request failed. Check Settings → AI API keys or Edge Function secrets.';
+              }
             }
           }
-        } catch (_) {}
-        if (genericMsg && msg === (fnErr?.message ?? fnErr?.error_description)) {
+        } catch {
+          /* response body parse failed, use existing msg */
+        }
+        if (genericMsg && msg === getErrorMessage(fnErr, '')) {
           msg = 'AI request failed. Check your API key in Settings → AI API keys, or server secrets for default provider.';
         }
         throw new Error(msg);
@@ -632,7 +669,7 @@ export default function ObjectDetail() {
         await supabase.from('prompt_runs').update({ status: 'completed', output: outputText }).eq('id', runId);
       }
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'AI generation failed.');
+      const msg = getErrorMessage(err, 'AI generation failed.');
       setError(msg);
       if (runId) {
         await supabase.from('prompt_runs').update({ status: 'failed', output: msg }).eq('id', runId);
@@ -664,7 +701,7 @@ export default function ObjectDetail() {
       logAudit(user.id, AUDIT_ACTIONS.PROMPT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { prompt_template_id: runTemplateId || null });
       deliverWebhookEvent('prompt_run.completed', { objectId: object.id, objectTitle: object.title, promptTemplateId: runTemplateId || null });
     } catch (e) {
-      setError(e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Failed to save run'));
+      setError(getErrorMessage(e, 'Failed to save run'));
     } finally {
       setSavingRun(false);
     }
@@ -707,7 +744,7 @@ export default function ObjectDetail() {
       deliverWebhookEvent('prompt_run.completed', { objectId: object.id, createdObjectId: newObj.id, promptTemplateId: runTemplateId || null });
       navigate(`/objects/${newObj.id}`);
     } catch (e) {
-      setError(e?.message ?? e?.error_description ?? (typeof e === 'string' ? e : 'Failed to save as object'));
+      setError(getErrorMessage(e, 'Failed to save as object'));
     } finally {
       setSavingRun(false);
     }
@@ -721,7 +758,7 @@ export default function ObjectDetail() {
     const lines = [];
     const nl = () => lines.push('');
     lines.push(object.title);
-    lines.push(`${object.type} · Updated ${new Date(object.updated_at).toLocaleString()}`);
+    lines.push(`${formatObjectTypeLabel(object.type)} · Updated ${new Date(object.updated_at).toLocaleString()}`);
     nl();
     if (object.source && (include.content || include.summary)) lines.push(asMarkdown ? `*Source:* ${object.source}` : `Source: ${object.source}`), nl();
     if (include.summary && object.summary) {
@@ -760,7 +797,7 @@ export default function ObjectDetail() {
   function buildExportHtml(include = exportInclude) {
     const parts = [];
     parts.push(`<h1>${escapeHtml(object.title)}</h1>`);
-    parts.push(`<p><em>${escapeHtml(object.type)} · Updated ${new Date(object.updated_at).toLocaleString()}</em></p>`);
+    parts.push(`<p><em>${escapeHtml(formatObjectTypeLabel(object.type))} · Updated ${new Date(object.updated_at).toLocaleString()}</em></p>`);
     if (object.source) parts.push(`<p>Source: ${escapeHtml(object.source)}</p>`);
     if (include.summary && object.summary) parts.push('<h2>Summary</h2>', `<p>${escapeHtml(object.summary)}</p>`);
     if (include.key_points && object.key_points?.length) {
@@ -770,7 +807,13 @@ export default function ObjectDetail() {
     }
     if (include.domains && objectDomains.length) parts.push('<p><strong>Domains:</strong> ' + objectDomains.map((d) => escapeHtml(d.name)).join(', ') + '</p>');
     if (include.tags && objectTags.length) parts.push('<p><strong>Tags:</strong> ' + objectTags.map((t) => escapeHtml(t.name)).join(', ') + '</p>');
-    if (include.content && object.content) parts.push('<h2>Content</h2>', markdownToHtml(object.content));
+    if (include.content && object.content) {
+      const MAX_CONTENT_FOR_HTML_EXPORT = 500000;
+      const content = object.content.length > MAX_CONTENT_FOR_HTML_EXPORT
+        ? object.content.slice(0, MAX_CONTENT_FOR_HTML_EXPORT) + '\n\n_[Content truncated for export — document is very long.]_'
+        : object.content;
+      parts.push('<h2>Content</h2>', markdownToHtml(content));
+    }
     if (include.links && (outgoingLinks.length || incomingLinks.length)) {
       parts.push('<h2>Links</h2><ul>');
       outgoingLinks.forEach((l) => parts.push(`<li>Out: ${escapeHtml(l.target?.title ?? l.to_object_id)}</li>`));
@@ -851,11 +894,18 @@ export default function ObjectDetail() {
         if (blob) downloadBlob(blob, suggestedFilename);
       } else {
         const html = buildExportHtml(inc);
-        const w = window.open('', '_blank');
-        w.document.write(html);
-        w.document.close();
-        w.focus();
-        w.print();
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, '_blank', 'noopener,noreferrer');
+        if (w) {
+          w.onload = () => {
+            URL.revokeObjectURL(url);
+            w.focus();
+            w.print();
+          };
+        } else {
+          URL.revokeObjectURL(url);
+        }
       }
 
       await supabase.from('export_jobs').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', jobId);
@@ -867,7 +917,7 @@ export default function ObjectDetail() {
       loadRecentExportJobs();
       setShowExportPanel(false);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Export failed');
+      const msg = getErrorMessage(err, 'Export failed');
       if (jobId) {
         await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
       }
@@ -900,7 +950,7 @@ export default function ObjectDetail() {
     const { Document, Packer, Paragraph, HeadingLevel } = await import('docx');
     const children = [];
     children.push(new Paragraph({ text: object.title, heading: HeadingLevel.TITLE }));
-    children.push(new Paragraph({ text: `${object.type} · Updated ${new Date(object.updated_at).toLocaleString()}`, italics: true }));
+    children.push(new Paragraph({ text: `${formatObjectTypeLabel(object.type)} · Updated ${new Date(object.updated_at).toLocaleString()}`, italics: true }));
     if (object.source) children.push(new Paragraph({ text: `Source: ${object.source}` }));
     if (include.summary && object.summary) {
       children.push(new Paragraph({ text: 'Summary', heading: HeadingLevel.HEADING_1 }));
@@ -919,13 +969,18 @@ export default function ObjectDetail() {
     if (include.content && object.content) {
       children.push(new Paragraph({ text: 'Content', heading: HeadingLevel.HEADING_1 }));
       const contentLines = object.content.split(/\n/);
-      for (const line of contentLines) {
-        const t = line.trimEnd();
-        if (/^###\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^###\s+/, ''), heading: HeadingLevel.HEADING_3 }));
-        else if (/^##\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^##\s+/, ''), heading: HeadingLevel.HEADING_2 }));
-        else if (/^#\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^#\s+/, ''), heading: HeadingLevel.HEADING_1 }));
-        else if (/^[-*]\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^[-*]\s+/, ''), bullet: { level: 0 } }));
-        else children.push(new Paragraph(t || ' '));
+      const DOCX_LINE_CHUNK = 100;
+      for (let i = 0; i < contentLines.length; i += DOCX_LINE_CHUNK) {
+        const chunk = contentLines.slice(i, i + DOCX_LINE_CHUNK);
+        for (const line of chunk) {
+          const t = line.trimEnd();
+          if (/^###\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^###\s+/, ''), heading: HeadingLevel.HEADING_3 }));
+          else if (/^##\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^##\s+/, ''), heading: HeadingLevel.HEADING_2 }));
+          else if (/^#\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^#\s+/, ''), heading: HeadingLevel.HEADING_1 }));
+          else if (/^[-*]\s+/.test(t)) children.push(new Paragraph({ text: t.replace(/^[-*]\s+/, ''), bullet: { level: 0 } }));
+          else children.push(new Paragraph(t || ' '));
+        }
+        if (i + DOCX_LINE_CHUNK < contentLines.length) await new Promise((r) => setTimeout(r, 0));
       }
     }
     if (include.links && (outgoingLinks.length || incomingLinks.length)) {
@@ -946,13 +1001,28 @@ export default function ObjectDetail() {
 
   async function loadShares() {
     if (!object?.id || !user?.id) return;
-    const { data } = await supabase.from('share_permissions').select('id, shared_with_email, role, created_at').eq('knowledge_object_id', object.id).order('created_at', { ascending: false });
+    const { data, error: err } = await supabase.from('share_permissions').select('id, shared_with_email, role, created_at').eq('knowledge_object_id', object.id).order('created_at', { ascending: false });
+    if (err) {
+      if (import.meta.env.DEV) console.warn('Failed to load shares:', err);
+      setShares([]);
+      return;
+    }
     setShares(data || []);
+  }
+
+  function isValidEmail(str) {
+    const s = typeof str === 'string' ? str.trim() : '';
+    if (!s) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
   }
 
   async function handleAddShare(e) {
     e.preventDefault();
     if (!object || !shareEmail.trim()) return;
+    if (!isValidEmail(shareEmail.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
     setSharing(true);
     setError('');
     try {
@@ -971,7 +1041,7 @@ export default function ObjectDetail() {
       setShareEmail('');
       addToast('success', `Shared with ${shareEmail.trim()}`);
     } catch (err) {
-      const msg = err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to share');
+      const msg = getErrorMessage(err, 'Failed to share');
       addToast('error', msg);
       setError(msg);
     } finally {
@@ -987,7 +1057,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to revoke'));
+      setError(getErrorMessage(err, 'Failed to revoke'));
     }
   }
 
@@ -1022,7 +1092,7 @@ export default function ObjectDetail() {
                   linkSearchResults.map((o) => (
                     <div key={o.id} className="detail-link-search-item">
                       <Link to={`/objects/${o.id}`} className="detail-link-search-title" onClick={() => setLinkSearchOpen(false)}>{o.title}</Link>
-                      <span className="detail-link-search-type">{o.type}</span>
+                      <span className="detail-link-search-type">{formatObjectTypeLabel(o.type)}</span>
                       {!outgoingLinks.some((l) => l.to_object_id === o.id) ? (
                         <button type="button" className="btn btn-primary btn-small" onClick={() => { addLink(o.id); setLinkSearchOpen(false); setLinkSearchQuery(''); }}>Link</button>
                       ) : (
@@ -1037,7 +1107,7 @@ export default function ObjectDetail() {
         )}
         <div className="detail-actions">
           {isOwner && (
-            <button type="button" className={`btn btn-secondary ${object.is_pinned ? 'active' : ''}`} onClick={async () => { setPinning(true); const { error: e } = await supabase.from('knowledge_objects').update({ is_pinned: !object.is_pinned }).eq('id', object.id).eq('user_id', user.id); if (!e) setObject((o) => ({ ...o, is_pinned: !o.is_pinned })); setPinning(false); }} disabled={pinning} title={object.is_pinned ? 'Unpin from top' : 'Pin to top'} aria-label={object.is_pinned ? 'Unpin' : 'Pin'}>
+            <button type="button" className={`btn btn-secondary ${object.is_pinned ? 'active' : ''}`} onClick={handleTogglePin} disabled={pinning} title={object.is_pinned ? 'Unpin from top' : 'Pin to top'} aria-label={object.is_pinned ? 'Unpin' : 'Pin'}>
               {object.is_pinned ? '📌 Unpin' : 'Pin'}
             </button>
           )}
@@ -1097,9 +1167,9 @@ export default function ObjectDetail() {
         <main className="detail-main">
           <div className="detail-hero">
             <div className="detail-meta detail-meta-inline">
-              <span className="detail-type" title={object.type}>
+              <span className="detail-type" title={formatObjectTypeLabel(object.type)}>
                 <span className="detail-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[object.type] ?? '📄'}</span>
-                {object.type}
+                {formatObjectTypeLabel(object.type)}
               </span>
               {(object.status || 'active') !== 'active' && (
                 <span className="detail-status" title="Status">{object.status}</span>
@@ -1306,7 +1376,7 @@ export default function ObjectDetail() {
                 {suggestedLinkedObjects.filter((o) => !outgoingLinks.some((l) => l.to_object_id === o.id)).slice(0, 4).map((o) => (
                   <div key={o.id} className="detail-related-card">
                     <Link to={`/objects/${o.id}`} className="detail-related-title-link">{o.title}</Link>
-                    <span className="detail-related-type">{OBJECT_TYPE_ICONS[o.type] ?? '📄'} {o.type}</span>
+                    <span className="detail-related-type">{OBJECT_TYPE_ICONS[o.type] ?? '📄'} {formatObjectTypeLabel(o.type)}</span>
                     <button type="button" className="btn btn-primary btn-small detail-related-link-btn" onClick={() => addLink(o.id)}>Link</button>
                   </div>
                 ))}
@@ -1322,7 +1392,7 @@ export default function ObjectDetail() {
                   <select value="" onChange={(e) => { const v = e.target.value; if (v) addLink(v); e.target.value = ''; }} className="detail-links-add">
                     <option value="">+ Link to object</option>
                     {availableToLink.slice(0, 50).map((o) => (
-                      <option key={o.id} value={o.id}>{o.title} ({o.type})</option>
+                      <option key={o.id} value={o.id}>{o.title} ({formatObjectTypeLabel(o.type)})</option>
                     ))}
                   </select>
                 )}
@@ -1347,7 +1417,7 @@ export default function ObjectDetail() {
                   <select value="" onChange={(e) => { const v = e.target.value; if (v) addLink(v); e.target.value = ''; }} className="detail-links-add">
                     <option value="">+ Link to object</option>
                     {availableToLink.slice(0, 50).map((o) => (
-                      <option key={o.id} value={o.id}>{o.title} ({o.type})</option>
+                      <option key={o.id} value={o.id}>{o.title} ({formatObjectTypeLabel(o.type)})</option>
                     ))}
                   </select>
                 )}

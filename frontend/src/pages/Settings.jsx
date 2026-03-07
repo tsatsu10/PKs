@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
-import { useDeckEnabled } from '../components/MainMenuDeck';
+import { getErrorMessage } from '../lib/errors';
+import { useDeckEnabled } from '../components/MainMenuDeckContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import JSZip from 'jszip';
 import './Settings.css';
@@ -106,7 +107,7 @@ export default function Settings() {
       await refreshUser();
       addToast('success', 'Profile updated');
     } catch (err) {
-      setProfileError(err?.message ?? 'Failed to update profile');
+      setProfileError(getErrorMessage(err, 'Failed to update profile'));
     } finally {
       setProfileSaving(false);
     }
@@ -151,7 +152,7 @@ export default function Settings() {
       setConfirmPassword('');
       addToast('success', 'Password updated');
     } catch (err) {
-      setPasswordError(err?.message ?? 'Failed to update password');
+      setPasswordError(getErrorMessage(err, 'Failed to update password'));
     } finally {
       setPasswordSaving(false);
     }
@@ -186,10 +187,11 @@ export default function Settings() {
       const { error: err } = await supabase.from('domains').insert({ user_id: user.id, name });
       if (err) throw err;
       setNewDomain('');
-      const { data } = await supabase.from('domains').select('id, name').eq('user_id', user.id).order('name');
+      const { data, error: refetchErr } = await supabase.from('domains').select('id, name').eq('user_id', user.id).order('name');
+      if (refetchErr && import.meta.env.DEV) console.warn('Domains refetch failed:', refetchErr);
       setDomains(data || []);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add domain'));
+      setError(getErrorMessage(err, 'Failed to add domain'));
     } finally {
       setAddingDomain(false);
     }
@@ -204,11 +206,12 @@ export default function Settings() {
     try {
       const { error: err } = await supabase.from('tags').insert({ user_id: user.id, name });
       if (err) throw err;
-      const { data } = await supabase.from('tags').select('id, name').eq('user_id', user.id).eq('name', name).single();
+      const { data, error: refetchErr } = await supabase.from('tags').select('id, name').eq('user_id', user.id).eq('name', name).single();
+      if (refetchErr && import.meta.env.DEV) console.warn('Tags refetch failed:', refetchErr);
       if (data) setTags((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       setNewTag('');
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add tag'));
+      setError(getErrorMessage(err, 'Failed to add tag'));
     } finally {
       setAddingTag(false);
     }
@@ -223,7 +226,7 @@ export default function Settings() {
       if (err) throw err;
       setDomains((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete domain'));
+      setError(getErrorMessage(err, 'Failed to delete domain'));
     } finally {
       setDeletingId(null);
     }
@@ -238,7 +241,7 @@ export default function Settings() {
       if (err) throw err;
       setTags((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to delete tag'));
+      setError(getErrorMessage(err, 'Failed to delete tag'));
     } finally {
       setDeletingId(null);
     }
@@ -261,10 +264,11 @@ export default function Settings() {
       if (err) throw err;
       setAiProviderName('');
       setAiProviderKey('');
-      const { data } = await supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name');
+      const { data, error: refetchErr } = await supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name');
+      if (refetchErr && import.meta.env.DEV) console.warn('AI providers refetch failed:', refetchErr);
       setAiProviders(data || []);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to add AI provider'));
+      setError(getErrorMessage(err, 'Failed to add AI provider'));
     } finally {
       setAddingAiProvider(false);
     }
@@ -278,10 +282,32 @@ export default function Settings() {
       if (err) throw err;
       setAiProviders((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to remove AI provider'));
+      setError(getErrorMessage(err, 'Failed to remove AI provider'));
     } finally {
       setDeletingId(null);
     }
+  }
+
+  /** Fetch all non-deleted knowledge_objects in pages (avoids huge single response for large accounts). */
+  async function fetchAllKnowledgeObjectsPaginated() {
+    const PAGE = 500;
+    let objs = [];
+    let offset = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('knowledge_objects')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + PAGE - 1);
+      if (error) throw error;
+      if (!data?.length) break;
+      objs = objs.concat(data);
+      if (data.length < PAGE) break;
+      offset += PAGE;
+    }
+    return objs;
   }
 
   /** Full account export: objects, journal, paste bin, domains, tags as one JSON. */
@@ -289,19 +315,17 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const [objsRes, journalRes, pasteRes, domainsRes, tagsRes] = await Promise.all([
-        supabase.from('knowledge_objects').select('*').eq('user_id', user.id).eq('is_deleted', false).order('updated_at', { ascending: false }),
+      const [journalRes, pasteRes, domainsRes, tagsRes] = await Promise.all([
         supabase.from('journal_entries').select('*').eq('user_id', user.id).order('entry_date', { ascending: false }),
         supabase.from('paste_bin').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
         supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
       ]);
-      if (objsRes.error) throw objsRes.error;
       if (journalRes.error) throw journalRes.error;
       if (pasteRes.error) throw pasteRes.error;
       if (domainsRes.error) throw domainsRes.error;
       if (tagsRes.error) throw tagsRes.error;
-      const objs = objsRes.data || [];
+      const objs = await fetchAllKnowledgeObjectsPaginated();
       const ids = objs.map((o) => o.id);
       const [kodRes, kotRes] = ids.length
         ? await Promise.all([
@@ -320,23 +344,38 @@ export default function Settings() {
         if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
       });
       const objects = objs.map((o) => ({ ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] }));
-      const payload = {
-        exported_at: new Date().toISOString(),
-        version: 1,
-        objects,
-        journal_entries: journalRes.data || [],
-        paste_bin: pasteRes.data || [],
-        domains: domainsRes.data || [],
-        tags: tagsRes.data || [],
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const exported_at = new Date().toISOString();
+      const journal_entries = journalRes.data || [];
+      const paste_bin = pasteRes.data || [];
+      const domains = domainsRes.data || [];
+      const tags = tagsRes.data || [];
+      const CHUNK = 50;
+      const parts = [
+        '{"exported_at":"', exported_at, '","version":1,"objects":[',
+      ];
+      for (let i = 0; i < objects.length; i += CHUNK) {
+        const chunk = objects.slice(i, i + CHUNK);
+        chunk.forEach((o, j) => {
+          if (i + j > 0) parts.push(',');
+          parts.push(JSON.stringify(o, null, 2));
+        });
+        if (i + CHUNK < objects.length) await new Promise((r) => setTimeout(r, 0));
+      }
+      parts.push(
+        '],"journal_entries":', JSON.stringify(journal_entries, null, 2),
+        ',"paste_bin":', JSON.stringify(paste_bin, null, 2),
+        ',"domains":', JSON.stringify(domains, null, 2),
+        ',"tags":', JSON.stringify(tags, null, 2),
+        '}',
+      );
+      const blob = new Blob([parts.join('')], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
-      setBackupError(err?.message ?? 'Export failed');
+      setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);
     }
@@ -346,8 +385,7 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const { data: objs, error: e } = await supabase.from('knowledge_objects').select('*').eq('user_id', user.id).eq('is_deleted', false).order('updated_at', { ascending: false });
-      if (e) throw e;
+      const objs = await fetchAllKnowledgeObjectsPaginated();
       const [kodRes, kotRes] = await Promise.all([
         supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', (objs || []).map((o) => o.id)),
         supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', (objs || []).map((o) => o.id)),
@@ -363,14 +401,26 @@ export default function Settings() {
         if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
       });
       const normalized = (objs || []).map((o) => ({ ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] }));
-      const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), objects: normalized }, null, 2)], { type: 'application/json' });
+      const exported_at = new Date().toISOString();
+      const CHUNK = 50;
+      const parts = ['{"exported_at":"', exported_at, '","objects":['];
+      for (let i = 0; i < normalized.length; i += CHUNK) {
+        const chunk = normalized.slice(i, i + CHUNK);
+        chunk.forEach((o, j) => {
+          if (i + j > 0) parts.push(',');
+          parts.push(JSON.stringify(o, null, 2));
+        });
+        if (i + CHUNK < normalized.length) await new Promise((r) => setTimeout(r, 0));
+      }
+      parts.push(']}');
+      const blob = new Blob([parts.join('')], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `pks-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
-      setBackupError(err?.message ?? 'Export failed');
+      setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);
     }
@@ -380,8 +430,7 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const { data: objs, error: e } = await supabase.from('knowledge_objects').select('*').eq('user_id', user.id).eq('is_deleted', false).order('updated_at', { ascending: false });
-      if (e) throw e;
+      const objs = await fetchAllKnowledgeObjectsPaginated();
       const ids = (objs || []).map((o) => o.id);
       const [kodRes, kotRes] = await Promise.all([
         supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', ids),
@@ -412,7 +461,7 @@ export default function Settings() {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
-      setBackupError(err?.message ?? 'Export failed');
+      setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);
     }
@@ -428,9 +477,9 @@ export default function Settings() {
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}
 
-      <section className="settings-section" aria-labelledby="account-heading">
-        <h2 id="account-heading">Account</h2>
-        <p className="settings-desc">Your display name and timezone. Used across the app for dates and identification.</p>
+      <section className="settings-section page-section" aria-labelledby="account-heading">
+        <h2 id="account-heading" className="page-section-title">Account</h2>
+        <p className="settings-desc page-section-desc">Your display name and timezone. Used across the app for dates and identification.</p>
         {profileError && <div className="form-error" role="alert">{profileError}</div>}
         <form onSubmit={saveProfile} className="settings-form form">
           <label>
@@ -476,9 +525,9 @@ export default function Settings() {
         </form>
       </section>
 
-      <section className="settings-section" aria-labelledby="password-heading">
-        <h2 id="password-heading">Change password</h2>
-        <p className="settings-desc">Enter your current password, then choose a new one (min 8 characters).</p>
+      <section className="settings-section page-section" aria-labelledby="password-heading">
+        <h2 id="password-heading" className="page-section-title">Change password</h2>
+        <p className="settings-desc page-section-desc">Enter your current password, then choose a new one (min 8 characters).</p>
         {passwordError && <div className="form-error" role="alert">{passwordError}</div>}
         {passwordSuccess && <p className="settings-muted" role="status">Password updated. You can sign in with the new password next time.</p>}
         <form onSubmit={changePassword} className="settings-form form">
@@ -526,9 +575,9 @@ export default function Settings() {
         </form>
       </section>
 
-      <section className="settings-section">
-        <h2>Bottom menu</h2>
-        <p className="settings-desc">Show the menu wheel at the bottom of the screen. When off, the standard bottom bar (Home, New, Alerts, Settings) is used on mobile.</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Bottom menu</h2>
+        <p className="settings-desc page-section-desc">Show the menu wheel at the bottom of the screen. When off, the standard bottom bar (Home, New, Alerts, Settings) is used on mobile.</p>
         <label className="settings-toggle-label">
           <input
             type="checkbox"
@@ -541,9 +590,9 @@ export default function Settings() {
         <p id="deck-desc" className="settings-desc">Tap the Menu button at the bottom to open the wheel and jump to any section.</p>
       </section>
 
-      <section className="settings-section">
-        <h2>Appearance</h2>
-        <p className="settings-desc">Choose light, dark, or system theme.</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Appearance</h2>
+        <p className="settings-desc page-section-desc">Choose light, dark, or system theme.</p>
         <div className="settings-theme-toggle" role="group" aria-label="Theme">
           <button type="button" className={`btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTheme('dark')}>Dark</button>
           <button type="button" className={`btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTheme('light')}>Light</button>
@@ -551,9 +600,9 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="settings-section">
-        <h2>AI API keys</h2>
-        <p className="settings-desc">Add your own OpenAI or DeepSeek API keys and give them a name. You can then choose them in the Run prompt dropdown instead of the server default.</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">AI API keys</h2>
+        <p className="settings-desc page-section-desc">Add your own OpenAI or DeepSeek API keys and give them a name. You can then choose them in the Run prompt dropdown instead of the server default.</p>
         <form onSubmit={addAiProvider} className="settings-form form">
           <input
             type="text"
@@ -603,9 +652,9 @@ export default function Settings() {
         </ul>
       </section>
 
-      <section className="settings-section">
-        <h2>Domains</h2>
-        <p className="settings-desc">Domains group your knowledge by area (e.g. Health, Tech, Projects).</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Domains</h2>
+        <p className="settings-desc page-section-desc">Domains group your knowledge by area (e.g. Health, Tech, Projects).</p>
         <form onSubmit={addDomain} className="settings-form form">
           <input
             type="text"
@@ -636,9 +685,9 @@ export default function Settings() {
         </ul>
       </section>
 
-      <section className="settings-section">
-        <h2>Install app</h2>
-        <p className="settings-desc">Install PKS on your device for quick access. The app caches assets for faster loads and basic offline support when installed.</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Install app</h2>
+        <p className="settings-desc page-section-desc">Install PKS on your device for quick access. The app caches assets for faster loads and basic offline support when installed.</p>
         {installPrompt && !installed && (
           <button type="button" className="btn btn-primary" onClick={handleInstallClick}>
             Install PKS app
@@ -648,9 +697,9 @@ export default function Settings() {
         {!installPrompt && !installed && <p className="settings-muted">Install prompt not available (e.g. already installed or not supported).</p>}
       </section>
 
-      <section className="settings-section">
-        <h2>Export &amp; backup</h2>
-        <p className="settings-desc">Download your data as a portable backup. &quot;Download my data&quot; includes knowledge objects, journal entries, paste bin, domains, and tags in one JSON file.</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Export &amp; backup</h2>
+        <p className="settings-desc page-section-desc">Download your data as a portable backup. &quot;Download my data&quot; includes knowledge objects, journal entries, paste bin, domains, and tags in one JSON file.</p>
         {backupError && <div className="form-error" role="alert">{backupError}</div>}
         <div className="settings-form" style={{ gap: '0.5rem' }}>
           <button type="button" className="btn btn-primary" onClick={downloadFullAccountData} disabled={backupLoading}>
@@ -665,9 +714,9 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="settings-section">
-        <h2>Tags</h2>
-        <p className="settings-desc">Tags are labels you can attach to any object (e.g. urgent, draft).</p>
+      <section className="settings-section page-section">
+        <h2 className="page-section-title">Tags</h2>
+        <p className="settings-desc page-section-desc">Tags are labels you can attach to any object (e.g. urgent, draft).</p>
         <form onSubmit={addTag} className="settings-form form">
           <input
             type="text"

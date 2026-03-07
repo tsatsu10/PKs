@@ -5,7 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
-import { routeConfig, PageLoadFallback } from './routes';
+import { routeConfig, PageLoadFallback } from './routeConfig';
 import './App.css';
 
 function App() {

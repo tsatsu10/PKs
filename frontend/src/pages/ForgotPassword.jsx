@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
@@ -22,7 +23,7 @@ export default function ForgotPassword() {
       if (err) throw err;
       setSent(true);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to send reset email'));
+      setError(getErrorMessage(err, 'Failed to send reset email'));
     } finally {
       setSubmitting(false);
     }

@@ -1,7 +1,11 @@
-import { lazy, Suspense } from 'react';
+/**
+ * Route configuration and loading fallback for the app.
+ * Kept in a separate file so routes.jsx could be component-only; App imports from here.
+ */
+import { lazy } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 
-const PageLoadFallback = () => (
+export const PageLoadFallback = () => (
   <div className="loading-screen" role="status" aria-live="polite" aria-label="Loading">
     <div className="loading-screen-logo-wrap">
       <img src="/pks-logo.svg" alt="" className="loading-screen-logo" width="64" height="64" />
@@ -38,6 +42,7 @@ const withProtected = (children) => <ProtectedRoute>{children}</ProtectedRoute>;
  * Route configuration: path, element.
  * Heavy pages are lazy-loaded for smaller initial bundle.
  */
+/* eslint-disable-next-line react-refresh/only-export-components -- route config is data used by App, not a component */
 export const routeConfig = [
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
@@ -61,5 +66,3 @@ export const routeConfig = [
   { path: '/trash', element: withProtected(<Trash />) },
   { path: '/import', element: withProtected(<Import />) },
 ];
-
-export { PageLoadFallback };

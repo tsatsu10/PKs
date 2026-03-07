@@ -126,44 +126,59 @@ export default function NotificationCenter() {
         {unreadCount > 0 && <span className="notification-badge" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
       {open && (
-        <div className="notification-panel" role="dialog" aria-label="Notifications" aria-modal="true">
-          <div className="notification-panel-header">
-            <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button type="button" className="btn-mark-all" onClick={markAllRead}>Mark all read</button>
-            )}
+        <>
+          <div
+            className="notification-panel-backdrop"
+            aria-hidden="true"
+            onClick={() => setOpen(false)}
+          />
+          <div className="notification-panel notification-panel-side" role="dialog" aria-label="Notifications" aria-modal="true">
+            <div className="notification-panel-header">
+              <h3>Notifications</h3>
+              <div className="notification-panel-header-actions">
+                {unreadCount > 0 && (
+                  <button type="button" className="btn-mark-all" onClick={markAllRead}>Mark all read</button>
+                )}
+                <button type="button" className="notification-panel-close" onClick={() => setOpen(false)} aria-label="Close">×</button>
+              </div>
+            </div>
+            <div className="notification-panel-body">
+              {loading ? (
+                <p className="notification-loading">Loading…</p>
+              ) : list.length === 0 ? (
+                <div className="empty-state">
+                  <p className="empty-state-title">No notifications yet</p>
+                  <p className="empty-state-desc">Alerts and updates will appear here.</p>
+                </div>
+              ) : (
+                <ul className="notification-list">
+                  {list.map((n) => (
+                    <li key={n.id} className={n.read_at ? 'read' : 'unread'}>
+                      <div className="notification-item">
+                        <div className="notification-item-main">
+                          <span className="notification-title">{n.title}</span>
+                          {n.body && <span className="notification-body">{n.body}</span>}
+                          <span className="notification-time">{formatTime(n.created_at)}</span>
+                        </div>
+                        <div className="notification-item-actions">
+                          {n.related_type === 'knowledge_object' && n.related_id && (
+                            <Link to={`/objects/${n.related_id}`} className="notification-link" onClick={() => setOpen(false)}>View</Link>
+                          )}
+                          {!n.read_at && (
+                            <button type="button" className="btn-mark-read" onClick={() => markRead(n.id)}>Mark read</button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="notification-panel-footer">
+              <Link to="/notifications" onClick={() => setOpen(false)}>See all</Link>
+            </div>
           </div>
-          {loading ? (
-            <p className="notification-loading">Loading…</p>
-          ) : list.length === 0 ? (
-            <p className="notification-empty">No notifications yet.</p>
-          ) : (
-            <ul className="notification-list">
-              {list.map((n) => (
-                <li key={n.id} className={n.read_at ? 'read' : 'unread'}>
-                  <div className="notification-item">
-                    <div className="notification-item-main">
-                      <span className="notification-title">{n.title}</span>
-                      {n.body && <span className="notification-body">{n.body}</span>}
-                      <span className="notification-time">{formatTime(n.created_at)}</span>
-                    </div>
-                    <div className="notification-item-actions">
-                      {n.related_type === 'knowledge_object' && n.related_id && (
-                        <Link to={`/objects/${n.related_id}`} className="notification-link" onClick={() => setOpen(false)}>View</Link>
-                      )}
-                      {!n.read_at && (
-                        <button type="button" className="btn-mark-read" onClick={() => markRead(n.id)}>Mark read</button>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="notification-panel-footer">
-            <Link to="/notifications" onClick={() => setOpen(false)}>See all</Link>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

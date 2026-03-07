@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
 
@@ -16,7 +17,7 @@ export default function ResetPassword() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setHasSession(!!session?.user);
-    });
+    }).catch(() => setHasSession(false));
   }, []);
 
   async function handleSubmit(e) {
@@ -37,7 +38,7 @@ export default function ResetPassword() {
       setDone(true);
       setTimeout(() => navigate('/', { replace: true }), 2000);
     } catch (err) {
-      setError(err?.message ?? err?.error_description ?? (typeof err === 'string' ? err : 'Failed to update password'));
+      setError(getErrorMessage(err, 'Failed to update password'));
     } finally {
       setSubmitting(false);
     }

@@ -2,9 +2,18 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
+import { OBJECT_TYPES } from '../constants';
 import './Import.css';
+
+/** Allowlist: coerce type to a valid knowledge_object_type or 'note'. */
+function normalizeImportType(value) {
+  if (!value || typeof value !== 'string') return 'note';
+  const v = value.trim().toLowerCase().replace(/\s+/g, '_');
+  return OBJECT_TYPES.includes(v) ? v : 'note';
+}
 
 function parseMarkdown(text) {
   const items = [];
@@ -39,8 +48,8 @@ function parseCSV(text) {
     const cells = lines[i].split(',').map((c) => c.trim());
     const title = titleIdx >= 0 ? (cells[titleIdx] || '') : (cells[contentIdx]?.slice(0, 200) || 'Imported');
     const content = contentIdx >= 0 ? (cells[contentIdx] || '') : '';
-    const type = typeIdx >= 0 && cells[typeIdx] ? cells[typeIdx] : 'note';
-    if (title || content) items.push({ title: title || 'Untitled', content, type });
+    const rawType = typeIdx >= 0 && cells[typeIdx] ? cells[typeIdx] : 'note';
+    if (title || content) items.push({ title: title || 'Untitled', content, type: normalizeImportType(rawType) });
   }
   return items;
 }
@@ -74,25 +83,29 @@ export default function Import() {
     setImporting(true);
     let created = 0;
     let failed = 0;
+    const BATCH_SIZE = 25;
     try {
-      for (const item of items) {
-        const { error: err } = await supabase.from('knowledge_objects').insert({
+      for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        const chunk = items.slice(i, i + BATCH_SIZE);
+        const rows = chunk.map((item) => ({
           user_id: user.id,
-          type: item.type || 'note',
+          type: normalizeImportType(item.type),
           title: item.title.slice(0, 500),
           content: item.content || null,
           summary: null,
           source: null,
-        });
-        if (err) failed++;
-        else created++;
+        }));
+        const { error: err } = await supabase.from('knowledge_objects').insert(rows);
+        if (err) failed += chunk.length;
+        else created += chunk.length;
       }
       setResult({ created, failed, total: items.length });
       addToast('success', `Imported ${created} object(s)`);
       if (created > 0) navigate('/', { replace: true });
     } catch (e) {
-      setError(e?.message ?? 'Import failed');
-      addToast('error', e?.message ?? 'Import failed');
+      const msg = getErrorMessage(e, 'Import failed');
+      setError(msg);
+      addToast('error', msg);
     } finally {
       setImporting(false);
     }

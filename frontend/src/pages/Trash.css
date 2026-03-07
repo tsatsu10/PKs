@@ -29,15 +29,8 @@
 }
 
 .trash-empty {
-  padding: 2rem;
+  padding: var(--space-16, 2rem) var(--space-8, 1rem);
   text-align: center;
-  background: var(--surface);
-  border-radius: var(--input-radius);
-}
-
-.trash-empty-text {
-  margin: 0 0 1rem;
-  color: var(--polar-dim);
 }
 
 .trash-list {
