@@ -1,9 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import './DashboardStats.css';
+
+/** Animates a number from previous value to target over duration (ms). */
+function NumberTicker({ value, duration = 400 }) {
+  const [display, setDisplay] = useState(value);
+  const prevValueRef = useRef(value);
+  useEffect(() => {
+    const target = Number(value) || 0;
+    const start = prevValueRef.current;
+    prevValueRef.current = target;
+    if (start === target) {
+      setDisplay(target);
+      return;
+    }
+    const startTime = performance.now();
+    function tick(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - (1 - t) * (1 - t);
+      setDisplay(Math.round(start + (target - start) * eased));
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    const id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [value, duration]);
+  return <span className="dashboard-overview-value">{display}</span>;
+}
 
 /**
  * Dashboard overview: fetches and displays stats (total, activity, due) and optional breakdown by type/status.
@@ -102,11 +128,11 @@ export default function DashboardStats({ userId, onStats }) {
           className="dashboard-overview-card dashboard-overview-card-primary dashboard-overview-card-link"
           aria-label={`${total} total objects. View all.`}
         >
-          <span className="dashboard-overview-value">{total}</span>
+          <NumberTicker value={total} />
           <span className="dashboard-overview-label">Total objects</span>
         </Link>
         <div className="dashboard-overview-card dashboard-overview-card-updated" aria-label={`${updated7} updated in last 7 days`}>
-          <span className="dashboard-overview-value">{updated7}</span>
+          <NumberTicker value={updated7} />
           <span className="dashboard-overview-label" title="Updated in last 7 days">Updated (7d)</span>
           {updated7 > 0 && (
             <Link to="/?updated=7d" className="dashboard-overview-link">
@@ -115,7 +141,7 @@ export default function DashboardStats({ userId, onStats }) {
           )}
         </div>
         <div className="dashboard-overview-card dashboard-overview-card-due" aria-label={`${due7} due in next 7 days`}>
-          <span className="dashboard-overview-value">{due7}</span>
+          <NumberTicker value={due7} />
           <span className="dashboard-overview-label" title="Due in next 7 days">Due (7d)</span>
           {due7 > 0 ? (
             <Link to="/?due=soon" className="dashboard-overview-link" aria-label="View objects due in the next 7 days">

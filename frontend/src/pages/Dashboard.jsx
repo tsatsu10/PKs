@@ -21,7 +21,19 @@ import './Dashboard.css';
 
 const VIEW_MODE_KEY = 'pks-dashboard-view';
 const DENSITY_KEY = 'pks-dashboard-density';
+const SAVED_FILTERS_KEY = 'pks-saved-filters';
 const SEARCH_DEBOUNCE_MS = 300;
+
+function loadSavedFilters() {
+  try {
+    const raw = localStorage.getItem(SAVED_FILTERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -86,6 +98,14 @@ export default function Dashboard() {
   const commandPaletteInputRef = useRef(null);
   const commandPaletteFilteredLengthRef = useRef(0);
   const commandPaletteActionsRef = useRef([]);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [savedFilters, setSavedFilters] = useState(() => loadSavedFilters());
+  const [showSaveFilterModal, setShowSaveFilterModal] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
+  const [showSavedFiltersDropdown, setShowSavedFiltersDropdown] = useState(false);
+  const savedFiltersDropdownRef = useRef(null);
+  const previousFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const modalPreviousFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [quickAddContent, setQuickAddContent] = useState('');
   const [quickAddSaving, setQuickAddSaving] = useState(false);
@@ -207,24 +227,39 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [searchQuery, user?.id]);
 
-  // Command palette: Cmd/Ctrl+K
+  // Command palette: Cmd/Ctrl+K — store focus for restore
   useEffect(() => {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        const willOpen = !showCommandPalette;
+        if (willOpen) previousFocusRef.current = document.activeElement;
         setShowCommandPalette((v) => !v);
         setCommandPaletteQuery('');
-        setTimeout(() => commandPaletteInputRef.current?.focus(), 0);
+        if (willOpen) setTimeout(() => commandPaletteInputRef.current?.focus(), 0);
+        else setTimeout(() => previousFocusRef.current?.focus(), 0);
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showCommandPalette]);
+  // Scroll progress (window) for list area feedback
+  useEffect(() => {
+    function onScroll() {
+      const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
+      const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      setScrollProgress(height > 0 ? (winScroll / height) * 100 : 0);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
   useEffect(() => {
     if (!showCommandPalette) return;
     function onKeyDown(e) {
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
+        setTimeout(() => previousFocusRef.current?.focus(), 0);
         e.preventDefault();
         return;
       }
@@ -260,6 +295,35 @@ export default function Dashboard() {
     setQuickAddTitle('');
     setQuickAddContent('');
   }, []);
+
+  // List keyboard nav: J/K and ↑/↓ move focus through items, Enter opens (default link behavior)
+  useEffect(() => {
+    function onKeyDown(e) {
+      const listEl = listScrollRef.current;
+      if (!listEl || !objects.length) return;
+      if (!listEl.contains(document.activeElement)) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const key = e.key;
+      const isDown = key === 'j' || key === 'J' || key === 'ArrowDown';
+      const isUp = key === 'k' || key === 'K' || key === 'ArrowUp';
+      if (!isDown && !isUp) return;
+      e.preventDefault();
+      const row = document.activeElement?.closest?.('[data-object-index]');
+      const current = row ? parseInt(row.getAttribute('data-object-index') ?? '-1', 10) : -1;
+      const nextIndex = isDown ? Math.min(current + 1, objects.length - 1) : Math.max(0, current - 1);
+      if (nextIndex === current && current >= 0) return;
+      listVirtualizer.scrollToIndex(nextIndex, { align: 'start', behavior: 'auto' });
+      setTimeout(() => {
+        const row = listEl.querySelector(`[data-object-index="${nextIndex}"]`);
+        const link = row?.querySelector?.('.object-card, .object-list-link');
+        const toFocus = link instanceof HTMLElement ? link : row;
+        if (toFocus instanceof HTMLElement) toFocus.focus();
+      }, 50);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [objects.length, listVirtualizer]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -475,11 +539,57 @@ export default function Dashboard() {
   useEffect(() => {
     function onClickOutside(e) {
       if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setShowBulkMenu(false);
+      if (savedFiltersDropdownRef.current && !savedFiltersDropdownRef.current.contains(e.target)) setShowSavedFiltersDropdown(false);
     }
-    if (!showBulkMenu) return;
+    if (!showBulkMenu && !showSavedFiltersDropdown) return;
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [showBulkMenu]);
+  }, [showBulkMenu, showSavedFiltersDropdown]);
+
+  // Focus trap/restore for modals (export + bulk)
+  const anyModalOpen = showExportModal || bulkModal != null;
+  useEffect(() => {
+    if (anyModalOpen) {
+      modalPreviousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setTimeout(() => {
+        const first = document.querySelector('.dashboard-modal-overlay .dashboard-modal select, .dashboard-modal-overlay .dashboard-modal button:not([disabled])');
+        if (first instanceof HTMLElement) first.focus();
+      }, 0);
+    } else {
+      const prev = modalPreviousFocusRef.current;
+      modalPreviousFocusRef.current = null;
+      if (prev) setTimeout(() => prev.focus(), 0);
+    }
+  }, [anyModalOpen]);
+
+  // Focus trap: Tab cycles only inside the open modal
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    function onKeyDown(e) {
+      if (e.key !== 'Tab') return;
+      const overlay = document.querySelector('.dashboard-modal-overlay');
+      if (!overlay || !overlay.contains(document.activeElement)) return;
+      const focusable = overlay.querySelectorAll('a[href], button:not([disabled]), select, input, textarea, [tabindex]:not([tabindex="-1"])');
+      const list = Array.from(focusable).filter((el) => el instanceof HTMLElement && el.offsetParent != null);
+      if (list.length === 0) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey) {
+        if (active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [anyModalOpen]);
 
   async function bulkAddDomain() {
     const domainId = bulkDomainId;
@@ -660,6 +770,55 @@ export default function Dashboard() {
     setShowOnboarding(false);
   };
 
+  useEffect(() => {
+    try { localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(savedFilters)); } catch { /* ignore */ }
+  }, [savedFilters]);
+
+  function saveCurrentFilters() {
+    const name = saveFilterName.trim() || 'Saved view';
+    const next = {
+      id: `saved-${Date.now()}`,
+      name,
+      filters: {
+        searchQuery,
+        typeFilter,
+        statusFilter,
+        domainFilter,
+        tagFilter,
+        dateFrom,
+        dateTo,
+        dueFrom,
+        dueTo,
+      },
+    };
+    setSavedFilters((prev) => [...prev, next]);
+    setSaveFilterName('');
+    setShowSaveFilterModal(false);
+    addToast('success', `Saved "${name}"`);
+  }
+
+  function applySavedFilter(saved) {
+    const f = saved.filters || {};
+    setSearchQuery(f.searchQuery ?? '');
+    setTypeFilter(f.typeFilter ?? '');
+    setStatusFilter(f.statusFilter ?? '');
+    setDomainFilter(f.domainFilter ?? '');
+    setTagFilter(f.tagFilter ?? '');
+    setDateFrom(f.dateFrom ?? '');
+    setDateTo(f.dateTo ?? '');
+    setDueFrom(f.dueFrom ?? '');
+    setDueTo(f.dueTo ?? '');
+    setShowFilters(true);
+    setShowSavedFiltersDropdown(false);
+    setTimeout(() => runSearch(0, f.searchQuery ?? ''), 0);
+  }
+
+  function deleteSavedFilter(id) {
+    setSavedFilters((prev) => prev.filter((s) => s.id !== id));
+    setShowSavedFiltersDropdown(false);
+    addToast('success', 'Saved filter removed');
+  }
+
   // Single dismissible strip: run-prompt takes priority over onboarding
   const showBanner = runPromptTemplate || showOnboarding;
   const bannerKind = runPromptTemplate ? 'run-prompt' : 'onboarding';
@@ -683,7 +842,13 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <main className="dashboard-main" aria-busy={loading} aria-live="polite">
-        {/* Hero / welcome strip */}
+        <a href="#dashboard-object-list" className="dashboard-skip-link">Skip to object list</a>
+        <div className="dashboard-scroll-progress" role="presentation" aria-hidden="true">
+          <div className="dashboard-scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
+        </div>
+        <div className="dashboard-layout">
+          <div className="dashboard-main-col">
+        {/* Hero / welcome strip — 5-second test: status + next action */}
         <section className="dashboard-hero" aria-label="Welcome">
           <p className="dashboard-hero-greeting">
             {getGreeting()}{user?.displayName ? `, ${user.displayName}` : ''}
@@ -703,6 +868,11 @@ export default function Dashboard() {
                 })()
               : 'Your knowledge base'}
           </p>
+          {heroStats && (heroStats.due_next_7_days ?? 0) > 0 && (
+            <p className="dashboard-hero-next">
+              <Link to="/?due=soon" className="dashboard-hero-next-link">View {heroStats.due_next_7_days} due soon →</Link>
+            </p>
+          )}
         </section>
 
         {/* Single dismissible banner: run-prompt or onboarding */}
@@ -746,6 +916,25 @@ export default function Dashboard() {
             <Link to="/settings">Add domains in Settings</Link> to organize by topic.
           </p>
         )}
+
+        {/* Mobile-only: Due soon + Recent (sidebar is hidden below 1024px) */}
+        <div className="dashboard-mobile-quick-links" aria-label="Quick links">
+          {heroStats && (heroStats.due_next_7_days ?? 0) > 0 && (
+            <div className="dashboard-mobile-quick-links-card">
+              <Link to="/?due=soon" className="dashboard-mobile-quick-links-link">Due soon ({heroStats.due_next_7_days}) →</Link>
+            </div>
+          )}
+          {!loading && objects.length > 0 && (
+            <div className="dashboard-mobile-quick-links-card">
+              <span className="dashboard-mobile-quick-links-label">Recent</span>
+              <ul className="dashboard-mobile-quick-links-list">
+                {objects.slice(0, 3).map((o) => (
+                  <li key={o.id}><Link to={`/objects/${o.id}`} className="dashboard-mobile-quick-links-link">{o.title}</Link></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
 
         <section className="dashboard-actions">
           <h2 className="dashboard-actions-heading">
@@ -794,15 +983,17 @@ export default function Dashboard() {
               <button type="button" className={`btn btn-secondary btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view">≡</button>
               <button type="button" className={`btn btn-secondary btn-icon ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')} aria-pressed={viewMode === 'card'} title="Card view">▦</button>
             </div>
+            <div className="dashboard-actions-cta">
+              <Link to="/objects/new" className="btn btn-primary dashboard-cta-primary">New object</Link>
+              <Link to="/quick" className="btn btn-secondary dashboard-cta-secondary">Quick capture</Link>
+            </div>
             <div className="density-toggle" role="group" aria-label="List density">
               <button type="button" className={`btn btn-secondary btn-icon ${listDensity === 'compact' ? 'active' : ''}`} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'} title="Compact rows">Compact</button>
               <button type="button" className={`btn btn-secondary btn-icon ${listDensity === 'comfortable' ? 'active' : ''}`} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'} title="Comfortable rows">Comfy</button>
             </div>
-            <Link to="/quick" className="btn btn-secondary">Quick capture</Link>
             <button type="button" className="btn btn-secondary" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
               Export
             </button>
-            <Link to="/objects/new" className="btn btn-primary">New object</Link>
           </div>
         </section>
 
@@ -824,7 +1015,7 @@ export default function Dashboard() {
               onClick={() => setShowFilters((s) => !s)}
               aria-expanded={showFilters}
             >
-              {showFilters ? 'Hide filters' : 'Filters'}
+              {showFilters ? 'Hide filters' : 'More filters'}
             </button>
           </form>
 
@@ -868,7 +1059,51 @@ export default function Dashboard() {
                 Clear filters
               </button>
             )}
+            {savedFilters.length > 0 && (
+              <div className="dashboard-saved-filters" ref={savedFiltersDropdownRef}>
+                <button
+                  type="button"
+                  className="quick-filter-pill"
+                  onClick={() => setShowSavedFiltersDropdown((v) => !v)}
+                  aria-expanded={showSavedFiltersDropdown}
+                  aria-haspopup="true"
+                >
+                  Saved ({savedFilters.length})
+                </button>
+                {showSavedFiltersDropdown && (
+                  <div className="dashboard-saved-filters-dropdown" role="menu">
+                    {savedFilters.map((s) => (
+                      <div key={s.id} className="dashboard-saved-filters-item">
+                        <button type="button" className="dashboard-saved-filters-apply" role="menuitem" onClick={() => applySavedFilter(s)}>
+                          {s.name}
+                        </button>
+                        <button type="button" className="dashboard-saved-filters-delete" aria-label={`Delete ${s.name}`} onClick={() => deleteSavedFilter(s.id)}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <button type="button" className="quick-filter-pill" onClick={() => { setSaveFilterName(''); setShowSaveFilterModal(true); }}>
+              Save current
+            </button>
           </div>
+
+          {showSaveFilterModal && (
+            <div className="dashboard-save-filter-inline">
+              <input
+                type="text"
+                className="dashboard-save-filter-input"
+                value={saveFilterName}
+                onChange={(e) => setSaveFilterName(e.target.value)}
+                placeholder="Name this view"
+                aria-label="Name for saved filters"
+                onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentFilters(); if (e.key === 'Escape') setShowSaveFilterModal(false); }}
+              />
+              <button type="button" className="btn btn-primary btn-small" onClick={saveCurrentFilters}>Save</button>
+              <button type="button" className="btn btn-ghost btn-small" onClick={() => { setShowSaveFilterModal(false); setSaveFilterName(''); }}>Cancel</button>
+            </div>
+          )}
 
           {hasActiveFilters && filterSummaryText && (
             <div className="dashboard-filter-summary">
@@ -987,13 +1222,14 @@ export default function Dashboard() {
           </section>
         ) : (
           <>
-            <div ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects">
+            <div id="dashboard-object-list" ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}${hasMore ? ' has-more' : ''}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects" tabIndex={-1}>
               <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                 {listVirtualizer.getVirtualItems().map((virtualRow) => {
                   const obj = objects[virtualRow.index];
                   return (
                     <div
                       key={obj.id}
+                      data-object-index={virtualRow.index}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -1004,8 +1240,8 @@ export default function Dashboard() {
                       }}
                     >
                       {viewMode === 'card' ? (
-                        <div className="object-card-wrapper">
-                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`}>
+                        <div className="object-card-wrapper" style={{ animationDelay: `${Math.min(virtualRow.index, 12) * 25}ms` }}>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`} data-object-index={virtualRow.index}>
                             <div className="object-card-cover-wrap">
                               {obj.cover_url ? (
                                 <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />
@@ -1042,11 +1278,11 @@ export default function Dashboard() {
                           </Link>
                         </div>
                       ) : (
-                        <div className="object-list-item-with-checkbox" role="listitem">
+                        <div className="object-list-item-with-checkbox" role="listitem" style={{ animationDelay: `${Math.min(virtualRow.index, 12) * 25}ms` }}>
                           <label className="object-list-checkbox">
                             <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                           </label>
-                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`}>
+                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-list-link" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`} data-object-index={virtualRow.index}>
                             <span className="object-list-type" title={formatObjectTypeLabel(obj.type)}>
                               <span className="object-list-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
                               {formatObjectTypeLabel(obj.type)}
@@ -1071,6 +1307,31 @@ export default function Dashboard() {
             )}
           </>
         )}
+          </div>
+          <aside className="dashboard-sidebar" aria-label="Quick links">
+            {heroStats && (heroStats.due_next_7_days ?? 0) > 0 && (
+              <div className="dashboard-sidebar-card">
+                <h3 className="dashboard-sidebar-title">Due soon</h3>
+                <p className="dashboard-sidebar-meta">{heroStats.due_next_7_days} due in next 7 days</p>
+                <Link to="/?due=soon" className="dashboard-sidebar-link">View all →</Link>
+              </div>
+            )}
+            <div className="dashboard-sidebar-card">
+              <h3 className="dashboard-sidebar-title">Recent</h3>
+              {!loading && objects.length > 0 ? (
+                <ul className="dashboard-sidebar-list">
+                  {objects.slice(0, 5).map((o) => (
+                    <li key={o.id}>
+                      <Link to={`/objects/${o.id}`} className="dashboard-sidebar-link">{o.title}</Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="dashboard-sidebar-muted">No recent items</p>
+              )}
+            </div>
+          </aside>
+        </div>
 
         {/* Command palette (Cmd/Ctrl+K) */}
         {showCommandPalette && (
