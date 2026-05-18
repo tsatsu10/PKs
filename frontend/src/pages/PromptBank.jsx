@@ -209,7 +209,7 @@ export default function PromptBank() {
 
   if (loading) {
     return (
-      <div className="prompt-bank-page" id="main-content" role="main">
+      <div className="prompt-bank-page" >
         <div className="prompt-bank-loading">
           <div className="prompt-bank-spinner" aria-hidden="true" />
           <p role="status" aria-live="polite">Loading…</p>
@@ -219,7 +219,7 @@ export default function PromptBank() {
   }
 
   return (
-    <div className="prompt-bank-page" id="main-content" role="main">
+    <div className="prompt-bank-page" >
       <header className="prompt-bank-hero">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Prompt Bank' }]} />
         <h1 className="prompt-bank-title">Prompt Bank</h1>
@@ -368,7 +368,7 @@ export default function PromptBank() {
           )}
         </aside>
 
-        <main className="prompt-bank-main">
+        <div className="prompt-bank-main" aria-label="Prompt bank">
           {editingId === 'new' || editingId ? (
             <div className="prompt-bank-editor">
               <div className="prompt-bank-editor-header">
@@ -480,7 +480,7 @@ export default function PromptBank() {
               )}
             </div>
           )}
-        </main>
+        </div>
       </div>
 
       {deleteConfirmId && (

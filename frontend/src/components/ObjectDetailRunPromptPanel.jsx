@@ -1,5 +1,5 @@
-import { useMemo, useEffect } from 'react';
-import { AI_MODELS } from '../constants';
+import { useEffect } from 'react';
+import { AI_MODELS, DEFAULT_AI_MODEL } from '../constants';
 
 /**
  * Run prompt overlay: source, template, prompt, provider (default or user's API), model, context, generate, output.
@@ -33,13 +33,9 @@ export default function ObjectDetailRunPromptPanel({
   onSaveOutputAsObject,
   onClose,
 }) {
-  const selectedProvider = aiProviders.find((p) => p.id === runAiProviderId);
-  const allowedModels = useMemo(() => {
-    if (!selectedProvider) return AI_MODELS;
-    return AI_MODELS.filter((m) => m.provider === selectedProvider.provider_type);
-  }, [selectedProvider]);
+  const allowedModels = AI_MODELS;
   const modelInAllowed = allowedModels.some((m) => m.id === runAiModel);
-  const effectiveModel = modelInAllowed ? runAiModel : (allowedModels[0]?.id ?? 'gpt-4.1-mini');
+  const effectiveModel = modelInAllowed ? runAiModel : (allowedModels[0]?.id ?? DEFAULT_AI_MODEL);
 
   useEffect(() => {
     if (!modelInAllowed && allowedModels[0]) setRunAiModel(allowedModels[0].id);
@@ -59,10 +55,7 @@ export default function ObjectDetailRunPromptPanel({
   const handleProviderChange = (providerId) => {
     const id = providerId === '' ? null : providerId;
     setRunAiProviderId(id);
-    const provider = id ? aiProviders.find((p) => p.id === id) : null;
-    const models = provider ? AI_MODELS.filter((m) => m.provider === provider.provider_type) : AI_MODELS;
-    const currentInList = models.some((m) => m.id === runAiModel);
-    if (!currentInList && models[0]) setRunAiModel(models[0].id);
+    if (!AI_MODELS.some((m) => m.id === runAiModel)) setRunAiModel(DEFAULT_AI_MODEL);
   };
 
   return (
@@ -188,7 +181,7 @@ export default function ObjectDetailRunPromptPanel({
               className="run-prompt-template-select"
               aria-label="AI provider"
             >
-              <option value="">Default (server keys)</option>
+              <option value="">Default (server DeepSeek key)</option>
               {aiProviders.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}

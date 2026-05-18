@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- context exports provider + hook */
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const THEME_KEY = 'pks-theme';
 
@@ -38,26 +38,27 @@ export function ThemeProvider({ children }) {
     } catch (_e) { void _e; }
   }, [theme, resolvedTheme]);
 
-  const setTheme = (value) => {
+  const setTheme = useCallback((value) => {
     if (value === 'light' || value === 'dark' || value === 'system') {
       setThemeState(value);
     } else {
       setThemeState('dark');
     }
-  };
+  }, []);
 
-  const cycleTheme = () => {
+  const cycleTheme = useCallback(() => {
     setThemeState((prev) => {
       const effective = prev === 'system' ? systemTheme : prev;
       return effective === 'dark' ? 'light' : 'dark';
     });
-  };
+  }, [systemTheme]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, cycleTheme }}>
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({ theme, resolvedTheme, setTheme, cycleTheme }),
+    [theme, resolvedTheme, setTheme, cycleTheme]
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

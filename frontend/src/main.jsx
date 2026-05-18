@@ -16,11 +16,17 @@ LINK_PROTOCOLS.forEach((scheme) => registerCustomProtocol(scheme))
 init()
 
 // Suppress linkifyjs "already initialized" warnings from Tiptap Link extension
-const origWarn = console.warn
-console.warn = (...args) => {
-  if (args[0]?.includes?.('linkifyjs: already initialized')) return
-  origWarn.apply(console, args)
+const isLinkifyInitWarning = (msg) =>
+  typeof msg === 'string' && msg.includes('linkifyjs: already initialized')
+const patchConsole = (method) => {
+  const orig = console[method]
+  console[method] = (...args) => {
+    if (isLinkifyInitWarning(args[0])) return
+    orig.apply(console, args)
+  }
 }
+patchConsole('warn')
+patchConsole('log')
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

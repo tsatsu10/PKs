@@ -6,7 +6,7 @@ import '../pages/Auth.css';
  */
 export default function AuthLayout({ title, hint, footer, children }) {
   return (
-    <div className="auth-page" role="main" id="main-content">
+    <div className="auth-page">
       <div className="auth-layout">
         <aside className="auth-brand" aria-hidden="true">
           <Link to="/" className="auth-brand-inner">
@@ -17,7 +17,7 @@ export default function AuthLayout({ title, hint, footer, children }) {
             <span className="auth-brand-copy">Capture, connect, and reuse what you learn.</span>
           </Link>
         </aside>
-        <main className="auth-main">
+        <main className="auth-main" id="main-content" role="main">
           <div className="auth-card">
             <h2 className="auth-card-title">{title}</h2>
             {hint && <p className="auth-hint">{hint}</p>}

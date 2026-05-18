@@ -16,7 +16,8 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, formatObjectTypeLabel } from '../constants';
+import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER, formatObjectTypeLabel } from '../constants';
+import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { getErrorMessage } from '../lib/errors';
 import { useObjectDetail } from '../hooks/useObjectDetail';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
@@ -65,7 +66,7 @@ export default function ObjectDetail() {
   const [uploading, setUploading] = useState(false);
   const [runTemplateId, setRunTemplateId] = useState('');
   const [runPromptText, setRunPromptText] = useState('');
-  const [runAiModel, setRunAiModel] = useState('gpt-4.1-mini');
+  const [runAiModel, setRunAiModel] = useState(DEFAULT_AI_MODEL);
   const [runAiProviderId, setRunAiProviderId] = useState(null);
   const [aiProviders, setAiProviders] = useState([]);
   const [runPromptSource, setRunPromptSource] = useState('bank');
@@ -99,7 +100,7 @@ export default function ObjectDetail() {
   const linkSearchRef = useRef(null);
 
   useEffect(() => {
-    if (!object) return;
+    if (!object || editing) return;
     setEditForm({
       title: object.title,
       content: object.content || '',
@@ -110,9 +111,7 @@ export default function ObjectDetail() {
       remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '',
       cover_url: object.cover_url || '',
     });
-    // Only sync form when we switch to a different object (by id), not on every object field change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [object?.id]);
+  }, [object, editing]);
 
   const draftAppliedRef = useRef(false);
   useEffect(() => {
@@ -123,7 +122,7 @@ export default function ObjectDetail() {
     editInitialContentRef.current = d.content ?? object.content ?? '';
     setEditForm((prev) => ({ ...prev, ...d }));
     setEditing(true);
-    addToast('Draft restored');
+    addToast('success', 'Draft restored');
   }, [object, id, draft, addToast]);
   useEffect(() => {
     if (!id) draftAppliedRef.current = false;
@@ -198,7 +197,12 @@ export default function ObjectDetail() {
     if (!user?.id) return;
     let cancelled = false;
     (async () => {
-      const { data, error: err } = await supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name');
+      const { data, error: err } = await supabase
+        .from('user_ai_providers')
+        .select('id, name, provider_type')
+        .eq('user_id', user.id)
+        .eq('provider_type', AI_PROVIDER)
+        .order('name');
       if (cancelled) return;
       if (err && import.meta.env.DEV) console.warn('Failed to load AI providers:', err);
       setAiProviders(data || []);
@@ -628,7 +632,7 @@ export default function ObjectDetail() {
           promptText: promptToUse,
           objectTitle: object.title,
           objectContent: object.content || '',
-          model: runAiModel || 'gpt-4.1-mini',
+          model: runAiModel || DEFAULT_AI_MODEL,
           user_provider_id: runAiProviderId || undefined,
         },
       });
@@ -648,9 +652,12 @@ export default function ObjectDetail() {
                 const sec = typeof body.retryAfter === 'number' ? body.retryAfter : 60;
                 msg = `Too many requests. Try again in ${sec} second${sec !== 1 ? 's' : ''}.`;
               } else {
-                const fromBody = body.hint || body.error || body.detail;
-                if (fromBody) msg = fromBody;
-                else if (genericMsg) msg = body.code ? `${body.code}: see Settings → AI API keys or server config` : 'AI request failed. Check Settings → AI API keys or Edge Function secrets.';
+                msg =
+                  body.hint ||
+                  getDeepSeekErrorMessage(
+                    body.code,
+                    body.error || body.detail || (genericMsg ? 'AI request failed. Check Settings → AI API keys or Edge Function secrets.' : msg)
+                  );
               }
             }
           }
@@ -722,11 +729,12 @@ export default function ObjectDetail() {
         summary: null,
       }).select('id').single();
       if (objErr) throw objErr;
-      await supabase.from('link_edges').insert({
+      const { error: linkErr } = await supabase.from('link_edges').insert({
         from_object_id: object.id,
         to_object_id: newObj.id,
         relationship_type: 'references',
       });
+      if (linkErr) throw linkErr;
       const { data: runData, error: runErr } = await supabase.from('prompt_runs').insert({
         user_id: user.id,
         prompt_template_id: runTemplateId || null,
@@ -1026,7 +1034,10 @@ export default function ObjectDetail() {
     setSharing(true);
     setError('');
     try {
-      const { data: userId, error: rpcErr } = await supabase.rpc('resolve_user_id_by_email', { target_email: shareEmail.trim() });
+      const { data: userId, error: rpcErr } = await supabase.rpc('resolve_user_id_by_email', {
+        target_email: shareEmail.trim(),
+        p_knowledge_object_id: object.id,
+      });
       if (rpcErr) throw rpcErr;
       if (!userId) throw new Error('No user found with that email');
       if (userId === user.id) throw new Error('You cannot share with yourself');
@@ -1061,12 +1072,12 @@ export default function ObjectDetail() {
     }
   }
 
-  if (loading) return <div className="object-detail loading" id="main-content" role="main"><p className="sr-only" role="status" aria-live="polite">Loading…</p><SkeletonDetail /></div>;
-  if (error && !object) return <div className="object-detail" id="main-content" role="main"><p className="detail-error" role="alert">{error}</p><Link to="/">Back to Dashboard</Link></div>;
+  if (loading) return <div className="object-detail loading" ><p className="sr-only" role="status" aria-live="polite">Loading…</p><SkeletonDetail /></div>;
+  if (error && !object) return <div className="object-detail" ><p className="detail-error" role="alert">{error}</p><Link to="/">Back to Dashboard</Link></div>;
   if (!object) return null;
 
   return (
-    <div className="object-detail" id="main-content" role="main">
+    <div className="object-detail" >
       <header className="object-detail-header">
         <div className="object-detail-header-left">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: object.title || 'Object' }]} />
@@ -1164,7 +1175,7 @@ export default function ObjectDetail() {
       )}
 
       <div className="detail-layout">
-        <main className="detail-main">
+        <div className="detail-main" aria-label="Object content">
           <div className="detail-hero">
             <div className="detail-meta detail-meta-inline">
               <span className="detail-type" title={formatObjectTypeLabel(object.type)}>
@@ -1243,7 +1254,7 @@ export default function ObjectDetail() {
         </>
       )}
           </div>
-        </main>
+        </div>
         <aside className="detail-sidebar">
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Domains</h3>

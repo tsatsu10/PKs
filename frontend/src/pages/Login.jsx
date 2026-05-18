@@ -58,6 +58,9 @@ export default function Login() {
         throw new Error(msg);
       }
       if (!data?.user) throw new Error('Login failed');
+      if (!data.session?.access_token) {
+        throw new Error('Sign-in did not create a session. Please try again.');
+      }
 
       const profileFetch = supabase
         .from('users')
@@ -71,14 +74,14 @@ export default function Login() {
         new Promise((r) => setTimeout(() => r(null), 4000)),
       ]);
 
-      login({
+      const loggedIn = await login({
         id: data.user.id,
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? '',
         timezone: profile?.timezone ?? 'Africa/Accra',
         createdAt: profile?.created_at ?? data.user.created_at,
       });
-      setTimeout(() => navigate('/', { replace: true }), 50);
+      if (!loggedIn) throw new Error('Sign-in did not create a session. Please try again.');
     } catch (err) {
       setError(getErrorMessage(err, 'Login failed'));
     } finally {

@@ -17,5 +17,5 @@ export async function createNotification(userId, type, title, body = null, relat
     related_type: related?.type || null,
     related_id: related?.id || null,
   });
-  if (error) console.warn('Failed to create notification:', error);
+  if (error && import.meta.env.DEV) console.warn('Failed to create notification:', error);
 }

@@ -41,7 +41,7 @@ export default function AuditLogs() {
   }
 
   return (
-    <div className="audit-logs-page" id="main-content" role="main">
+    <div className="audit-logs-page" >
       <header className="audit-logs-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Audit logs' }]} />
         <h1>Audit logs</h1>

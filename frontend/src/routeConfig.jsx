@@ -1,18 +1,15 @@
 /**
  * Route configuration and loading fallback for the app.
- * Kept in a separate file so routes.jsx could be component-only; App imports from here.
  */
 import { lazy } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppShell from './components/AppShell';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoadingScreen from './components/LoadingScreen';
 
-export const PageLoadFallback = () => (
-  <div className="loading-screen" role="status" aria-live="polite" aria-label="Loading">
-    <div className="loading-screen-logo-wrap">
-      <img src="/pks-logo.svg" alt="" className="loading-screen-logo" width="64" height="64" />
-    </div>
-    <p className="loading-screen-text">Loading…</p>
-  </div>
-);
+export const PageLoadFallback = LoadingScreen;
+
+const withErrorBoundary = (children) => <ErrorBoundary>{children}</ErrorBoundary>;
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ObjectNew = lazy(() => import('./pages/ObjectNew'));
@@ -36,33 +33,54 @@ const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
-const withProtected = (children) => <ProtectedRoute>{children}</ProtectedRoute>;
+const protectedLayout = withErrorBoundary(
+  <ProtectedRoute>
+    <AppShell />
+  </ProtectedRoute>
+);
 
 /**
- * Route configuration: path, element.
- * Heavy pages are lazy-loaded for smaller initial bundle.
+ * Public routes: path + element.
  */
-/* eslint-disable-next-line react-refresh/only-export-components -- route config is data used by App, not a component */
+/* eslint-disable-next-line react-refresh/only-export-components */
+export const publicRoutes = [
+  { path: '/login', element: withErrorBoundary(<Login />) },
+  { path: '/register', element: withErrorBoundary(<Register />) },
+  { path: '/forgot-password', element: withErrorBoundary(<ForgotPassword />) },
+  { path: '/reset-password', element: withErrorBoundary(<ResetPassword />) },
+];
+
+/**
+ * Authenticated child routes under a single AppShell (no remount on navigation).
+ */
+/* eslint-disable-next-line react-refresh/only-export-components */
+export const protectedChildRoutes = [
+  { path: '/', element: withErrorBoundary(<Dashboard />) },
+  { path: '/objects/new', element: withErrorBoundary(<ObjectNew />) },
+  { path: '/objects/by-slug/:slug', element: withErrorBoundary(<ObjectBySlug />) },
+  { path: '/quick', element: withErrorBoundary(<QuickCapture />) },
+  { path: '/objects/:id', element: withErrorBoundary(<ObjectDetail />) },
+  { path: '/settings', element: withErrorBoundary(<Settings />) },
+  { path: '/prompts', element: withErrorBoundary(<PromptBank />) },
+  { path: '/templates', element: withErrorBoundary(<Templates />) },
+  { path: '/notifications', element: withErrorBoundary(<Notifications />) },
+  { path: '/audit-logs', element: withErrorBoundary(<AuditLogs />) },
+  { path: '/integrations', element: withErrorBoundary(<Integrations />) },
+  { path: '/paste', element: withErrorBoundary(<PasteBin />) },
+  { path: '/journal', element: withErrorBoundary(<Journal />) },
+  { path: '/about', element: withErrorBoundary(<About />) },
+  { path: '/search', element: withErrorBoundary(<Search />) },
+  { path: '/trash', element: withErrorBoundary(<Trash />) },
+  { path: '/import', element: withErrorBoundary(<Import />) },
+];
+
+/** Layout route element wrapping all protectedChildRoutes. */
+/* eslint-disable-next-line react-refresh/only-export-components */
+export const protectedLayoutRoute = { element: protectedLayout, children: protectedChildRoutes };
+
+/** @deprecated Use publicRoutes + protectedLayoutRoute — kept for tests importing routeConfig */
+/* eslint-disable-next-line react-refresh/only-export-components */
 export const routeConfig = [
-  { path: '/login', element: <Login /> },
-  { path: '/register', element: <Register /> },
-  { path: '/forgot-password', element: <ForgotPassword /> },
-  { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/', element: withProtected(<Dashboard />) },
-  { path: '/objects/new', element: withProtected(<ObjectNew />) },
-  { path: '/objects/by-slug/:slug', element: withProtected(<ObjectBySlug />) },
-  { path: '/quick', element: withProtected(<QuickCapture />) },
-  { path: '/objects/:id', element: withProtected(<ObjectDetail />) },
-  { path: '/settings', element: withProtected(<Settings />) },
-  { path: '/prompts', element: withProtected(<PromptBank />) },
-  { path: '/templates', element: withProtected(<Templates />) },
-  { path: '/notifications', element: withProtected(<Notifications />) },
-  { path: '/audit-logs', element: withProtected(<AuditLogs />) },
-  { path: '/integrations', element: withProtected(<Integrations />) },
-  { path: '/paste', element: withProtected(<PasteBin />) },
-  { path: '/journal', element: withProtected(<Journal />) },
-  { path: '/about', element: withProtected(<About />) },
-  { path: '/search', element: withProtected(<Search />) },
-  { path: '/trash', element: withProtected(<Trash />) },
-  { path: '/import', element: withProtected(<Import />) },
+  ...publicRoutes,
+  ...protectedChildRoutes.map(({ path }) => ({ path, element: protectedLayout })),
 ];

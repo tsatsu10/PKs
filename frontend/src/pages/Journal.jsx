@@ -86,6 +86,7 @@ export default function Journal() {
 
   useEffect(() => {
     if (view !== 'entry' || !selectedDate || !user?.id) return;
+    let cancelled = false;
     setLoadingEntry(true);
     setError('');
     supabase
@@ -95,11 +96,13 @@ export default function Journal() {
       .eq('entry_date', selectedDate)
       .maybeSingle()
       .then(({ data, error: e }) => {
+        if (cancelled) return;
         setEntry(data || null);
         setContent(data?.content ?? '');
         setError(getErrorMessage(e, ''));
         setLoadingEntry(false);
       });
+    return () => { cancelled = true; };
   }, [view, selectedDate, user?.id]);
 
   async function handleSaveEntry() {
@@ -141,7 +144,7 @@ export default function Journal() {
 
   if (view === 'entry') {
     return (
-      <div className="journal-page" id="main-content" role="main">
+      <div className="journal-page" >
         <header className="journal-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Journal' }, { label: selectedDate ?? '' }]} />
           <div className="journal-header-actions">
@@ -179,7 +182,7 @@ export default function Journal() {
   const isViewingCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth();
 
   return (
-    <div className="journal-page" id="main-content" role="main">
+    <div className="journal-page" >
       <header className="journal-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Journal' }]} />
         {!loadingDates && entryDates.size > 0 && (

@@ -8,6 +8,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
+import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
 
@@ -48,9 +49,14 @@ export default function Search() {
     setQuery(qFromUrl);
   }, [qFromUrl]);
 
-  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null) => {
+  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
     if (!user?.id) return;
-    const q = (queryOverride !== null && queryOverride !== undefined ? String(queryOverride) : query).trim();
+    const state = { searchQuery: query, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo };
+    const { q, typeF, domF, tagF, statusF, dateFromF, dateToF, dueFromF, dueToF } = resolveSearchRpcFilters(
+      filtersOverride,
+      state
+    );
+    const searchQ = queryOverride !== null && queryOverride !== undefined ? String(queryOverride).trim() : q;
     const isLoadMore = nextOffset > 0;
     if (!isLoadMore) setLoading(true);
     else setLoadingMore(true);
@@ -58,17 +64,17 @@ export default function Search() {
     measureSearchStart();
     try {
       const { data, error: err } = await supabase.rpc(
-        q ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects',
+        searchQ ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects',
         {
-          search_query: q || null,
-          type_filter: typeFilter || null,
-          domain_id_f: domainFilter || null,
-          tag_id_f: tagFilter || null,
-          date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
-          date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
-          status_filter: statusFilter || null,
-          due_from_f: dueFrom ? `${dueFrom}T00:00:00Z` : null,
-          due_to_f: dueTo ? `${dueTo}T23:59:59Z` : null,
+          search_query: searchQ || null,
+          type_filter: typeF,
+          domain_id_f: domF,
+          tag_id_f: tagF,
+          date_from_f: dateFromF ? `${dateFromF}T00:00:00Z` : null,
+          date_to_f: dateToF ? `${dateToF}T23:59:59Z` : null,
+          status_filter: statusF,
+          due_from_f: dueFromF ? `${dueFromF}T00:00:00Z` : null,
+          due_to_f: dueToF ? `${dueToF}T23:59:59Z` : null,
           limit_n: PAGE_SIZE,
           offset_n: nextOffset,
         }
@@ -165,8 +171,19 @@ export default function Search() {
             setDueTo={setDueTo}
             domains={domains}
             tags={tags}
-            onApply={() => runSearch(0)}
+            onApply={() => runSearch(0, null, {
+              searchQuery: query,
+              typeFilter,
+              statusFilter,
+              domainFilter,
+              tagFilter,
+              dateFrom,
+              dateTo,
+              dueFrom,
+              dueTo,
+            })}
             onClear={() => {
+              const empty = createEmptyFiltersOverride();
               setTypeFilter('');
               setStatusFilter('');
               setDomainFilter('');
@@ -175,7 +192,7 @@ export default function Search() {
               setDateTo('');
               setDueFrom('');
               setDueTo('');
-              runSearch(0);
+              runSearch(0, '', empty);
             }}
           />
         )}

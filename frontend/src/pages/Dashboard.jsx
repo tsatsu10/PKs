@@ -11,8 +11,7 @@ import { deliverWebhookEvent } from '../lib/webhooks';
 import { useToast } from '../context/ToastContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
-import JSZip from 'jszip';
-import { useDashboardSearch } from '../hooks/useDashboardSearch';
+import { useDashboardSearch, createEmptyFiltersOverride } from '../hooks/useDashboardSearch';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import DashboardQuickAddForm from '../components/DashboardQuickAddForm';
 import DashboardStats from '../components/DashboardStats';
@@ -40,6 +39,13 @@ function getGreeting() {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+/** Selected object IDs the user owns (RLS bulk ops require ownership, not shared access). */
+function resolveOwnedObjectIds(selectedIds, objectList, ownerId) {
+  if (!ownerId || selectedIds.size === 0) return [];
+  const owned = new Set(objectList.filter((o) => o.user_id === ownerId).map((o) => o.id));
+  return Array.from(selectedIds).filter((id) => owned.has(id));
 }
 
 export default function Dashboard() {
@@ -152,28 +158,48 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user?.id) return;
     const hasAnyParam = dueSoonFromParams || typeFromParams || statusFromParams || updatedFromParams;
+    const today = new Date();
+    let overrides;
     if (hasAnyParam) {
       if (dueSoonFromParams) {
-        const today = new Date();
         const in7 = new Date(today);
         in7.setDate(in7.getDate() + 7);
-        setDueFrom(today.toISOString().slice(0, 10));
-        setDueTo(in7.toISOString().slice(0, 10));
+        const dueFromVal = today.toISOString().slice(0, 10);
+        const dueToVal = in7.toISOString().slice(0, 10);
+        setDueFrom(dueFromVal);
+        setDueTo(dueToVal);
+        overrides = {
+          dueFrom: dueFromVal,
+          dueTo: dueToVal,
+          dateFrom: '',
+          dateTo: '',
+          typeFilter: typeFromParams || '',
+          statusFilter: statusFromParams || '',
+        };
       } else {
         setDueFrom('');
         setDueTo('');
+        overrides = {
+          dueFrom: '',
+          dueTo: '',
+          typeFilter: typeFromParams || '',
+          statusFilter: statusFromParams || '',
+        };
       }
       setTypeFilter(typeFromParams || '');
       setStatusFilter(statusFromParams || '');
       if (updatedFromParams === '7d') {
-        const today = new Date();
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
-        setDateFrom(weekAgo.toISOString().slice(0, 10));
-        setDateTo(today.toISOString().slice(0, 10));
+        const dateFromVal = weekAgo.toISOString().slice(0, 10);
+        const dateToVal = today.toISOString().slice(0, 10);
+        setDateFrom(dateFromVal);
+        setDateTo(dateToVal);
+        overrides = { ...overrides, dateFrom: dateFromVal, dateTo: dateToVal };
       } else {
         setDateFrom('');
         setDateTo('');
+        overrides = { ...overrides, dateFrom: '', dateTo: '' };
       }
       setShowFilters(true);
     } else {
@@ -183,11 +209,10 @@ export default function Dashboard() {
       setDateTo('');
       setDueFrom('');
       setDueTo('');
+      overrides = createEmptyFiltersOverride();
     }
-    const t = setTimeout(() => runSearch(0), 0);
-    return () => clearTimeout(t);
-    // Intentionally only depend on URL params so we don't re-run when setters/runSearch identity changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    runSearch(0, null, overrides);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- URL-driven filter sync only
   }, [user?.id, dueSoonFromParams, typeFromParams, statusFromParams, updatedFromParams]);
 
   useEffect(() => {
@@ -225,6 +250,7 @@ export default function Dashboard() {
     }
     const t = setTimeout(() => runSearch(0), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce searchQuery only; runSearch identity changes with filters
   }, [searchQuery, user?.id]);
 
   // Command palette: Cmd/Ctrl+K — store focus for restore
@@ -368,7 +394,13 @@ export default function Dashboard() {
   }
 
   function selectAllOnPage() {
-    setSelectedIds(new Set(objects.map((o) => o.id)));
+    setSelectedIds(new Set(objects.filter((o) => o.user_id === user?.id).map((o) => o.id)));
+  }
+
+  function getOwnedSelection() {
+    const ownedIds = resolveOwnedObjectIds(selectedIds, objects, user?.id);
+    const skipped = selectedIds.size - ownedIds.length;
+    return { ownedIds, skipped };
   }
 
   function clearSelection() {
@@ -499,6 +531,7 @@ export default function Dashboard() {
         }
       });
 
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       const ZIP_CHUNK = 20;
       for (let i = 0; i < ids.length; i += ZIP_CHUNK) {
@@ -594,13 +627,21 @@ export default function Dashboard() {
   async function bulkAddDomain() {
     const domainId = bulkDomainId;
     if (!domainId || selectedIds.size === 0) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
-      const rows = Array.from(selectedIds).map((knowledge_object_id) => ({ knowledge_object_id, domain_id: domainId }));
+      const rows = ownedIds.map((knowledge_object_id) => ({ knowledge_object_id, domain_id: domainId }));
       const { error: err } = await supabase.from('knowledge_object_domains').upsert(rows, { onConflict: 'knowledge_object_id,domain_id', ignoreDuplicates: true });
       if (err) throw err;
-      addToast('success', `Domain added to ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Domain added to ${ownedIds.length} object(s) (${skipped} shared object(s) skipped)`
+        : `Domain added to ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setBulkDomainId('');
       setShowBulkMenu(false);
@@ -618,13 +659,21 @@ export default function Dashboard() {
   async function bulkAddTag() {
     const tagId = bulkTagId;
     if (!tagId || selectedIds.size === 0) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
-      const rows = Array.from(selectedIds).map((knowledge_object_id) => ({ knowledge_object_id, tag_id: tagId }));
+      const rows = ownedIds.map((knowledge_object_id) => ({ knowledge_object_id, tag_id: tagId }));
       const { error: err } = await supabase.from('knowledge_object_tags').upsert(rows, { onConflict: 'knowledge_object_id,tag_id', ignoreDuplicates: true });
       if (err) throw err;
-      addToast('success', `Tag added to ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Tag added to ${ownedIds.length} object(s) (${skipped} shared object(s) skipped)`
+        : `Tag added to ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setBulkTagId('');
       setShowBulkMenu(false);
@@ -642,16 +691,24 @@ export default function Dashboard() {
   async function bulkRemoveDomain() {
     const domainId = bulkDomainId;
     if (!domainId || selectedIds.size === 0) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
       const { error: err } = await supabase
         .from('knowledge_object_domains')
         .delete()
-        .in('knowledge_object_id', Array.from(selectedIds))
+        .in('knowledge_object_id', ownedIds)
         .eq('domain_id', domainId);
       if (err) throw err;
-      addToast('success', `Domain removed from ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Domain removed from ${ownedIds.length} object(s) (${skipped} shared object(s) skipped)`
+        : `Domain removed from ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setBulkDomainId('');
       setShowBulkMenu(false);
@@ -669,16 +726,24 @@ export default function Dashboard() {
   async function bulkRemoveTag() {
     const tagId = bulkTagId;
     if (!tagId || selectedIds.size === 0) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
       const { error: err } = await supabase
         .from('knowledge_object_tags')
         .delete()
-        .in('knowledge_object_id', Array.from(selectedIds))
+        .in('knowledge_object_id', ownedIds)
         .eq('tag_id', tagId);
       if (err) throw err;
-      addToast('success', `Tag removed from ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Tag removed from ${ownedIds.length} object(s) (${skipped} shared object(s) skipped)`
+        : `Tag removed from ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setBulkTagId('');
       setShowBulkMenu(false);
@@ -695,15 +760,23 @@ export default function Dashboard() {
 
   async function bulkDelete() {
     if (selectedIds.size === 0) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
       const { error: err } = await supabase
         .from('knowledge_objects')
         .update({ is_deleted: true })
-        .in('id', Array.from(selectedIds));
+        .in('id', ownedIds);
       if (err) throw err;
-      addToast('success', `${selectedIds.size} object(s) deleted`);
+      const msg = skipped > 0
+        ? `${ownedIds.length} object(s) deleted (${skipped} shared object(s) skipped)`
+        : `${ownedIds.length} object(s) deleted`;
+      addToast('success', msg);
       setBulkModal(null);
       setShowBulkMenu(false);
       clearSelection();
@@ -719,15 +792,23 @@ export default function Dashboard() {
 
   async function bulkChangeType() {
     if (selectedIds.size === 0 || !bulkType) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
       const { error: err } = await supabase
         .from('knowledge_objects')
         .update({ type: bulkType })
-        .in('id', Array.from(selectedIds));
+        .in('id', ownedIds);
       if (err) throw err;
-      addToast('success', `Type set to "${bulkType}" for ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Type set to "${bulkType}" for ${ownedIds.length} object(s) (${skipped} shared skipped)`
+        : `Type set to "${bulkType}" for ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setShowBulkMenu(false);
       clearSelection();
@@ -743,15 +824,23 @@ export default function Dashboard() {
 
   async function bulkSetStatus() {
     if (selectedIds.size === 0 || !bulkStatus) return;
+    const { ownedIds, skipped } = getOwnedSelection();
+    if (ownedIds.length === 0) {
+      addToast('error', 'Bulk actions only apply to objects you own.');
+      return;
+    }
     setBulkActionLoading(true);
     setError('');
     try {
       const { error: err } = await supabase
         .from('knowledge_objects')
         .update({ status: bulkStatus })
-        .in('id', Array.from(selectedIds));
+        .in('id', ownedIds);
       if (err) throw err;
-      addToast('success', `Status set to "${bulkStatus}" for ${selectedIds.size} object(s)`);
+      const msg = skipped > 0
+        ? `Status set to "${bulkStatus}" for ${ownedIds.length} object(s) (${skipped} shared skipped)`
+        : `Status set to "${bulkStatus}" for ${ownedIds.length} object(s)`;
+      addToast('success', msg);
       setBulkModal(null);
       setShowBulkMenu(false);
       clearSelection();
@@ -799,18 +888,29 @@ export default function Dashboard() {
 
   function applySavedFilter(saved) {
     const f = saved.filters || {};
-    setSearchQuery(f.searchQuery ?? '');
-    setTypeFilter(f.typeFilter ?? '');
-    setStatusFilter(f.statusFilter ?? '');
-    setDomainFilter(f.domainFilter ?? '');
-    setTagFilter(f.tagFilter ?? '');
-    setDateFrom(f.dateFrom ?? '');
-    setDateTo(f.dateTo ?? '');
-    setDueFrom(f.dueFrom ?? '');
-    setDueTo(f.dueTo ?? '');
+    const overrides = {
+      searchQuery: f.searchQuery ?? '',
+      typeFilter: f.typeFilter ?? '',
+      statusFilter: f.statusFilter ?? '',
+      domainFilter: f.domainFilter ?? '',
+      tagFilter: f.tagFilter ?? '',
+      dateFrom: f.dateFrom ?? '',
+      dateTo: f.dateTo ?? '',
+      dueFrom: f.dueFrom ?? '',
+      dueTo: f.dueTo ?? '',
+    };
+    setSearchQuery(overrides.searchQuery);
+    setTypeFilter(overrides.typeFilter);
+    setStatusFilter(overrides.statusFilter);
+    setDomainFilter(overrides.domainFilter);
+    setTagFilter(overrides.tagFilter);
+    setDateFrom(overrides.dateFrom);
+    setDateTo(overrides.dateTo);
+    setDueFrom(overrides.dueFrom);
+    setDueTo(overrides.dueTo);
     setShowFilters(true);
     setShowSavedFiltersDropdown(false);
-    setTimeout(() => runSearch(0, f.searchQuery ?? ''), 0);
+    runSearch(0, overrides.searchQuery, overrides);
   }
 
   function deleteSavedFilter(id) {
@@ -841,7 +941,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <main className="dashboard-main" aria-busy={loading} aria-live="polite">
+      <div className="dashboard-main" aria-busy={loading} aria-live="polite" aria-label="Dashboard">
         <a href="#dashboard-object-list" className="dashboard-skip-link">Skip to object list</a>
         <div className="dashboard-scroll-progress" role="presentation" aria-hidden="true">
           <div className="dashboard-scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
@@ -1027,11 +1127,13 @@ export default function Dashboard() {
                 const today = new Date();
                 const in7 = new Date(today);
                 in7.setDate(in7.getDate() + 7);
-                setDueFrom(today.toISOString().slice(0, 10));
-                setDueTo(in7.toISOString().slice(0, 10));
+                const dueFromVal = today.toISOString().slice(0, 10);
+                const dueToVal = in7.toISOString().slice(0, 10);
+                setDueFrom(dueFromVal);
+                setDueTo(dueToVal);
                 setDateFrom('');
                 setDateTo('');
-                runSearch(0);
+                runSearch(0, null, { dueFrom: dueFromVal, dueTo: dueToVal, dateFrom: '', dateTo: '' });
                 setShowFilters(true);
               }}
             >
@@ -1044,11 +1146,13 @@ export default function Dashboard() {
                 const today = new Date();
                 const weekAgo = new Date(today);
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                setDateFrom(weekAgo.toISOString().slice(0, 10));
-                setDateTo(today.toISOString().slice(0, 10));
+                const dateFromVal = weekAgo.toISOString().slice(0, 10);
+                const dateToVal = today.toISOString().slice(0, 10);
+                setDateFrom(dateFromVal);
+                setDateTo(dateToVal);
                 setDueFrom('');
                 setDueTo('');
-                runSearch(0);
+                runSearch(0, null, { dateFrom: dateFromVal, dateTo: dateToVal, dueFrom: '', dueTo: '' });
                 setShowFilters(true);
               }}
             >
@@ -1119,7 +1223,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 className={`quick-filter-pill ${!domainFilter ? 'active' : ''}`}
-                onClick={() => { setDomainFilter(''); runSearch(0, null, { domain_id_f: null }); }}
+                onClick={() => { setDomainFilter(''); runSearch(0, null, { domainFilter: '' }); }}
               >
                 All
               </button>
@@ -1128,7 +1232,7 @@ export default function Dashboard() {
                   key={d.id}
                   type="button"
                   className={`quick-filter-pill ${domainFilter === d.id ? 'active' : ''}`}
-                  onClick={() => { setDomainFilter(d.id); runSearch(0, null, { domain_id_f: d.id }); }}
+                  onClick={() => { setDomainFilter(d.id); runSearch(0, null, { domainFilter: d.id }); }}
                 >
                   {d.name}
                 </button>
@@ -1157,7 +1261,17 @@ export default function Dashboard() {
             setDueTo={setDueTo}
             domains={domains}
             tags={tags}
-            onApply={() => runSearch(0)}
+            onApply={() => runSearch(0, null, {
+              searchQuery,
+              typeFilter,
+              statusFilter,
+              domainFilter,
+              tagFilter,
+              dateFrom,
+              dateTo,
+              dueFrom,
+              dueTo,
+            })}
             onClear={clearFilters}
           />
         )}
@@ -1578,7 +1692,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

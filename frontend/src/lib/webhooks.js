@@ -12,7 +12,9 @@ export function deliverWebhookEvent(event, payload = {}) {
   supabase.functions
     .invoke('webhook-deliver', { body: { event, payload } })
     .then(({ error }) => {
-      if (error) console.warn('Webhook delivery failed:', error);
+      if (error && import.meta.env.DEV) console.warn('Webhook delivery failed:', error);
     })
-    .catch((err) => console.warn('Webhook delivery error:', err));
+    .catch((err) => {
+      if (import.meta.env.DEV) console.warn('Webhook delivery error:', err);
+    });
 }

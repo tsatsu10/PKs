@@ -50,5 +50,8 @@
   },
   "optionalDependencies": {
     "@esbuild/win32-x64": "^0.27.3"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.3"
   }
 }

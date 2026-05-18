@@ -7,28 +7,32 @@ import './DashboardStats.css';
 
 /** Animates a number from previous value to target over duration (ms). */
 function NumberTicker({ value, duration = 400 }) {
-  const [display, setDisplay] = useState(value);
-  const prevValueRef = useRef(value);
+  const target = Number(value) || 0;
+  const [animDisplay, setAnimDisplay] = useState(null);
+  const prevValueRef = useRef(target);
+
   useEffect(() => {
-    const target = Number(value) || 0;
     const start = prevValueRef.current;
     prevValueRef.current = target;
-    if (start === target) {
-      setDisplay(target);
-      return;
-    }
+    if (start === target) return;
+
     const startTime = performance.now();
     function tick(now) {
       const elapsed = now - startTime;
       const t = Math.min(elapsed / duration, 1);
       const eased = 1 - (1 - t) * (1 - t);
-      setDisplay(Math.round(start + (target - start) * eased));
+      setAnimDisplay(Math.round(start + (target - start) * eased));
       if (t < 1) requestAnimationFrame(tick);
+      else setAnimDisplay(null);
     }
     const id = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(id);
-  }, [value, duration]);
-  return <span className="dashboard-overview-value">{display}</span>;
+    return () => {
+      cancelAnimationFrame(id);
+      setAnimDisplay(null);
+    };
+  }, [target, duration]);
+
+  return <span className="dashboard-overview-value">{animDisplay ?? target}</span>;
 }
 
 /**

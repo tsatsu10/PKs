@@ -38,18 +38,26 @@ export default function Register() {
       });
       if (err) throw new Error(getErrorMessage(err, 'Sign up failed'));
       if (!data.user) throw new Error('Sign up failed');
+      if (!data.session?.access_token) {
+        setError('Account created. Check your email for a confirmation link, then sign in.');
+        return;
+      }
       const { data: profile } = await supabase
         .from('users')
         .select('email, display_name, timezone, created_at')
         .eq('id', data.user.id)
         .single();
-      login({
+      const loggedIn = await login({
         id: data.user.id,
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? displayName.trim() ?? '',
         timezone: profile?.timezone ?? 'Africa/Accra',
         createdAt: profile?.created_at ?? data.user.created_at,
       });
+      if (!loggedIn) {
+        setError('Account created but no session was issued. Please sign in.');
+        return;
+      }
       setTimeout(() => navigate('/', { replace: true }), 50);
     } catch (err) {
       setError(getErrorMessage(err, 'Registration failed'));

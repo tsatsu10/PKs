@@ -30,7 +30,7 @@ export default function QuickCapture() {
     hasRestoredDraft.current = true;
     setTitle(draft.title ?? '');
     setContent(draft.content ?? '');
-    addToast('Draft restored');
+    addToast('success', 'Draft restored');
   }, [addToast]);
 
   const draftTimerRef = useRef(null);
@@ -81,7 +81,7 @@ export default function QuickCapture() {
   }
 
   return (
-    <div className="object-form-page quick-capture-page" id="main-content" role="main">
+    <div className="object-form-page quick-capture-page" >
       <header className="object-form-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Quick capture' }]} />
         <h1>Quick capture</h1>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -24,78 +24,70 @@ async function fetchProfile(userId) {
   return data;
 }
 
+async function resolveUserFromSession(session) {
+  if (!session?.user) return null;
+  const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
+  if (userError || !verifiedUser) return null;
+  const profile = await fetchProfile(verifiedUser.id).catch(() => null);
+  return mapUser(verifiedUser, profile);
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [hasValidSession, setHasValidSession] = useState(false);
   const [loading, setLoading] = useState(true);
-  /** When session is lost after we had a user (expired/invalid), show re-auth message on login page. */
   const [sessionExpired, setSessionExpired] = useState(false);
   const hadUserRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     const globalTimeoutId = setTimeout(() => {
-      if (cancelled) return;
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }, 8000);
 
-    supabase.auth.getSession()
-      .then(({ data: { session }, error: sessionError }) => {
+    const applySession = async (session) => {
+      if (cancelled) return;
+      if (session?.user) {
+        const mapped = await resolveUserFromSession(session);
         if (cancelled) return;
-        if (sessionError) {
-          setUser(null);
-          clearTimeout(globalTimeoutId);
-          setLoading(false);
-          return;
-        }
-        if (session?.user) {
+        const sessionOk = !!session?.access_token;
+        if (mapped && sessionOk) {
           hadUserRef.current = true;
-          const profilePromise = fetchProfile(session.user.id);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('profile_timeout')), 4000)
-          );
-          Promise.race([profilePromise, timeoutPromise])
-            .then((profile) => {
-              if (!cancelled) setUser(mapUser(session.user, profile ?? null));
-            })
-            .catch(() => {
-              if (!cancelled) setUser(mapUser(session.user, null));
-            })
-            .finally(() => {
-              if (!cancelled) {
-                clearTimeout(globalTimeoutId);
-                setLoading(false);
-              }
-            });
+          setUser(mapped);
+          setHasValidSession(true);
+        } else if (hadUserRef.current) {
+          setSessionExpired(true);
+          hadUserRef.current = false;
+          setUser(null);
+          setHasValidSession(false);
         } else {
           setUser(null);
-          clearTimeout(globalTimeoutId);
-          setLoading(false);
+          setHasValidSession(false);
         }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setUser(null);
-          clearTimeout(globalTimeoutId);
-          setLoading(false);
+      } else {
+        if (hadUserRef.current) {
+          setSessionExpired(true);
+          hadUserRef.current = false;
         }
-      });
+        setUser(null);
+        setHasValidSession(false);
+      }
+      clearTimeout(globalTimeoutId);
+      setLoading(false);
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          hadUserRef.current = true;
-          const profile = await fetchProfile(session.user.id).catch(() => null);
-          setUser(mapUser(session.user, profile));
-        } else {
-          if (hadUserRef.current) {
-            setSessionExpired(true);
-            hadUserRef.current = false;
-          }
-          setUser(null);
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => applySession(session)).catch(() => {
+      if (!cancelled) {
+        setUser(null);
+        setHasValidSession(false);
+        clearTimeout(globalTimeoutId);
         setLoading(false);
       }
-    );
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
+    });
 
     return () => {
       cancelled = true;
@@ -104,30 +96,51 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = (userData) => {
+  /** Only set user when Supabase has a JWT (required for RLS). Returns false if no session. */
+  const login = useCallback(async (userData) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      setHasValidSession(false);
+      return false;
+    }
+    hadUserRef.current = true;
     setUser(userData);
-  };
+    setHasValidSession(true);
+    return true;
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await supabase.auth.signOut();
+    hadUserRef.current = false;
     setUser(null);
-  };
+    setHasValidSession(false);
+  }, []);
 
-  /** Refetch profile from public.users and update context (e.g. after editing display name or timezone). */
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const { data: { user: au } } = await supabase.auth.getUser();
     if (!au) return;
     const profile = await fetchProfile(au.id);
     setUser(mapUser(au, profile ?? null));
-  };
+  }, []);
 
-  const clearSessionExpired = () => setSessionExpired(false);
+  const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, supabase, sessionExpired, clearSessionExpired }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      hasValidSession,
+      loading,
+      login,
+      logout,
+      refreshUser,
+      supabase,
+      sessionExpired,
+      clearSessionExpired,
+    }),
+    [user, hasValidSession, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /* eslint-disable-next-line react-refresh/only-export-components -- useAuth is the standard hook for AuthProvider */

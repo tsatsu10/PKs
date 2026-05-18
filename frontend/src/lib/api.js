@@ -12,6 +12,8 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 /**
  * Returns headers including the Supabase session JWT for backend auth.
  * Use with: fetch(url, { headers: await getAuthHeaders() }).
+ * Note: Token comes from getSession() (local storage). Backends must verify the JWT
+ * with Supabase Auth; do not trust the token for authorization without verification.
  * @returns {Promise<Record<string, string>>}
  */
 export async function getAuthHeaders() {

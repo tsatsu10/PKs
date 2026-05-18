@@ -1,17 +1,24 @@
-// PKS Edge Function: run prompt with OpenAI or DeepSeek
-// Server: set OPENAI_API_KEY and/or DEEPSEEK_API_KEY in Edge Function Secrets.
-// Or client can pass user_provider_id (UUID from user_ai_providers) to use their own API key.
+// PKS Edge Function: run prompt with DeepSeek only
+// Server: set DEEPSEEK_API_KEY in Edge Function Secrets.
+// Or client can pass user_provider_id (UUID from user_ai_providers, deepseek only).
 // Invoke: POST body { promptText, objectTitle?, objectContent?, model?, user_provider_id? }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeDeepSeekApiKey, validateDeepSeekApiKey, hintForDeepSeekAuthCode } from "./deepseekKey.ts";
 
+const appOrigin = Deno.env.get("PKS_APP_ORIGIN") ?? "*";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": appOrigin,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Rate limit: per user, per minute, via DB (works across all edge instances).
 const RATE_LIMIT_PER_MINUTE = 20;
+const MAX_PROMPT_TEXT = 16_384;
+const MAX_OBJECT_TITLE = 200;
+const MAX_OBJECT_CONTENT = 50_000;
+const DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"];
+const DEFAULT_MODEL = "deepseek-chat";
+const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -53,7 +60,7 @@ Deno.serve(async (req) => {
       );
     }
     const rl = rlData as { count?: number; limited?: boolean; retry_after_sec?: number; error?: string } | null;
-    if (rl?.error === "unauthorized" || (rl?.limited === true)) {
+    if (rl?.error === "unauthorized" || rl?.limited === true) {
       const retryAfter = typeof rl?.retry_after_sec === "number" ? rl.retry_after_sec : 60;
       return new Response(
         JSON.stringify({
@@ -82,16 +89,13 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const OPENAI_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4.1-nano", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4o-nano", "gpt-3.5-turbo"];
-    const DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"];
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
     const userProviderId = typeof body?.user_provider_id === "string" ? body.user_provider_id.trim() || null : null;
+    const requestedModel = typeof body?.model === "string" ? body.model.trim() : DEFAULT_MODEL;
+    const model = DEEPSEEK_MODELS.includes(requestedModel) ? requestedModel : DEFAULT_MODEL;
 
     let apiKey: string;
-    let useDeepSeek: boolean;
-    let model: string;
-    const requestedModel = typeof body?.model === "string" ? body.model.trim() : "gpt-4.1-mini";
 
     if (userProviderId) {
       const { data: providerRow, error: providerErr } = await supabase
@@ -110,28 +114,19 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      apiKey = providerRow.api_key;
-      useDeepSeek = providerRow.provider_type === "deepseek";
-      const allowedModels = useDeepSeek ? DEEPSEEK_MODELS : OPENAI_MODELS;
-      model = allowedModels.includes(requestedModel) ? requestedModel : allowedModels[0];
-    } else {
-      const hasOpenAI = Boolean(openaiKey);
-      const hasDeepSeek = Boolean(deepseekKey);
-      if (!hasOpenAI && !hasDeepSeek) {
+      if (providerRow.provider_type !== "deepseek") {
         return new Response(
           JSON.stringify({
-            error: "AI not configured",
-            code: "AI_NOT_CONFIGURED",
-            hint: "Set OPENAI_API_KEY and/or DEEPSEEK_API_KEY in Edge Function Secrets, or add your own key in Settings → AI API keys.",
+            error: "Only DeepSeek providers are supported",
+            code: "PROVIDER_NOT_SUPPORTED",
+            hint: "Add a DeepSeek API key in Settings → AI API keys.",
           }),
-          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const isDeepSeek = DEEPSEEK_MODELS.includes(requestedModel);
-      const isOpenAI = OPENAI_MODELS.includes(requestedModel);
-      model = isDeepSeek ? requestedModel : isOpenAI ? requestedModel : "gpt-4.1-mini";
-      useDeepSeek = DEEPSEEK_MODELS.includes(model);
-      if (useDeepSeek && !deepseekKey) {
+      apiKey = providerRow.api_key;
+    } else {
+      if (!deepseekKey) {
         return new Response(
           JSON.stringify({
             error: "DeepSeek not configured",
@@ -141,37 +136,44 @@ Deno.serve(async (req) => {
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (!useDeepSeek && !openaiKey) {
-        return new Response(
-          JSON.stringify({
-            error: "OpenAI not configured",
-            code: "OPENAI_API_KEY_MISSING",
-            hint: "Set OPENAI_API_KEY in Edge Function Secrets or add your own OpenAI key in Settings.",
-          }),
-          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      apiKey = useDeepSeek ? deepseekKey! : openaiKey!;
+      apiKey = deepseekKey;
     }
 
-    const { promptText, objectTitle = "", objectContent = "" } = body ?? {};
-    if (!promptText || typeof promptText !== "string") {
+    const keyCheck = validateDeepSeekApiKey(apiKey);
+    if (!keyCheck.ok) {
+      return new Response(
+        JSON.stringify({ error: "Invalid DeepSeek API key", code: keyCheck.code, hint: keyCheck.hint }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    apiKey = keyCheck.key;
+
+    const rawPromptText = body?.promptText;
+    const rawObjectTitle = body?.objectTitle;
+    const rawObjectContent = body?.objectContent;
+    if (!rawPromptText || typeof rawPromptText !== "string") {
       return new Response(JSON.stringify({ error: "promptText (string) is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (rawPromptText.length > MAX_PROMPT_TEXT) {
+      return new Response(
+        JSON.stringify({ error: `promptText must be at most ${MAX_PROMPT_TEXT} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const objectTitle =
+      typeof rawObjectTitle === "string" ? rawObjectTitle.slice(0, MAX_OBJECT_TITLE) : "";
+    const objectContent =
+      typeof rawObjectContent === "string" ? rawObjectContent.slice(0, MAX_OBJECT_CONTENT) : "";
 
     const userMessage =
       (objectTitle || objectContent)
-        ? `Document title: ${objectTitle}\n\nContent:\n${objectContent || "(none)"}\n\nTask:\n${promptText}`
-        : promptText;
+        ? `Document title: ${objectTitle}\n\nContent:\n${objectContent || "(none)"}\n\nTask:\n${rawPromptText}`
+        : rawPromptText;
 
-    const apiUrl = useDeepSeek
-      ? "https://api.deepseek.com/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-
-    const res = await fetch(apiUrl, {
+    const res = await fetch(DEEPSEEK_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -185,20 +187,30 @@ Deno.serve(async (req) => {
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      let detail = err;
+      let upstreamCode = "DEEPSEEK_ERROR";
+      let upstreamMessage = "";
       try {
-        const parsed = JSON.parse(err);
-        detail = parsed.error?.message ?? parsed.error ?? err;
+        const errJson = await res.json();
+        const errObj = errJson?.error;
+        upstreamMessage =
+          (typeof errObj === "object" && errObj?.message) ||
+          errJson?.message ||
+          (typeof errJson?.error === "string" ? errJson.error : "") ||
+          "";
+        upstreamCode =
+          (typeof errObj === "object" && errObj?.code) ||
+          errJson?.code ||
+          upstreamCode;
       } catch {
-        /* use raw err */
+        /* ignore parse errors */
       }
+      const hint = hintForDeepSeekAuthCode(String(upstreamCode)) || upstreamMessage ||
+        "Check your DeepSeek API key in Settings → AI API keys, or DEEPSEEK_API_KEY in Edge Function secrets.";
       return new Response(
         JSON.stringify({
-          error: "AI request failed",
-          code: useDeepSeek ? "DEEPSEEK_ERROR" : "OPENAI_ERROR",
-          hint: "Check your API key in Settings → AI API keys, or try another model.",
-          detail: detail.slice(0, 500),
+          error: upstreamMessage || "AI request failed",
+          code: upstreamCode,
+          hint,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -209,13 +221,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ output }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+  } catch (_e) {
     return new Response(
       JSON.stringify({
         error: "Server error",
         hint: "Something went wrong on the server. Try again in a moment.",
-        detail: message.slice(0, 300),
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

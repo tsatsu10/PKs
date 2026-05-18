@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
+import { AI_PROVIDER } from '../constants';
+import { validateDeepSeekApiKey } from '../lib/deepseekKey';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useDeckEnabled } from '../components/MainMenuDeckContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
-import JSZip from 'jszip';
 import './Settings.css';
 
 export default function Settings() {
@@ -31,7 +32,6 @@ export default function Settings() {
   const [installed, setInstalled] = useState(false);
   const [aiProviders, setAiProviders] = useState([]);
   const [aiProviderName, setAiProviderName] = useState('');
-  const [aiProviderType, setAiProviderType] = useState('openai');
   const [aiProviderKey, setAiProviderKey] = useState('');
   const [addingAiProvider, setAddingAiProvider] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState('');
@@ -71,25 +71,6 @@ export default function Settings() {
     setProfileDisplayName(user.displayName ?? '');
     setProfileTimezone(user.timezone ?? 'Africa/Accra');
   }, [user?.id, user?.displayName, user?.timezone]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    async function load() {
-      const [dRes, tRes, pRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name'),
-      ]);
-      if (cancelled) return;
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-      setAiProviders(pRes.data || []);
-      setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [user?.id]);
 
   async function saveProfile(e) {
     e.preventDefault();
@@ -165,7 +146,7 @@ export default function Settings() {
       const [dRes, tRes, pRes] = await Promise.all([
         supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
         supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name'),
+        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).eq('provider_type', AI_PROVIDER).order('name'),
       ]);
       if (cancelled) return;
       setDomains(dRes.data || []);
@@ -250,21 +231,30 @@ export default function Settings() {
   async function addAiProvider(e) {
     e.preventDefault();
     const name = aiProviderName.trim();
-    const key = aiProviderKey.trim();
-    if (!name || !key) return;
+    const keyCheck = validateDeepSeekApiKey(aiProviderKey);
+    if (!name) return;
+    if (!keyCheck.ok) {
+      setError(keyCheck.message);
+      return;
+    }
     setError('');
     setAddingAiProvider(true);
     try {
       const { error: err } = await supabase.from('user_ai_providers').insert({
         user_id: user.id,
         name,
-        provider_type: aiProviderType,
-        api_key: key,
+        provider_type: AI_PROVIDER,
+        api_key: keyCheck.key,
       });
       if (err) throw err;
       setAiProviderName('');
       setAiProviderKey('');
-      const { data, error: refetchErr } = await supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).order('name');
+      const { data, error: refetchErr } = await supabase
+        .from('user_ai_providers')
+        .select('id, name, provider_type')
+        .eq('user_id', user.id)
+        .eq('provider_type', AI_PROVIDER)
+        .order('name');
       if (refetchErr && import.meta.env.DEV) console.warn('AI providers refetch failed:', refetchErr);
       setAiProviders(data || []);
     } catch (err) {
@@ -447,6 +437,7 @@ export default function Settings() {
         if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
       });
       const include = getExportIncludeFromTemplate('full', { includeLinks: false });
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       (objs || []).forEach((o, i) => {
         const obj = { ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] };
@@ -467,10 +458,10 @@ export default function Settings() {
     }
   }
 
-  if (loading) return <div className="settings-page" id="main-content" role="main"><p role="status" aria-live="polite">Loading…</p></div>;
+  if (loading) return <div className="settings-page"><p role="status" aria-live="polite">Loading…</p></div>;
 
   return (
-    <div className="settings-page" id="main-content" role="main">
+    <div className="settings-page">
       <header className="settings-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Settings' }]} />
         <h1>Settings</h1>
@@ -602,30 +593,21 @@ export default function Settings() {
 
       <section className="settings-section page-section">
         <h2 className="page-section-title">AI API keys</h2>
-        <p className="settings-desc page-section-desc">Add your own OpenAI or DeepSeek API keys and give them a name. You can then choose them in the Run prompt dropdown instead of the server default.</p>
+        <p className="settings-desc page-section-desc">Add your own DeepSeek API key and give it a name. You can then choose it in the Run prompt dropdown instead of the server default.</p>
         <form onSubmit={addAiProvider} className="settings-form form">
           <input
             type="text"
             value={aiProviderName}
             onChange={(e) => setAiProviderName(e.target.value)}
-            placeholder="e.g. My OpenAI"
+            placeholder="e.g. My DeepSeek"
             disabled={addingAiProvider}
             aria-label="Provider name"
           />
-          <select
-            value={aiProviderType}
-            onChange={(e) => setAiProviderType(e.target.value)}
-            disabled={addingAiProvider}
-            aria-label="Provider type"
-          >
-            <option value="openai">OpenAI</option>
-            <option value="deepseek">DeepSeek</option>
-          </select>
           <input
             type="password"
             value={aiProviderKey}
             onChange={(e) => setAiProviderKey(e.target.value)}
-            placeholder="API key (sk-…)"
+            placeholder="sk-… (from platform.deepseek.com/api_keys)"
             disabled={addingAiProvider}
             autoComplete="off"
             aria-label="API key"
@@ -637,7 +619,7 @@ export default function Settings() {
         <ul className="settings-list">
           {aiProviders.map((p) => (
             <li key={p.id}>
-              <span><strong>{p.name}</strong> ({p.provider_type})</span>
+              <span><strong>{p.name}</strong> (DeepSeek)</span>
               <button
                 type="button"
                 className="btn btn-small btn-danger"
@@ -701,7 +683,7 @@ export default function Settings() {
         <h2 className="page-section-title">Export &amp; backup</h2>
         <p className="settings-desc page-section-desc">Download your data as a portable backup. &quot;Download my data&quot; includes knowledge objects, journal entries, paste bin, domains, and tags in one JSON file.</p>
         {backupError && <div className="form-error" role="alert">{backupError}</div>}
-        <div className="settings-form" style={{ gap: '0.5rem' }}>
+        <div className="settings-form settings-form-actions">
           <button type="button" className="btn btn-primary" onClick={downloadFullAccountData} disabled={backupLoading}>
             {backupLoading ? 'Preparing…' : 'Download my data (full JSON)'}
           </button>

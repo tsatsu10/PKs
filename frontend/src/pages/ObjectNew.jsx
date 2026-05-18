@@ -108,7 +108,7 @@ export default function ObjectNew() {
     setForm((f) => ({ ...f, ...draft.form }));
     if (draft.selectedTemplateId) setSelectedTemplateId(draft.selectedTemplateId);
     if (draft.templateValues && Object.keys(draft.templateValues).length) setTemplateValues(draft.templateValues);
-    addToast('Draft restored');
+    addToast('success', 'Draft restored');
   }, [addToast]);
 
   const draftTimerRef = useRef(null);
@@ -214,7 +214,7 @@ export default function ObjectNew() {
   }, []);
 
   return (
-    <div className="object-form-page notion-style" id="main-content" role="main">
+    <div className="object-form-page notion-style" >
       <form onSubmit={handleSubmit} className="object-form form">
         {error && <div className="form-error" role="alert">{error}</div>}
 

@@ -27,22 +27,21 @@ export function useObjectDetail({ id, userId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (cancelledRef) => {
     if (!id || !userId) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
+    const isCancelled = () => cancelledRef?.current === true;
     setLoading(true);
     setError('');
     try {
-      // Fetch object without content (smaller payload); fetch content in parallel for large docs.
       const OBJECT_COLS = 'id, user_id, type, title, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at';
       const [objRes, contentRes] = await Promise.all([
         supabase.from('knowledge_objects').select(OBJECT_COLS).eq('id', id).single(),
         supabase.from('knowledge_objects').select('content').eq('id', id).single(),
       ]);
-      if (cancelled) return;
+      if (isCancelled()) return;
       const e1 = objRes.error;
       const obj = objRes.data;
       if (e1 || !obj) {
@@ -66,7 +65,7 @@ export function useObjectDetail({ id, userId }) {
         .eq('knowledge_object_id', id)
         .eq('shared_with_user_id', userId)
         .maybeSingle();
-      if (!cancelled) setMyShare(myShareRes.data || null);
+      if (!isCancelled()) setMyShare(myShareRes.data || null);
 
       const [
         versRes,
@@ -113,7 +112,7 @@ export function useObjectDetail({ id, userId }) {
           .order('created_at', { ascending: false })
           .limit(20),
       ]);
-      if (cancelled) return;
+      if (isCancelled()) return;
 
       setAttachedFiles((kofRes.data || []).map((r) => r.files).filter(Boolean));
       setPromptTemplates(ptRes.data || []);
@@ -132,15 +131,13 @@ export function useObjectDetail({ id, userId }) {
       let targetMap = {};
       if (allLinkIds.length > 0) {
         const { data: objs, error: objsErr } = await supabase.from('knowledge_objects').select('id, title, type').in('id', allLinkIds);
-        if (objsErr) {
-          if (import.meta.env.DEV) console.warn('Link targets fetch failed:', objsErr);
-        }
+        if (objsErr && import.meta.env.DEV) console.warn('Link targets fetch failed:', objsErr);
         targetMap = (objs || []).reduce((acc, o) => ({ ...acc, [o.id]: o }), {});
-        // When fetch failed or RLS hid some rows, show "Unknown" instead of raw UUID
         for (const linkId of allLinkIds) {
           if (!targetMap[linkId]) targetMap[linkId] = { id: linkId, title: 'Unknown', type: '' };
         }
       }
+      if (isCancelled()) return;
       setOutgoingLinks(
         outRows.map((r) => ({
           id: r.id,
@@ -163,7 +160,7 @@ export function useObjectDetail({ id, userId }) {
         supabase.rpc('suggest_tags_for_object', { p_object_id: id }),
         supabase.rpc('suggest_linked_objects', { p_object_id: id, limit_n: 10 }),
       ]);
-      if (!cancelled) {
+      if (!isCancelled()) {
         const tagSuggestions =
           sugTagsRes.data?.length
             ? sugTagsRes.data
@@ -172,18 +169,26 @@ export function useObjectDetail({ id, userId }) {
         setSuggestedLinkedObjects(sugLinkRes.data || []);
       }
     } catch (e) {
-      if (!cancelled) {
+      if (!isCancelled()) {
         setError(getErrorMessage(e, 'Load failed'));
         setObject(null);
       }
     } finally {
-      if (!cancelled) setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
-    return () => { cancelled = true; };
   }, [id, userId]);
 
   useEffect(() => {
-    load();
+    const cancelledRef = { current: false };
+    load(cancelledRef);
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [load]);
+
+  const reload = useCallback(() => {
+    const cancelledRef = { current: false };
+    return load(cancelledRef);
   }, [load]);
 
   const draft = id ? getDraft(DRAFT_KEYS.object(id)) : null;
@@ -194,7 +199,7 @@ export function useObjectDetail({ id, userId }) {
     loading,
     error,
     setError,
-    reload: load,
+    reload,
     draft,
     versions,
     setVersions,

@@ -4,6 +4,21 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    dedupe: ['linkifyjs'],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'react-vendor';
+          if (id.includes('node_modules/@supabase/')) return 'supabase';
+          if (id.includes('node_modules/@mantine/')) return 'mantine';
+          if (id.includes('node_modules/@blocknote/') || id.includes('node_modules/@tiptap/') || id.includes('node_modules/prosemirror')) return 'blocknote';
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -23,6 +38,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        navigateFallback: 'index.html',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,woff}'],
         runtimeCaching: [
           {

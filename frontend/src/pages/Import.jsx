@@ -87,21 +87,38 @@ export default function Import() {
     try {
       for (let i = 0; i < items.length; i += BATCH_SIZE) {
         const chunk = items.slice(i, i + BATCH_SIZE);
+        const MAX_TITLE_LENGTH = 500;
+        const MAX_CONTENT_LENGTH = 500_000;
         const rows = chunk.map((item) => ({
           user_id: user.id,
           type: normalizeImportType(item.type),
-          title: item.title.slice(0, 500),
-          content: item.content || null,
+          title: (item.title || '').slice(0, MAX_TITLE_LENGTH),
+          content: (item.content || '').slice(0, MAX_CONTENT_LENGTH) || null,
           summary: null,
           source: null,
         }));
         const { error: err } = await supabase.from('knowledge_objects').insert(rows);
-        if (err) failed += chunk.length;
-        else created += chunk.length;
+        if (err) {
+          failed += chunk.length;
+          if (created === 0 && i === 0) {
+            throw err;
+          }
+        } else {
+          created += chunk.length;
+        }
       }
       setResult({ created, failed, total: items.length });
-      addToast('success', `Imported ${created} object(s)`);
-      if (created > 0) navigate('/', { replace: true });
+      if (created > 0 && failed === 0) {
+        addToast('success', `Imported ${created} object(s)`);
+        navigate('/', { replace: true });
+      } else if (created > 0) {
+        addToast('success', `Imported ${created} of ${items.length} object(s) (${failed} failed)`);
+        navigate('/', { replace: true });
+      } else {
+        const msg = 'Import failed. Check that you are signed in and try again.';
+        setError(msg);
+        addToast('error', msg);
+      }
     } catch (e) {
       const msg = getErrorMessage(e, 'Import failed');
       setError(msg);

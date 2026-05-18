@@ -127,7 +127,7 @@ export default function PasteBin() {
   if (!user) return null;
 
   return (
-    <div className="paste-bin-page" id="main-content" role="main">
+    <div className="paste-bin-page" >
       <header className="paste-bin-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Paste bin' }]} />
         <div className="paste-bin-actions">
@@ -171,7 +171,7 @@ export default function PasteBin() {
           )}
         </aside>
 
-        <main className="paste-bin-main">
+        <div className="paste-bin-main" aria-label="Paste bin">
           <div className="paste-bin-editor-card">
             <div className="paste-bin-editor-meta">
               <input
@@ -206,7 +206,7 @@ export default function PasteBin() {
               aria-label="Paste content"
             />
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

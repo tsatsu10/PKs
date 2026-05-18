@@ -63,7 +63,7 @@ export default function Notifications() {
   }
 
   return (
-    <div className="notifications-page" id="main-content" role="main">
+    <div className="notifications-page" >
       <header className="notifications-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Notifications' }]} />
         <h1>Notifications</h1>

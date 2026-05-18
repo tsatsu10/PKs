@@ -140,7 +140,7 @@ export default function Integrations() {
 
   if (loading) {
     return (
-      <div className="integrations-page" id="main-content" role="main">
+      <div className="integrations-page" >
         <header className="integrations-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
           <h1>Integrations</h1>
@@ -153,7 +153,7 @@ export default function Integrations() {
   }
 
   return (
-    <div className="integrations-page" id="main-content" role="main">
+    <div className="integrations-page" >
       <header className="integrations-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
         <h1>Integrations</h1>

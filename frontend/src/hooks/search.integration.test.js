@@ -88,9 +88,7 @@ describe('useDashboardSearch (integration)', () => {
     await act(async () => {
       result.current.setTypeFilter('note');
       result.current.setDomainFilter('domain-uuid');
-    });
-    await act(async () => {
-      result.current.runSearch(0);
+      result.current.runSearch(0, null, { typeFilter: 'note', domainFilter: 'domain-uuid' });
     });
 
     expect(mockRpc).toHaveBeenCalledWith(

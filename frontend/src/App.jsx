@@ -5,7 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
-import { routeConfig, PageLoadFallback } from './routeConfig';
+import { publicRoutes, protectedLayoutRoute, PageLoadFallback } from './routeConfig';
 import './App.css';
 
 function App() {
@@ -19,9 +19,14 @@ function App() {
           <a href="#main-content" className="skip-link">Skip to main content</a>
           <Suspense fallback={<PageLoadFallback />}>
             <Routes>
-              {routeConfig.map(({ path, element }) => (
-                <Route key={path || 'index'} path={path || '/'} element={element} />
+              {publicRoutes.map(({ path, element }) => (
+                <Route key={path} path={path} element={element} />
               ))}
+              <Route element={protectedLayoutRoute.element}>
+                {protectedLayoutRoute.children.map(({ path, element }) => (
+                  <Route key={path || 'index'} path={path || '/'} element={element} />
+                ))}
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

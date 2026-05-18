@@ -100,21 +100,17 @@ export const AUDIT_ACTION_LIST = [
 /** SessionStorage key for "use prompt on object" flow from Prompt Bank */
 export const RUN_PROMPT_STORAGE_KEY = 'pks_run_prompt_template';
 
+/** Only DeepSeek is supported for Run prompt (must match supabase/functions/run-prompt). */
+export const AI_PROVIDER = 'deepseek';
+
+export const DEFAULT_AI_MODEL = 'deepseek-chat';
+
 /**
- * AI/LLM models for "Run prompt". provider = 'openai' | 'deepseek'; must match allowlist in supabase/functions/run-prompt.
+ * AI/LLM models for "Run prompt".
  */
 export const AI_MODELS = [
-  { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini (fast)', provider: 'openai' },
-  { id: 'gpt-4.1', label: 'GPT-4.1', provider: 'openai' },
-  { id: 'gpt-4.1-nano', label: 'GPT-4.1 nano', provider: 'openai' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o mini', provider: 'openai' },
-  { id: 'gpt-4o', label: 'GPT-4o', provider: 'openai' },
-  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo', provider: 'openai' },
-  { id: 'gpt-4o-nano', label: 'GPT-4o nano', provider: 'openai' },
-  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', provider: 'openai' },
-  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: 'deepseek' },
-  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: 'deepseek' },
+  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: AI_PROVIDER },
+  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: AI_PROVIDER },
 ];
 
-export const OPENAI_MODEL_IDS = AI_MODELS.filter((m) => m.provider === 'openai').map((m) => m.id);
-export const DEEPSEEK_MODEL_IDS = AI_MODELS.filter((m) => m.provider === 'deepseek').map((m) => m.id);
+export const DEEPSEEK_MODEL_IDS = AI_MODELS.map((m) => m.id);

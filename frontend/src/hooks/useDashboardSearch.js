@@ -5,6 +5,54 @@ import { getErrorMessage } from '../lib/errors';
 
 const PAGE_SIZE = 20;
 
+/** All filter fields for synchronous search (avoids stale closure after setState). */
+export function createEmptyFiltersOverride() {
+  return {
+    searchQuery: '',
+    typeFilter: '',
+    statusFilter: '',
+    domainFilter: '',
+    tagFilter: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+  };
+}
+
+function pickFilter(key, filtersOverride, stateValue) {
+  if (filtersOverride != null && key in filtersOverride) {
+    const v = filtersOverride[key];
+    return v ? v : null;
+  }
+  return stateValue || null;
+}
+
+/** Build RPC filter args from optional override + current state. */
+export function resolveSearchRpcFilters(filtersOverride, state) {
+  return {
+    q: pickQuery(null, filtersOverride, state.searchQuery),
+    typeF: pickFilter('typeFilter', filtersOverride, state.typeFilter),
+    domF: pickFilter('domainFilter', filtersOverride, state.domainFilter),
+    tagF: pickFilter('tagFilter', filtersOverride, state.tagFilter),
+    statusF: pickFilter('statusFilter', filtersOverride, state.statusFilter),
+    dateFromF: pickFilter('dateFrom', filtersOverride, state.dateFrom),
+    dateToF: pickFilter('dateTo', filtersOverride, state.dateTo),
+    dueFromF: pickFilter('dueFrom', filtersOverride, state.dueFrom),
+    dueToF: pickFilter('dueTo', filtersOverride, state.dueTo),
+  };
+}
+
+function pickQuery(queryOverride, filtersOverride, searchQuery) {
+  if (queryOverride !== null && queryOverride !== undefined) {
+    return String(queryOverride).trim();
+  }
+  if (filtersOverride != null && 'searchQuery' in filtersOverride) {
+    return String(filtersOverride.searchQuery ?? '').trim();
+  }
+  return searchQuery.trim();
+}
+
 /**
  * Hook for dashboard object list: search, filters, pagination, and domains/tags for filters.
  * @param {{ userId: string | null }} options
@@ -33,14 +81,15 @@ export function useDashboardSearch({ userId }) {
     async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
       if (!userId) return;
       const isLoadMore = nextOffset > 0;
-      const q =
-        queryOverride !== null && queryOverride !== undefined
-          ? String(queryOverride).trim()
-          : searchQuery.trim();
-      const dom =
-        filtersOverride && 'domain_id_f' in filtersOverride
-          ? filtersOverride.domain_id_f
-          : domainFilter;
+      const q = pickQuery(queryOverride, filtersOverride, searchQuery);
+      const typeF = pickFilter('typeFilter', filtersOverride, typeFilter);
+      const domF = pickFilter('domainFilter', filtersOverride, domainFilter);
+      const tagF = pickFilter('tagFilter', filtersOverride, tagFilter);
+      const statusF = pickFilter('statusFilter', filtersOverride, statusFilter);
+      const dateFromF = pickFilter('dateFrom', filtersOverride, dateFrom);
+      const dateToF = pickFilter('dateTo', filtersOverride, dateTo);
+      const dueFromF = pickFilter('dueFrom', filtersOverride, dueFrom);
+      const dueToF = pickFilter('dueTo', filtersOverride, dueTo);
       if (!isLoadMore) setLoading(true);
       else setLoadingMore(true);
       setError('');
@@ -49,14 +98,14 @@ export function useDashboardSearch({ userId }) {
         const rpcName = q ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
         const { data, error: err } = await supabase.rpc(rpcName, {
           search_query: q || null,
-          type_filter: typeFilter || null,
-          domain_id_f: dom || null,
-          tag_id_f: tagFilter || null,
-          date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
-          date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
-          status_filter: statusFilter || null,
-          due_from_f: dueFrom ? `${dueFrom}T00:00:00Z` : null,
-          due_to_f: dueTo ? `${dueTo}T23:59:59Z` : null,
+          type_filter: typeF,
+          domain_id_f: domF,
+          tag_id_f: tagF,
+          date_from_f: dateFromF ? `${dateFromF}T00:00:00Z` : null,
+          date_to_f: dateToF ? `${dateToF}T23:59:59Z` : null,
+          status_filter: statusF,
+          due_from_f: dueFromF ? `${dueFromF}T00:00:00Z` : null,
+          due_to_f: dueToF ? `${dueToF}T23:59:59Z` : null,
           limit_n: PAGE_SIZE,
           offset_n: nextOffset,
         });
@@ -70,9 +119,7 @@ export function useDashboardSearch({ userId }) {
         setHasMore(list.length === PAGE_SIZE);
         setOffset(nextOffset + list.length);
       } catch (e) {
-        setError(
-          getErrorMessage(e, 'Search failed')
-        );
+        setError(getErrorMessage(e, 'Search failed'));
         if (!isLoadMore) setObjects([]);
       } finally {
         measureSearchEnd();
@@ -102,6 +149,7 @@ export function useDashboardSearch({ userId }) {
   }, [userId]);
 
   const clearFilters = useCallback(() => {
+    const empty = createEmptyFiltersOverride();
     setSearchQuery('');
     setTypeFilter('');
     setStatusFilter('');
@@ -111,7 +159,7 @@ export function useDashboardSearch({ userId }) {
     setDateTo('');
     setDueFrom('');
     setDueTo('');
-    runSearch(0);
+    runSearch(0, '', empty);
   }, [runSearch]);
 
   const handleLoadMore = useCallback(() => {
@@ -163,5 +211,6 @@ export function useDashboardSearch({ userId }) {
     loadingMore,
     handleLoadMore,
     hasActiveFilters,
+    createEmptyFiltersOverride,
   };
 }

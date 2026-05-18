@@ -279,7 +279,7 @@ export default function Templates() {
 
   if (loading) {
     return (
-      <div className="templates-page" id="main-content" role="main">
+      <div className="templates-page" >
         <div className="templates-loading">
           <div className="templates-loading-spinner" aria-hidden="true" />
           <p role="status" aria-live="polite">
@@ -291,7 +291,7 @@ export default function Templates() {
   }
 
   return (
-    <div className="templates-page" id="main-content" role="main">
+    <div className="templates-page" >
       <header className="templates-hero">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Templates' }]} />
         <h1 className="templates-hero-title">Templates</h1>
@@ -415,7 +415,7 @@ export default function Templates() {
           )}
         </aside>
 
-        <main className="templates-main">
+        <div className="templates-main" aria-label="Templates list">
           {editingId === 'new' || editingId ? (
             <div className="templates-editor">
               <div className="templates-editor-header">
@@ -617,7 +617,7 @@ export default function Templates() {
               )}
             </div>
           )}
-        </main>
+        </div>
       </div>
 
       {deleteConfirmId && (
