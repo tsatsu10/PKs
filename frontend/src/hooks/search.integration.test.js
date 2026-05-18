@@ -99,4 +99,27 @@ describe('useDashboardSearch (integration)', () => {
       })
     );
   });
+
+  it('goToPage fetches with correct offset', async () => {
+    mockRpc.mockResolvedValue({ data: Array(20).fill({ id: 'x', title: 't' }), error: null });
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+
+    await waitFor(() => {
+      expect(result.current.page).toBe(1);
+    });
+    mockRpc.mockClear();
+
+    await act(async () => {
+      result.current.goToPage(2);
+    });
+
+    await waitFor(() => {
+      expect(result.current.page).toBe(2);
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'search_knowledge_objects',
+      expect.objectContaining({ offset_n: 20, limit_n: 20 })
+    );
+  });
 });

@@ -15,10 +15,20 @@ import { useDashboardSearch, createEmptyFiltersOverride } from '../hooks/useDash
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import DashboardQuickAddForm from '../components/DashboardQuickAddForm';
 import DashboardStats from '../components/DashboardStats';
+import DashboardObjectCard from '../components/DashboardObjectCard';
+import DashboardPagination from '../components/DashboardPagination';
 import { getErrorMessage } from '../lib/errors';
 import './Dashboard.css';
 
 const VIEW_MODE_KEY = 'pks-dashboard-view';
+const CARD_COLS_BREAKPOINT_2 = 720;
+const CARD_COLS_BREAKPOINT_3 = 1100;
+
+function getCardColumns(width) {
+  if (width >= CARD_COLS_BREAKPOINT_3) return 3;
+  if (width >= CARD_COLS_BREAKPOINT_2) return 2;
+  return 1;
+}
 const DENSITY_KEY = 'pks-dashboard-density';
 const SAVED_FILTERS_KEY = 'pks-saved-filters';
 const SEARCH_DEBOUNCE_MS = 300;
@@ -79,9 +89,10 @@ export default function Dashboard() {
     clearFilters,
     domains,
     tags,
-    hasMore,
-    loadingMore,
-    handleLoadMore,
+    page,
+    totalPages,
+    pageSize,
+    goToPage,
     hasActiveFilters,
   } = useDashboardSearch({ userId: user?.id ?? null });
   const [showFilters, setShowFilters] = useState(false);
@@ -129,21 +140,41 @@ export default function Dashboard() {
   const bulkMenuRef = useRef(null);
   const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const location = useLocation();
+  const [cardColumns, setCardColumns] = useState(1);
 
-  const listRowHeight = viewMode === 'card'
-    ? (listDensity === 'compact' ? 220 : 280)
-    : (listDensity === 'compact' ? 56 : 72);
+  const listRowHeight = listDensity === 'compact' ? 56 : 72;
+  const cardRowHeight = listDensity === 'compact' ? 252 : 318;
+  const virtualizerCount = viewMode === 'card'
+    ? Math.max(1, Math.ceil(objects.length / Math.max(cardColumns, 1)))
+    : objects.length;
   const listVirtualizer = useVirtualizer({
-    count: objects.length,
+    count: virtualizerCount,
     getScrollElement: () => listScrollRef.current,
-    estimateSize: () => listRowHeight,
-    overscan: 5,
+    estimateSize: () => (viewMode === 'card' ? cardRowHeight : listRowHeight),
+    overscan: viewMode === 'card' ? 3 : 5,
   });
+
+  useEffect(() => {
+    if (viewMode !== 'card') return;
+    const el = listScrollRef.current;
+    if (!el) return;
+    const update = () => setCardColumns(getCardColumns(el.clientWidth));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, loading, objects.length]);
   const [runPromptTemplate, setRunPromptTemplate] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return localStorage.getItem('pks-onboarding-dismissed') !== 'true'; } catch { return false; }
   });
   const [heroStats, setHeroStats] = useState(null);
+
+  const handlePageChange = useCallback((nextPage) => {
+    goToPage(nextPage);
+    setSelectedIds(new Set());
+    listScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [goToPage]);
 
   // Sync search input from URL only when the URL query changes (e.g. navigation), not when user types
   useEffect(() => {
@@ -339,7 +370,10 @@ export default function Dashboard() {
       const current = row ? parseInt(row.getAttribute('data-object-index') ?? '-1', 10) : -1;
       const nextIndex = isDown ? Math.min(current + 1, objects.length - 1) : Math.max(0, current - 1);
       if (nextIndex === current && current >= 0) return;
-      listVirtualizer.scrollToIndex(nextIndex, { align: 'start', behavior: 'auto' });
+      const scrollRow = viewMode === 'card'
+        ? Math.floor(nextIndex / Math.max(cardColumns, 1))
+        : nextIndex;
+      listVirtualizer.scrollToIndex(scrollRow, { align: 'start', behavior: 'auto' });
       setTimeout(() => {
         const row = listEl.querySelector(`[data-object-index="${nextIndex}"]`);
         const link = row?.querySelector?.('.object-card, .object-list-link');
@@ -349,7 +383,7 @@ export default function Dashboard() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [objects.length, listVirtualizer]);
+  }, [objects.length, listVirtualizer, viewMode, cardColumns]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -1043,8 +1077,8 @@ export default function Dashboard() {
               <span className="dashboard-result-count" aria-live="polite">
                 {objects.length === 0
                   ? ' — No results'
-                  : hasMore
-                    ? ` — ${objects.length}+ objects`
+                  : totalPages > 1
+                    ? ` — Page ${page} of ${totalPages}${page < totalPages ? '+' : ''}`
                     : ` — ${objects.length} object${objects.length !== 1 ? 's' : ''}`}
               </span>
             )}
@@ -1336,9 +1370,58 @@ export default function Dashboard() {
           </section>
         ) : (
           <>
-            <div id="dashboard-object-list" ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}${hasMore ? ' has-more' : ''}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects" tabIndex={-1}>
+            {objects.length > 0 && (totalPages > 1 || page > 1) && (
+              <DashboardPagination
+                page={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                itemCount={objects.length}
+                loading={loading}
+                onPageChange={handlePageChange}
+              />
+            )}
+            <div id="dashboard-object-list" ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}${viewMode === 'card' ? ' dashboard-object-list-scroll--card' : ''}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects" tabIndex={-1}>
               <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                 {listVirtualizer.getVirtualItems().map((virtualRow) => {
+                  if (viewMode === 'card') {
+                    const rowIndex = virtualRow.index;
+                    const startIdx = rowIndex * cardColumns;
+                    const rowObjects = objects.slice(startIdx, startIdx + cardColumns);
+                    const objectLink = (id) => `/objects/${id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`;
+                    return (
+                      <div
+                        key={`card-row-${rowIndex}`}
+                        className="object-card-grid-row-wrap"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <div
+                          className="object-card-grid-row"
+                          style={{ gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))` }}
+                        >
+                          {rowObjects.map((rowObj, colIdx) => (
+                            <DashboardObjectCard
+                              key={rowObj.id}
+                              obj={rowObj}
+                              to={objectLink(rowObj.id)}
+                              selected={selectedIds.has(rowObj.id)}
+                              onToggleSelect={toggleSelect}
+                              animationDelay={Math.min(startIdx + colIdx, 12) * 25}
+                              compact={listDensity === 'compact'}
+                              objectIndex={startIdx + colIdx}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const obj = objects[virtualRow.index];
                   return (
                     <div
@@ -1353,46 +1436,7 @@ export default function Dashboard() {
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                     >
-                      {viewMode === 'card' ? (
-                        <div className="object-card-wrapper" style={{ animationDelay: `${Math.min(virtualRow.index, 12) * 25}ms` }}>
-                          <Link to={`/objects/${obj.id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`} className="object-card" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}, version ${obj.current_version}`} data-object-index={virtualRow.index}>
-                            <div className="object-card-cover-wrap">
-                              {obj.cover_url ? (
-                                <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />
-                              ) : (
-                                <span className="object-card-cover-fallback" aria-hidden="true">
-                                  <span className="object-card-cover-fallback-icon">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                                </span>
-                              )}
-                              <span className="object-card-type object-card-type-overlay" title={formatObjectTypeLabel(obj.type)}>
-                                <span className="object-card-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[obj.type] ?? '📄'}</span>
-                                {formatObjectTypeLabel(obj.type)}
-                              </span>
-                              <label className="object-card-checkbox" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                                <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
-                              </label>
-                            </div>
-                            <div className="object-card-body">
-                              <h3 className="object-card-title">
-                                {obj.is_pinned && <span className="object-pin-icon" aria-label="Pinned">📌</span>}
-                                {obj.title}
-                              </h3>
-                              {(obj.snippet || obj.summary) && (
-                                <p className="object-card-summary">{obj.snippet || obj.summary}</p>
-                              )}
-                              <footer className="object-card-footer">
-                                <span className="object-card-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
-                                {obj.due_at && (
-                                  <span className="object-card-due" title={`Due ${new Date(obj.due_at).toLocaleDateString()}`}>
-                                    Due {new Date(obj.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: new Date(obj.due_at).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}
-                                  </span>
-                                )}
-                              </footer>
-                            </div>
-                          </Link>
-                        </div>
-                      ) : (
-                        <div className="object-list-item-with-checkbox" role="listitem" style={{ animationDelay: `${Math.min(virtualRow.index, 12) * 25}ms` }}>
+                      <div className="object-list-item-with-checkbox" role="listitem" style={{ animationDelay: `${Math.min(virtualRow.index, 12) * 25}ms` }}>
                           <label className="object-list-checkbox">
                             <input type="checkbox" checked={selectedIds.has(obj.id)} onChange={() => toggleSelect(obj.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select ${obj.title}`} />
                           </label>
@@ -1406,18 +1450,20 @@ export default function Dashboard() {
                             <span className="object-list-meta">v{obj.current_version} · {new Date(obj.updated_at).toLocaleDateString()}</span>
                           </Link>
                         </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
-            {hasMore && (
-              <div className="load-more">
-                <button type="button" className="btn btn-secondary" onClick={handleLoadMore} disabled={loadingMore}>
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </button>
-              </div>
+            {objects.length > 0 && (
+              <DashboardPagination
+                page={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                itemCount={objects.length}
+                loading={loading}
+                onPageChange={handlePageChange}
+              />
             )}
           </>
         )}

@@ -4,7 +4,7 @@ import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { getErrorMessage } from '../lib/errors';
 import { deferAfterPaint } from '../lib/defer';
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
 
 /** All filter fields for synchronous search (avoids stale closure after setState). */
 export function createEmptyFiltersOverride() {
@@ -55,9 +55,8 @@ function pickQuery(queryOverride, filtersOverride, searchQuery) {
 }
 
 /**
- * Hook for dashboard object list: search, filters, pagination, and domains/tags for filters.
+ * Hook for dashboard object list: search, filters, and page-based pagination.
  * @param {{ userId: string | null }} options
- * @returns Search state, filter state, runSearch, clearFilters, domains, tags, load more.
  */
 export function useDashboardSearch({ userId }) {
   const [objects, setObjects] = useState([]);
@@ -72,16 +71,15 @@ export function useDashboardSearch({ userId }) {
   const [dateTo, setDateTo] = useState('');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [domains, setDomains] = useState([]);
   const [tags, setTags] = useState([]);
 
   const runSearch = useCallback(
     async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
       if (!userId) return;
-      const isLoadMore = nextOffset > 0;
+      const isNewQuery = nextOffset === 0;
       const q = pickQuery(queryOverride, filtersOverride, searchQuery);
       const typeF = pickFilter('typeFilter', filtersOverride, typeFilter);
       const domF = pickFilter('domainFilter', filtersOverride, domainFilter);
@@ -91,8 +89,7 @@ export function useDashboardSearch({ userId }) {
       const dateToF = pickFilter('dateTo', filtersOverride, dateTo);
       const dueFromF = pickFilter('dueFrom', filtersOverride, dueFrom);
       const dueToF = pickFilter('dueTo', filtersOverride, dueTo);
-      if (!isLoadMore) setLoading(true);
-      else setLoadingMore(true);
+      setLoading(true);
       setError('');
       measureSearchStart();
       try {
@@ -112,23 +109,33 @@ export function useDashboardSearch({ userId }) {
         });
         if (err) throw err;
         const list = data || [];
-        if (isLoadMore) {
-          setObjects((prev) => [...prev, ...list]);
+        const currentPage = Math.floor(nextOffset / PAGE_SIZE) + 1;
+        setObjects(list);
+        setPage(currentPage);
+        if (list.length < PAGE_SIZE) {
+          setTotalPages(currentPage);
+        } else if (isNewQuery) {
+          setTotalPages(2);
         } else {
-          setObjects(list);
+          setTotalPages((prev) => Math.max(prev, currentPage + 1));
         }
-        setHasMore(list.length === PAGE_SIZE);
-        setOffset(nextOffset + list.length);
       } catch (e) {
         setError(getErrorMessage(e, 'Search failed'));
-        if (!isLoadMore) setObjects([]);
+        if (isNewQuery) setObjects([]);
       } finally {
         measureSearchEnd();
         setLoading(false);
-        setLoadingMore(false);
       }
     },
     [userId, searchQuery, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]
+  );
+
+  const goToPage = useCallback(
+    (targetPage) => {
+      const p = Math.max(1, Math.floor(targetPage));
+      runSearch((p - 1) * PAGE_SIZE);
+    },
+    [runSearch]
   );
 
   useEffect(() => {
@@ -172,10 +179,6 @@ export function useDashboardSearch({ userId }) {
     runSearch(0, '', empty);
   }, [runSearch]);
 
-  const handleLoadMore = useCallback(() => {
-    runSearch(offset);
-  }, [runSearch, offset]);
-
   const hasActiveFilters = Boolean(
     searchQuery.trim()
     || typeFilter
@@ -216,10 +219,10 @@ export function useDashboardSearch({ userId }) {
     clearFilters,
     domains,
     tags,
-    offset,
-    hasMore,
-    loadingMore,
-    handleLoadMore,
+    page,
+    totalPages,
+    pageSize: PAGE_SIZE,
+    goToPage,
     hasActiveFilters,
     createEmptyFiltersOverride,
   };
