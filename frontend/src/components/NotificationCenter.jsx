@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { deferAfterPaint } from '../lib/defer';
 import './NotificationCenter.css';
 
 const LIMIT = 10;
@@ -17,15 +18,20 @@ export default function NotificationCenter() {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
-    (async () => {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .is('read_at', null);
-      if (!cancelled && !error) setUnreadCount(count ?? 0);
-    })();
-    return () => { cancelled = true; };
+    const cancelDefer = deferAfterPaint(() => {
+      (async () => {
+        const { count, error } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .is('read_at', null);
+        if (!cancelled && !error) setUnreadCount(count ?? 0);
+      })();
+    });
+    return () => {
+      cancelled = true;
+      cancelDefer();
+    };
   }, [user?.id]);
 
   useEffect(() => {

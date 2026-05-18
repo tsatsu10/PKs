@@ -3,9 +3,10 @@
  */
 import { lazy } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
-import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
+
+const AppShell = lazy(() => import('./components/AppShell'));
 
 export const PageLoadFallback = LoadingScreen;
 

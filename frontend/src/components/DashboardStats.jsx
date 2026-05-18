@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { deferAfterPaint } from '../lib/defer';
 import { getErrorMessage } from '../lib/errors';
 import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
 import './DashboardStats.css';
@@ -47,25 +48,27 @@ export default function DashboardStats({ userId, onStats }) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setLoading(true);
-        setError('');
-      }
-    });
-    (async () => {
-      const { data, error: err } = await supabase.rpc('get_dashboard_stats');
+    const cancelDefer = deferAfterPaint(() => {
       if (cancelled) return;
-      if (err) {
-        setError(getErrorMessage(err, 'Stats unavailable'));
-        setStats(null);
-      } else {
-        setStats(data);
-        if (onStats && data) onStats(data);
-      }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
+      setLoading(true);
+      setError('');
+      (async () => {
+        const { data, error: err } = await supabase.rpc('get_dashboard_stats');
+        if (cancelled) return;
+        if (err) {
+          setError(getErrorMessage(err, 'Stats unavailable'));
+          setStats(null);
+        } else {
+          setStats(data);
+          if (onStats && data) onStats(data);
+        }
+        if (!cancelled) setLoading(false);
+      })();
+    });
+    return () => {
+      cancelled = true;
+      cancelDefer();
+    };
   }, [userId, onStats]);
 
   if (!userId) return null;

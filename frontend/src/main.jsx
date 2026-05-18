@@ -6,7 +6,12 @@ import './index.css'
 import App from './App.jsx'
 
 if (typeof registerSW === 'function') {
-  registerSW({ immediate: true })
+  const registerPwa = () => registerSW({ immediate: true })
+  if (document.readyState === 'complete') {
+    registerPwa()
+  } else {
+    window.addEventListener('load', registerPwa, { once: true })
+  }
 }
 
 // Initialize linkify once with default schemes so BlockNote/Tiptap Link extension

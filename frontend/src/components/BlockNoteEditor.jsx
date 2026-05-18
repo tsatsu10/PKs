@@ -3,6 +3,7 @@ import '@blocknote/core/fonts/inter.css';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
+import BlockNoteMantineProvider from './BlockNoteMantineProvider';
 import './BlockNoteEditor.css';
 
 /**
@@ -113,6 +114,7 @@ function BlockNoteEditor({
   }, [editor]);
 
   return (
+    <BlockNoteMantineProvider>
     <div
       className="blocknote-editor-wrapper"
       data-mantine-color-scheme="dark"
@@ -133,6 +135,7 @@ function BlockNoteEditor({
         <div style={{ minHeight: `${minHeight}px` }} className="blocknote-editor-placeholder" aria-hidden="true" />
       )}
     </div>
+    </BlockNoteMantineProvider>
   );
 }
 

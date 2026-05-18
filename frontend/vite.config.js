@@ -13,8 +13,12 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'react-vendor';
           if (id.includes('node_modules/@supabase/')) return 'supabase';
-          if (id.includes('node_modules/@mantine/')) return 'mantine';
-          if (id.includes('node_modules/@blocknote/') || id.includes('node_modules/@tiptap/') || id.includes('node_modules/prosemirror')) return 'blocknote';
+          if (
+            id.includes('node_modules/@blocknote/')
+            || id.includes('node_modules/@tiptap/')
+            || id.includes('node_modules/prosemirror')
+            || id.includes('node_modules/@mantine/')
+          ) return 'blocknote';
         },
       },
     },
@@ -42,6 +46,7 @@ export default defineConfig({
         clientsClaim: true,
         navigateFallback: 'index.html',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,woff}'],
+        globIgnores: ['**/blocknote-*.js', '**/blocknote-*.css', '**/native-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

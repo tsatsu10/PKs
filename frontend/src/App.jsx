@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { MantineProvider } from '@mantine/core';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -11,7 +10,6 @@ import './App.css';
 function App() {
   return (
     <ErrorBoundary>
-      <MantineProvider defaultColorScheme="dark" theme={{ primaryColor: 'pink' }}>
       <AuthProvider>
         <ThemeProvider>
         <ToastProvider>
@@ -34,7 +32,6 @@ function App() {
         </ToastProvider>
         </ThemeProvider>
       </AuthProvider>
-      </MantineProvider>
     </ErrorBoundary>
   );
 }

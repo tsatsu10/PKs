@@ -3,6 +3,7 @@ import '@blocknote/core/fonts/inter.css';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
+import BlockNoteMantineProvider from './BlockNoteMantineProvider';
 import './BlockNoteEditor.css';
 
 /**
@@ -35,6 +36,7 @@ export default function BlockNoteViewer({ content, className = '' }) {
   if (!content || content.trim() === '') return null;
 
   return (
+    <BlockNoteMantineProvider>
     <div
       className={`blocknote-viewer-wrapper ${className}`.trim()}
       data-mantine-color-scheme="dark"
@@ -49,5 +51,6 @@ export default function BlockNoteViewer({ content, className = '' }) {
         slashMenu={false}
       />
     </div>
+    </BlockNoteMantineProvider>
   );
 }

@@ -24,11 +24,14 @@ async function fetchProfile(userId) {
   return data;
 }
 
-async function resolveUserFromSession(session) {
+/** Verify JWT with server and load profile (parallel). */
+async function verifyAndEnrichUser(session) {
   if (!session?.user) return null;
-  const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
+  const [{ data: { user: verifiedUser }, error: userError }, profile] = await Promise.all([
+    supabase.auth.getUser(),
+    fetchProfile(session.user.id).catch(() => null),
+  ]);
   if (userError || !verifiedUser) return null;
-  const profile = await fetchProfile(verifiedUser.id).catch(() => null);
   return mapUser(verifiedUser, profile);
 }
 
@@ -38,6 +41,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const hadUserRef = useRef(false);
+  const sessionUserIdRef = useRef(null);
+  const verifyGenerationRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,48 +50,71 @@ export function AuthProvider({ children }) {
       if (!cancelled) setLoading(false);
     }, 8000);
 
-    const applySession = async (session) => {
-      if (cancelled) return;
-      if (session?.user) {
-        const mapped = await resolveUserFromSession(session);
-        if (cancelled) return;
-        const sessionOk = !!session?.access_token;
-        if (mapped && sessionOk) {
-          hadUserRef.current = true;
-          setUser(mapped);
-          setHasValidSession(true);
-        } else if (hadUserRef.current) {
-          setSessionExpired(true);
-          hadUserRef.current = false;
-          setUser(null);
-          setHasValidSession(false);
-        } else {
-          setUser(null);
-          setHasValidSession(false);
-        }
-      } else {
-        if (hadUserRef.current) {
-          setSessionExpired(true);
-          hadUserRef.current = false;
-        }
-        setUser(null);
-        setHasValidSession(false);
-      }
+    const finishLoading = () => {
       clearTimeout(globalTimeoutId);
       setLoading(false);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => applySession(session)).catch(() => {
+    const clearAuthenticated = (expired = false) => {
+      if (expired && hadUserRef.current) {
+        setSessionExpired(true);
+      }
+      hadUserRef.current = false;
+      sessionUserIdRef.current = null;
+      setUser(null);
+      setHasValidSession(false);
+    };
+
+    const applyFastSession = (session) => {
+      const sessionOk = !!session?.access_token;
+      if (!session?.user || !sessionOk) {
+        clearAuthenticated(hadUserRef.current);
+        finishLoading();
+        return;
+      }
+
+      hadUserRef.current = true;
+      sessionUserIdRef.current = session.user.id;
+      setUser(mapUser(session.user, null));
+      setHasValidSession(true);
+      finishLoading();
+
+      const generation = ++verifyGenerationRef.current;
+      verifyAndEnrichUser(session).then((mapped) => {
+        if (cancelled || generation !== verifyGenerationRef.current) return;
+        if (mapped) {
+          setUser(mapped);
+          setHasValidSession(true);
+        } else {
+          clearAuthenticated(true);
+        }
+      });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) applyFastSession(session);
+    }).catch(() => {
       if (!cancelled) {
-        setUser(null);
-        setHasValidSession(false);
-        clearTimeout(globalTimeoutId);
-        setLoading(false);
+        clearAuthenticated(false);
+        finishLoading();
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+
+      if (event === 'TOKEN_REFRESHED' && session?.user?.id && session.user.id === sessionUserIdRef.current) {
+        setHasValidSession(!!session?.access_token);
+        return;
+      }
+
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        clearAuthenticated(hadUserRef.current);
+        finishLoading();
+        return;
+      }
+
+      applyFastSession(session);
     });
 
     return () => {
@@ -104,6 +132,7 @@ export function AuthProvider({ children }) {
       return false;
     }
     hadUserRef.current = true;
+    sessionUserIdRef.current = session.user?.id ?? userData?.id ?? null;
     setUser(userData);
     setHasValidSession(true);
     return true;
@@ -112,15 +141,16 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     hadUserRef.current = false;
+    sessionUserIdRef.current = null;
     setUser(null);
     setHasValidSession(false);
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const { data: { user: au } } = await supabase.auth.getUser();
-    if (!au) return;
-    const profile = await fetchProfile(au.id);
-    setUser(mapUser(au, profile ?? null));
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const mapped = await verifyAndEnrichUser(session);
+    if (mapped) setUser(mapped);
   }, []);
 
   const clearSessionExpired = useCallback(() => setSessionExpired(false), []);

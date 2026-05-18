@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { getErrorMessage } from '../lib/errors';
+import { deferAfterPaint } from '../lib/defer';
 
 const PAGE_SIZE = 20;
 
@@ -138,14 +139,23 @@ export function useDashboardSearch({ userId }) {
 
   useEffect(() => {
     if (!userId) return;
-    (async () => {
-      const [dRes, tRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', userId).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', userId).order('name'),
-      ]);
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-    })();
+    let cancelled = false;
+    const cancelDefer = deferAfterPaint(() => {
+      (async () => {
+        const [dRes, tRes] = await Promise.all([
+          supabase.from('domains').select('id, name').eq('user_id', userId).order('name'),
+          supabase.from('tags').select('id, name').eq('user_id', userId).order('name'),
+        ]);
+        if (!cancelled) {
+          setDomains(dRes.data || []);
+          setTags(tRes.data || []);
+        }
+      })();
+    });
+    return () => {
+      cancelled = true;
+      cancelDefer();
+    };
   }, [userId]);
 
   const clearFilters = useCallback(() => {
