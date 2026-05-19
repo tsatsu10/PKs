@@ -1,4 +1,5 @@
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
+import EntityComboBox from './EntityComboBox';
 
 /**
  * Filter panel for dashboard search: type, status, domain, tag, date range.
@@ -22,6 +23,8 @@ export default function DashboardFilterPanel({
   setDueTo,
   domains,
   tags,
+  onCreateDomain,
+  onCreateTag,
   onApply,
   onClear,
 }) {
@@ -45,24 +48,22 @@ export default function DashboardFilterPanel({
           ))}
         </select>
       </label>
-      <label>
-        Domain
-        <select value={domainFilter} onChange={(e) => setDomainFilter(e.target.value)}>
-          <option value="">Any</option>
-          {domains.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Tag
-        <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
-          <option value="">Any</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      </label>
+      <EntityComboBox
+        label="Domain"
+        value={domainFilter}
+        onChange={setDomainFilter}
+        options={domains}
+        onCreate={onCreateDomain}
+        createLabel="New domain"
+      />
+      <EntityComboBox
+        label="Tag"
+        value={tagFilter}
+        onChange={setTagFilter}
+        options={tags}
+        onCreate={onCreateTag}
+        createLabel="New tag"
+      />
       <label>
         Updated from
         <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="Updated from" />

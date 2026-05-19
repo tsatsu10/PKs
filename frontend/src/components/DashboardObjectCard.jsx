@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
-import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
+import { formatObjectTypeLabel } from '../constants';
+import TypeMark from './TypeMark';
+import LinkedBar from '../features/dashboard/components/Views/LinkedBar';
+import { useRowVisibility } from '../features/dashboard/hooks/useRowVisibility';
+import '../features/dashboard/components/Views/LinkedBar.css';
 
 function formatRelativeTime(iso) {
   if (!iso) return '';
@@ -44,14 +48,16 @@ export default function DashboardObjectCard({
   animationDelay = 0,
   compact = false,
   objectIndex = 0,
+  runPromptSuffix = '',
 }) {
   const typeLabel = formatObjectTypeLabel(obj.type);
-  const icon = OBJECT_TYPE_ICONS[obj.type] ?? '📄';
   const summary = obj.snippet || obj.summary;
   const status = obj.status && obj.status !== 'active' ? obj.status : null;
+  const rowRef = useRowVisibility(obj.id);
 
   return (
     <article
+      ref={rowRef}
       className={`object-card-wrapper${compact ? ' object-card-wrapper--compact' : ''}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -70,14 +76,14 @@ export default function DashboardObjectCard({
             <span className="object-card-cover" style={{ backgroundImage: `url(${obj.cover_url})` }} aria-hidden="true" />
           ) : (
             <span className="object-card-cover-fallback" aria-hidden="true">
-              <span className="object-card-cover-fallback-icon">{icon}</span>
+              <TypeMark type={obj.type} size="lg" className="object-card-cover-fallback-icon" />
             </span>
           )}
           <div className="object-card-cover-scrim" aria-hidden="true" />
 
           <div className="object-card-topbar">
             <span className="object-card-type-pill" title={typeLabel}>
-              <span className="object-card-type-icon" aria-hidden="true">{icon}</span>
+              <TypeMark type={obj.type} size="sm" className="object-card-type-icon" />
               <span className="object-card-type-label">{typeLabel}</span>
             </span>
             {status && (
@@ -108,6 +114,8 @@ export default function DashboardObjectCard({
           {summary && (
             <p className="object-card-summary">{summary}</p>
           )}
+
+          <LinkedBar objectId={obj.id} runPromptSuffix={runPromptSuffix} compact={compact} />
 
           <footer className="object-card-footer">
             <div className="object-card-meta-group">

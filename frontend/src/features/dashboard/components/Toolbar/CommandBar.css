@@ -1,0 +1,95 @@
+.command-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  margin-bottom: 0.35rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.command-bar-form {
+  display: flex;
+  flex: 1 1 280px;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.command-bar-search-icon {
+  color: var(--polar-faint);
+  font-size: 1rem;
+  padding-left: 0.25rem;
+}
+
+.command-bar-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  background: var(--panel-overlay);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--polar-white);
+  font-size: 0.875rem;
+}
+
+.command-bar-input:focus {
+  outline: 2px solid var(--cosmic-pink);
+  outline-offset: 1px;
+}
+
+.command-bar-kbd {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+}
+
+.command-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.command-bar-view {
+  display: inline-flex;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.command-bar-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--polar-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.command-bar-view-btn.is-active {
+  background: rgba(236, 72, 153, 0.15);
+  color: var(--polar-white);
+}
+
+.command-bar-view-label {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .command-bar-view-label {
+    display: inline;
+  }
+}
+
+.command-bar-cta {
+  display: flex;
+  gap: 0.35rem;
+}

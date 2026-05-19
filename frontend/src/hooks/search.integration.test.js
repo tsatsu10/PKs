@@ -20,8 +20,17 @@ function mockFromChain(resolvedData = []) {
   const chain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockResolvedValue({ data: resolvedData }),
+    not: vi.fn().mockReturnThis(),
+    order: vi.fn(),
+    limit: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
+  chain.order.mockImplementation((col) => {
+    if (col === 'name') {
+      return Promise.resolve({ data: resolvedData, error: null });
+    }
+    return chain;
+  });
   mockFrom.mockReturnValue(chain);
   return chain;
 }
@@ -29,7 +38,12 @@ function mockFromChain(resolvedData = []) {
 describe('useDashboardSearch (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRpc.mockResolvedValue({ data: [], error: null });
+    mockRpc.mockImplementation((fn) => {
+      if (fn === 'count_knowledge_objects') {
+        return Promise.resolve({ data: 0, error: null });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
     mockFromChain();
   });
 
@@ -101,7 +115,12 @@ describe('useDashboardSearch (integration)', () => {
   });
 
   it('goToPage fetches with correct offset', async () => {
-    mockRpc.mockResolvedValue({ data: Array(20).fill({ id: 'x', title: 't' }), error: null });
+    mockRpc.mockImplementation((fn) => {
+      if (fn === 'count_knowledge_objects') {
+        return Promise.resolve({ data: 40, error: null });
+      }
+      return Promise.resolve({ data: Array(20).fill({ id: 'x', title: 't' }), error: null });
+    });
     const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
 
     await waitFor(() => {

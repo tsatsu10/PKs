@@ -70,6 +70,14 @@
   --space-20: 2.5rem;
   --space-24: 3rem;
 
+  /* Motion tokens (Constellation v2) */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.2, 0.8, 0.2, 1.05);
+  --dur-instant: 80ms;
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+
   /* Radius scale */
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -203,6 +211,13 @@ a:focus-visible {
 
 /* Respect user preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+
   *,
   *::before,
   *::after {

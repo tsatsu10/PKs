@@ -16,9 +16,11 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_TYPE_ICONS, OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER, formatObjectTypeLabel } from '../constants';
+import { OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER, formatObjectTypeLabel } from '../constants';
+import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { getErrorMessage } from '../lib/errors';
+import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
 import ObjectDetailExportPanel from '../components/ObjectDetailExportPanel';
@@ -98,6 +100,11 @@ export default function ObjectDetail() {
   const [linkSearchOpen, setLinkSearchOpen] = useState(false);
   const editInitialContentRef = useRef('');
   const linkSearchRef = useRef(null);
+
+  useEffect(() => {
+    if (!object?.id || !user?.id || object.user_id !== user.id) return;
+    touchObjectView(object.id);
+  }, [object?.id, object?.user_id, user?.id]);
 
   useEffect(() => {
     if (!object || editing) return;
@@ -1179,7 +1186,7 @@ export default function ObjectDetail() {
           <div className="detail-hero">
             <div className="detail-meta detail-meta-inline">
               <span className="detail-type" title={formatObjectTypeLabel(object.type)}>
-                <span className="detail-type-icon" aria-hidden="true">{OBJECT_TYPE_ICONS[object.type] ?? '📄'}</span>
+                <TypeMark type={object.type} size="sm" className="detail-type-mark" />
                 {formatObjectTypeLabel(object.type)}
               </span>
               {(object.status || 'active') !== 'active' && (
@@ -1387,7 +1394,10 @@ export default function ObjectDetail() {
                 {suggestedLinkedObjects.filter((o) => !outgoingLinks.some((l) => l.to_object_id === o.id)).slice(0, 4).map((o) => (
                   <div key={o.id} className="detail-related-card">
                     <Link to={`/objects/${o.id}`} className="detail-related-title-link">{o.title}</Link>
-                    <span className="detail-related-type">{OBJECT_TYPE_ICONS[o.type] ?? '📄'} {formatObjectTypeLabel(o.type)}</span>
+                    <span className="detail-related-type">
+                      <TypeMark type={o.type} size="sm" className="detail-related-type-mark" />
+                      {formatObjectTypeLabel(o.type)}
+                    </span>
                     <button type="button" className="btn btn-primary btn-small detail-related-link-btn" onClick={() => addLink(o.id)}>Link</button>
                   </div>
                 ))}

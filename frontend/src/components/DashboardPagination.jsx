@@ -4,6 +4,7 @@
 export default function DashboardPagination({
   page,
   totalPages,
+  totalCount,
   pageSize,
   itemCount,
   loading,
@@ -19,10 +20,16 @@ export default function DashboardPagination({
 
   let summary = 'No objects on this page';
   if (itemCount > 0) {
-    summary = `Showing ${start}–${end}`;
-    if (hasMultiplePages) {
-      const suffix = page < totalPages ? '+' : '';
-      summary += ` · Page ${page} of ${totalPages}${suffix}`;
+    if (totalCount != null) {
+      summary = `Showing ${start}–${end} of ${totalCount}`;
+      if (hasMultiplePages) {
+        summary += ` · Page ${page} of ${totalPages}`;
+      }
+    } else {
+      summary = `Showing ${start}–${end}`;
+      if (hasMultiplePages) {
+        summary += ` · Page ${page} of ${totalPages}`;
+      }
     }
   }
 

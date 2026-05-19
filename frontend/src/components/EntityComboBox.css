@@ -1,0 +1,35 @@
+.entity-combobox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.entity-combobox-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #94a3b8);
+}
+
+.entity-combobox-select,
+.entity-combobox-create-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.entity-combobox-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.entity-combobox-create-input {
+  flex: 1 1 8rem;
+}
+
+.entity-combobox-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--danger, #f87171);
+}

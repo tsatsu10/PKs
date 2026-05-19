@@ -1,0 +1,21 @@
+.trailhead-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 1023px) {
+  .trailhead-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .trailhead-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .trailhead-row .trailhead:last-child:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}

@@ -1,0 +1,54 @@
+.active-filters-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0 0.75rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.35rem 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  font-size: 0.75rem;
+  color: var(--polar-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .filter-chip {
+    animation: filter-chip-in var(--dur-fast, 160ms) var(--ease-out-quint, ease);
+  }
+}
+
+@keyframes filter-chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.filter-chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--polar-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+
+.filter-chip-remove:hover {
+  color: var(--polar-white);
+}
+
+.active-filters-clear {
+  margin-left: auto;
+}

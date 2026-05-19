@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
+import { formatObjectTypeLabel } from '../constants';
+import TypeMark from '../components/TypeMark';
 import { SkeletonList } from '../components/Skeleton';
 import './Trash.css';
 
@@ -104,9 +105,7 @@ export default function Trash() {
         <ul className="trash-list" aria-label="Deleted objects">
           {objects.map((o) => (
             <li key={o.id} className="trash-item">
-              <span className="trash-item-type" title={formatObjectTypeLabel(o.type)} aria-hidden>
-                {OBJECT_TYPE_ICONS[o.type] ?? '•'}
-              </span>
+              <TypeMark type={o.type} size="sm" className="trash-item-type-mark" />
               <span className="trash-item-title">{o.title || 'Untitled'}</span>
               <span className="trash-item-meta">{new Date(o.updated_at).toLocaleDateString()}</span>
               <div className="trash-item-actions">

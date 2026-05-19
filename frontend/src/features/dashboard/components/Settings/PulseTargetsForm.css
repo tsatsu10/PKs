@@ -1,0 +1,44 @@
+.pulse-targets-form-intro {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.pulse-targets-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pulse-targets-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pulse-targets-form-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--polar-white);
+}
+
+.pulse-targets-form-hint {
+  font-size: 0.75rem;
+  color: var(--polar-dim);
+}
+
+.pulse-targets-form-field input {
+  width: 100%;
+  max-width: 5rem;
+}
+
+.pulse-targets-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pulse-targets-form-saved {
+  font-size: 0.8125rem;
+  color: #10b981;
+}

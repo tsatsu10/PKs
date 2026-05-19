@@ -1,0 +1,67 @@
+.bulk-action-ribbon {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(720px, calc(100vw - 2rem));
+  padding: 0.65rem 0.85rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bulk-action-ribbon {
+    animation: bulk-ribbon-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes bulk-ribbon-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.bulk-action-ribbon-count {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--polar-white);
+  white-space: nowrap;
+}
+
+.bulk-action-ribbon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.bulk-action-ribbon-danger {
+  color: #f87171;
+}
+
+.bulk-action-ribbon-dismiss {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .bulk-action-ribbon {
+    flex-wrap: wrap;
+  }
+
+  .bulk-action-ribbon-actions {
+    width: 100%;
+  }
+}

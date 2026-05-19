@@ -1,0 +1,121 @@
+.stream-bucket-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0 0.25rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.stream-bucket-header-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--polar-dim);
+  white-space: nowrap;
+}
+
+.stream-bucket-header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--glass-border), transparent);
+}
+
+.timeline-row-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.timeline-row-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.05rem;
+}
+
+.timeline-row-wrap--selected {
+  border-color: rgba(236, 72, 153, 0.45);
+  background: rgba(236, 72, 153, 0.06);
+}
+
+.timeline-row-checkbox {
+  display: flex;
+  align-items: center;
+  padding-left: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.timeline-row-checkbox.is-visible,
+.timeline-row-wrap:hover .timeline-row-checkbox,
+.timeline-row-wrap:focus-within .timeline-row-checkbox {
+  opacity: 1;
+}
+
+.timeline-row {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.timeline-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.timeline-row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.timeline-row-title .title-cluster-text {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--polar-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-row-snippet {
+  font-size: 0.75rem;
+  color: var(--polar-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-cluster {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  font-size: 0.6875rem;
+  color: var(--polar-faint);
+  white-space: nowrap;
+}
+
+.meta-cluster-sep {
+  opacity: 0.6;
+}
+
+.title-cluster-pin {
+  color: var(--cosmic-pink);
+  margin-right: 0.2rem;
+}

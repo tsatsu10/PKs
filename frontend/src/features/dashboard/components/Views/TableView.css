@@ -1,0 +1,83 @@
+.table-view-row-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.table-view-row-wrap--selected {
+  background: rgba(236, 72, 153, 0.06);
+}
+
+.table-view-checkbox {
+  display: flex;
+  align-items: center;
+  padding-left: 0.25rem;
+  opacity: 0;
+}
+
+.table-view-checkbox.is-visible,
+.table-view-row-wrap:hover .table-view-checkbox,
+.table-view-row-wrap:focus-within .table-view-checkbox {
+  opacity: 1;
+}
+
+.table-view-row {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) 1fr minmax(6rem, 10rem);
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.table-view-row-wrap--compact .table-view-row {
+  grid-template-columns: minmax(4.5rem, 7rem) 1fr minmax(5rem, 8rem);
+}
+
+.table-view-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--polar-dim);
+  min-width: 0;
+}
+
+.table-view-type-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-view-title .title-cluster-text {
+  font-weight: 600;
+  color: var(--polar-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-view-summary {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .table-view-row {
+    grid-template-columns: minmax(5rem, 8rem) 1fr 1fr minmax(6rem, 10rem);
+  }
+
+  .table-view-summary {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--polar-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

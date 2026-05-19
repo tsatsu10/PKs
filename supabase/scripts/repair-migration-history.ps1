@@ -3,55 +3,145 @@
 # supabase_migrations.schema_migrations is empty — otherwise `db push` re-runs
 # phase1 and fails with "policy already exists".
 #
+# Safe to re-run: skips versions already recorded on remote (duplicate key).
+#
 # Usage (from repo root):
 #   .\supabase\scripts\repair-migration-history.ps1
 #   .\supabase\scripts\repair-migration-history.ps1 -Password "your-db-password"
 #
-# Then apply only pending migrations:
+# Then apply only pending migrations (dashboard Phase 1–3):
 #   supabase db push -p "your-db-password"
-#
-# If verify_db_up_to_date.sql shows search_knowledge_objects_with_snippets is MISSING,
-# do NOT repair 20250222000001–20250224000005 (stop at 20250221000001), then db push
-# will apply the search snippet migrations.
 
 param(
-  [string]$Password
+  [string]$Password,
+  # Migrations to leave PENDING (db push will apply these).
+  [string[]]$LeavePending = @("20250519000001", "20250520000001", "20250521000001")
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
-# All local migrations EXCEPT the newest link_edges policy fix (still pending).
-$versions = @(
-  "20250212000001", "20250213000001", "20250213000002", "20250213000003",
-  "20250213000004", "20250213000005", "20250213000006", "20250213000007",
-  "20250213000008", "20250213000009", "20250213000010", "20250213000011",
-  "20250217000001", "20250217100001", "20250217100002", "20250217200001",
-  "20250217200002", "20250218000001", "20250219000001", "20250219000002",
-  "20250219000003", "20250220000001", "20250221000001", "20250222000001",
-  "20250222000002", "20250223000001", "20250224000001", "20250224000002",
-  "20250224000003", "20250224000004", "20250224000005", "20250225000001",
-  "20250226000001", "20250227000001", "20250309100001", "20250309100002",
-  "20250309100003", "20250309100004"
-)
+# Supabase CLI writes progress (e.g. "Connecting to remote database...") to stderr.
+# With $ErrorActionPreference = Stop, PowerShell treats that as a terminating error.
+function Invoke-SupabaseCli {
+  param([string[]]$SupabaseArgs)
+
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $lines = [System.Collections.Generic.List[string]]::new()
+    & supabase @SupabaseArgs 2>&1 | ForEach-Object {
+      if ($_ -is [System.Management.Automation.ErrorRecord]) {
+        $lines.Add($_.ToString())
+      } else {
+        $lines.Add("$($_)".TrimEnd())
+      }
+    }
+    $code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+    return @{ ExitCode = $code; Output = $lines.ToArray() }
+  } finally {
+    $ErrorActionPreference = $prevEap
+  }
+}
+
+function Get-RemoteAppliedVersions {
+  param([string[]]$PassArg)
+
+  $applied = [System.Collections.Generic.HashSet[string]]::new()
+  $result = Invoke-SupabaseCli -SupabaseArgs (@("migration", "list") + $PassArg)
+
+  if ($result.ExitCode -ne 0) {
+    Write-Host "  (could not read migration list; will skip duplicates on repair errors)" -ForegroundColor DarkYellow
+    return $applied
+  }
+
+  foreach ($line in $result.Output) {
+    if ($line -match 'LOCAL|REMOTE|TIME \(UTC\)|^[\s─\-]+$') { continue }
+    if ($line -notmatch '\d{14}') { continue }
+
+    # Avoid Unicode column chars (│) — encoding breaks regex on Windows PowerShell.
+    $digits = [regex]::Matches($line, '\d{14}')
+    if ($digits.Count -ge 2) {
+      [void]$applied.Add($digits[1].Value)
+      continue
+    }
+    if ($digits.Count -eq 1 -and $line -match '^\s*[^\d]') {
+      # Remote-only row (no local version at start of line)
+      [void]$applied.Add($digits[0].Value)
+    }
+  }
+
+  return $applied
+}
+
+function Test-RepairAlreadyApplied {
+  param([string]$Output)
+  return $Output -match 'duplicate key|schema_migrations_pkey|23505|already exists'
+}
+
+$allMigrations = Get-ChildItem (Join-Path $repoRoot "supabase\migrations\*.sql") |
+  Sort-Object Name |
+  ForEach-Object {
+    if ($_.BaseName -match '^(\d{14})') { $Matches[1] } else { $null }
+  } |
+  Where-Object { $_ }
+
+$versions = @($allMigrations | Where-Object { $_ -notin $LeavePending })
 
 $passArg = @()
 if ($Password) { $passArg = @("-p", $Password) }
 
-Write-Host "Repairing $($versions.Count) migration versions as applied on linked project..."
-Write-Host "(Skipping 20250518000001 — run 'supabase db push' to apply that one.)"
+Write-Host "Reading remote migration history..."
+$remoteApplied = Get-RemoteAppliedVersions -PassArg $passArg
+if ($remoteApplied.Count -gt 0) {
+  Write-Host "  $($remoteApplied.Count) version(s) already applied on remote (will skip)."
+}
+
+$toRepair = @($versions | Where-Object { -not $remoteApplied.Contains($_) })
+
+Write-Host ""
+Write-Host "Repairing $($toRepair.Count) migration version(s) as applied on linked project..."
+if ($LeavePending.Count -gt 0) {
+  Write-Host "Leaving pending: $($LeavePending -join ', ')"
+}
 Write-Host ""
 
-foreach ($v in $versions) {
+$skipped = 0
+$repaired = 0
+$failed = 0
+
+foreach ($v in $toRepair) {
   Write-Host "  repair $v"
-  & supabase migration repair $v --status applied @passArg
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "migration repair failed for $v"
+  $result = Invoke-SupabaseCli -SupabaseArgs (@("migration", "repair", $v, "--status", "applied") + $passArg)
+  $repairText = $result.Output -join "`n"
+
+  if ($result.ExitCode -eq 0) {
+    $repaired++
+    continue
   }
+
+  if (Test-RepairAlreadyApplied -Output $repairText) {
+    Write-Host "    already applied on remote (skipped)" -ForegroundColor DarkYellow
+    $skipped++
+    continue
+  }
+
+  Write-Host $repairText -ForegroundColor Red
+  $failed++
+  Write-Error "migration repair failed for $v"
 }
 
 Write-Host ""
+Write-Host "Summary: repaired=$repaired skipped=$skipped failed=$failed"
+if ($failed -gt 0) { exit 1 }
+
+Write-Host ""
 Write-Host "Done. Next:"
-Write-Host "  supabase migration list"
-Write-Host "  supabase db push"
+if ($Password) {
+  Write-Host "  supabase migration list -p `"$Password`""
+  Write-Host "  supabase db push -p `"$Password`""
+} else {
+  Write-Host "  supabase migration list"
+  Write-Host "  supabase db push"
+}

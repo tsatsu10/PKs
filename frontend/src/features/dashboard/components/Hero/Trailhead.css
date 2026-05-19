@@ -1,0 +1,103 @@
+.trailhead {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1rem 1rem 1.15rem;
+  min-height: 7.5rem;
+  background: var(--surface-elevated, #252532);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition: border-color var(--dur-fast, 160ms) ease, transform var(--dur-fast, 160ms) var(--ease-out-quint, ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trailhead-row .trailhead {
+    animation: trailhead-enter var(--dur-base, 220ms) var(--ease-out-quint, ease) backwards;
+  }
+
+  .trailhead-row .trailhead:nth-child(1) { animation-delay: 0ms; }
+  .trailhead-row .trailhead:nth-child(2) { animation-delay: 60ms; }
+  .trailhead-row .trailhead:nth-child(3) { animation-delay: 120ms; }
+}
+
+@keyframes trailhead-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.trailhead:hover {
+  border-color: rgba(236, 72, 153, 0.35);
+  transform: translateY(-1px);
+}
+
+.trailhead-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.trailhead--resume .trailhead-accent {
+  background: var(--accent-gradient);
+}
+
+.trailhead--pending .trailhead-accent {
+  background: #f59e0b;
+}
+
+.trailhead--spark .trailhead-accent {
+  background: linear-gradient(180deg, var(--midnight-purple-accent), transparent);
+}
+
+.trailhead-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--polar-faint);
+}
+
+.trailhead-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.trailhead-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--polar-white);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.trailhead-meta {
+  font-size: 0.75rem;
+  color: var(--polar-dim);
+}
+
+.trailhead-cta {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cosmic-pink);
+}

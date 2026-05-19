@@ -1,3 +1,36 @@
+@import '../features/dashboard/components/Hero/DashboardHero.css';
+@import '../features/dashboard/components/Hero/Trailhead.css';
+@import '../features/dashboard/components/Hero/TrailheadRow.css';
+@import '../features/dashboard/components/Hero/PulseRings.css';
+@import '../features/dashboard/components/Toolbar/CommandBar.css';
+@import '../features/dashboard/components/Toolbar/ActiveFiltersStrip.css';
+@import '../features/dashboard/components/Views/StreamView.css';
+@import '../features/dashboard/components/Views/TableView.css';
+@import '../features/dashboard/components/Selection/BulkActionRibbon.css';
+@import '../features/dashboard/components/Sidebar/ActivityPulse.css';
+@import '../features/dashboard/components/Views/LinkedBar.css';
+@import '../features/dashboard/components/Empty/DashboardEmptyStates.css';
+
+.dashboard-actions--compact .dashboard-actions-right {
+  gap: 0.5rem;
+}
+
+.dashboard-toolbar-extras {
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-object-list-scroll--stream {
+  max-height: min(70vh, calc(100vh - 320px));
+}
+
+.dashboard-selection-actions {
+  display: none;
+}
+
+.dashboard-view-toggle-legacy {
+  display: none;
+}
+
 .dashboard {
   min-height: 100vh;
   width: 100%;
@@ -96,10 +129,51 @@
   display: none;
 }
 
-@media (min-width: 1024px) {
+.dashboard-activity-toggle {
+  display: inline-flex;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-activity-toggle {
+    display: none;
+  }
+}
+
+.dashboard-sidebar--open-mobile {
+  display: block;
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(20rem, 92vw);
+  padding: 1rem;
+  overflow-y: auto;
+  background: var(--space-black-soft);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+}
+
+.dashboard-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dashboard-object-list-scroll {
+  transition: opacity var(--dur-base, 220ms) var(--ease-out-quint, ease);
+}
+
+@media (min-width: 1280px) {
   .dashboard-layout {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 300px;
     gap: var(--space-16, 2rem);
     align-items: start;
   }
@@ -107,6 +181,18 @@
     display: block;
     position: sticky;
     top: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .dashboard-layout {
+    display: block;
+  }
+  .dashboard-sidebar {
+    display: none;
+  }
+  .dashboard-sidebar.dashboard-sidebar--open-mobile {
+    display: block;
   }
 }
 .dashboard-sidebar-card {
@@ -458,6 +544,20 @@
 }
 .dashboard-suggested-next a:hover {
   text-decoration: underline;
+}
+
+.dashboard-suggested-next-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--cosmic-pink);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.dashboard-suggested-next-btn:hover {
+  color: var(--polar-white);
 }
 
 /* Command palette */
@@ -858,8 +958,8 @@
 }
 
 .object-card-cover-fallback-icon {
-  font-size: 2.75rem;
-  opacity: 0.85;
+  transform: scale(1.65);
+  opacity: 0.92;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
 }
 
@@ -1171,7 +1271,9 @@
 }
 
 .filter-panel select,
-.filter-panel input[type="date"] {
+.filter-panel input[type="date"],
+.filter-panel .entity-combobox-select,
+.filter-panel .entity-combobox-create-input {
   padding: 0.5rem 0.75rem;
   background: var(--panel-overlay);
   border: 1px solid var(--glass-border);
@@ -1179,6 +1281,11 @@
   color: var(--polar-white);
   font-size: 0.875rem;
   min-width: 120px;
+}
+
+.filter-panel .entity-combobox {
+  flex: 1 1 140px;
+  min-width: 140px;
 }
 
 .dashboard-quick-add-trigger {
@@ -1488,8 +1595,8 @@
 }
 
 .object-list-type-icon {
-  font-size: 0.875rem;
-  line-height: 1;
+  margin-right: 0.25rem;
+  vertical-align: middle;
 }
 
 .object-list-title {

@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
-import { OBJECT_TYPE_ICONS, formatObjectTypeLabel } from '../constants';
+import { formatObjectTypeLabel } from '../constants';
+import TypeMark from '../components/TypeMark';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';
 import { SkeletonList } from '../components/Skeleton';
@@ -225,9 +226,7 @@ export default function Search() {
                       role="listitem"
                     >
                       <Link to={`/objects/${o.id}`} className="search-result-link">
-                        <span className="search-result-type" title={formatObjectTypeLabel(o.type)} aria-hidden>
-                          {OBJECT_TYPE_ICONS[o.type] ?? '•'}
-                        </span>
+                        <TypeMark type={o.type} size="sm" className="search-result-type-mark" />
                         <span className="search-result-title">{o.title || 'Untitled'}</span>
                         {(o.snippet || o.summary) && (
                           <span className="search-result-summary">{o.snippet || o.summary}</span>
