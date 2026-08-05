@@ -291,7 +291,9 @@ export default function ObjectDetail() {
     setError('');
     try {
       const newSlug = slugify(editForm.title.trim()) || null;
-      const { error: err } = await supabase
+      // Optimistic concurrency: only update if the row is still at the version
+      // we loaded; a version trigger bumps current_version on every update.
+      const { data: updatedRows, error: err } = await supabase
         .from('knowledge_objects')
         .update({
           title: editForm.title.trim(),
@@ -304,8 +306,17 @@ export default function ObjectDetail() {
           cover_url: editForm.cover_url?.trim() || null,
           slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : null,
         })
-        .eq('id', object.id);
+        .eq('id', object.id)
+        .eq('current_version', object.current_version)
+        .select('current_version, updated_at');
       if (err) throw err;
+      if (!updatedRows || updatedRows.length === 0) {
+        const msg = 'This object was changed elsewhere (another tab or device). Copy your edits, then reload to get the latest version.';
+        setError(msg);
+        addToast('error', msg);
+        return;
+      }
+      const savedRow = updatedRows[0];
       setObject((o) => ({
         ...o,
         title: editForm.title.trim(),
@@ -317,8 +328,8 @@ export default function ObjectDetail() {
         remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
         cover_url: editForm.cover_url?.trim() || null,
         slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : o.slug,
-        updated_at: new Date().toISOString(),
-        current_version: o.current_version + 1,
+        updated_at: savedRow.updated_at ?? new Date().toISOString(),
+        current_version: savedRow.current_version ?? o.current_version + 1,
       }));
       setEditing(false);
       clearDraft(DRAFT_KEYS.object(object.id));

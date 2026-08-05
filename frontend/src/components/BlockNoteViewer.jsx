@@ -4,6 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import BlockNoteMantineProvider from './BlockNoteMantineProvider';
+import { useTheme } from '../context/ThemeContext';
 import './BlockNoteEditor.css';
 
 /**
@@ -12,6 +13,7 @@ import './BlockNoteEditor.css';
  */
 export default function BlockNoteViewer({ content, className = '' }) {
   const editor = useCreateBlockNote();
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     let mounted = true;
@@ -39,14 +41,14 @@ export default function BlockNoteViewer({ content, className = '' }) {
     <BlockNoteMantineProvider>
     <div
       className={`blocknote-viewer-wrapper ${className}`.trim()}
-      data-mantine-color-scheme="dark"
-      data-color-scheme="dark"
+      data-mantine-color-scheme={resolvedTheme}
+      data-color-scheme={resolvedTheme}
       aria-label="Content"
     >
       <BlockNoteView
         editor={editor}
         editable={false}
-        theme="dark"
+        theme={resolvedTheme}
         formattingToolbar={false}
         slashMenu={false}
       />

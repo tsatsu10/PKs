@@ -9,6 +9,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** True when an IPv4 address string falls in a loopback/private/link-local/reserved range. */
+function isPrivateIpV4(ip: string): boolean {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = m.slice(1).map(Number);
+  return (
+    a === 0 ||
+    a === 127 ||
+    a === 10 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    (a === 100 && b >= 64 && b <= 127) || // CGNAT
+    a >= 224 // multicast/reserved
+  );
+}
+
+/** True when an IPv6 address string is loopback/link-local/unique-local or a mapped private IPv4. */
+function isPrivateIpV6(ip: string): boolean {
+  const v = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (v === "::" || v === "::1") return true;
+  if (v.startsWith("fe8") || v.startsWith("fe9") || v.startsWith("fea") || v.startsWith("feb")) return true; // link-local
+  if (v.startsWith("fc") || v.startsWith("fd")) return true; // unique-local
+  const mapped = v.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (mapped) return isPrivateIpV4(mapped[1]);
+  return false;
+}
+
 /** Reject URLs that could be used for SSRF (internal/private/metadata). Only allow HTTPS with public hostnames. */
 function isWebhookUrlAllowed(urlString: string): { allowed: boolean; reason?: string } {
   let url: URL;
@@ -21,26 +49,47 @@ function isWebhookUrlAllowed(urlString: string): { allowed: boolean; reason?: st
     return { allowed: false, reason: "Only HTTPS URLs are allowed" };
   }
   const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host === "0.0.0.0" || host.endsWith(".local")) {
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
     return { allowed: false, reason: "Local/private hostnames are not allowed" };
   }
   if (host === "metadata.google.internal" || host === "169.254.169.254") {
     return { allowed: false, reason: "Metadata endpoints are not allowed" };
   }
-  const ipV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-  const m = host.match(ipV4);
-  if (m) {
-    const [a, b, c, d] = m.slice(1).map(Number);
-    if (a === 127) return { allowed: false, reason: "Loopback not allowed" };
-    if (a === 10) return { allowed: false, reason: "Private range not allowed" };
-    if (a === 172 && b >= 16 && b <= 31) return { allowed: false, reason: "Private range not allowed" };
-    if (a === 192 && b === 168) return { allowed: false, reason: "Private range not allowed" };
-    if (a === 169 && b === 254) return { allowed: false, reason: "Link-local not allowed" };
+  if (isPrivateIpV4(host)) {
+    return { allowed: false, reason: "Private/reserved IP addresses are not allowed" };
   }
-  if (host.startsWith("[") && (host.includes("::1") || host === "[::]")) {
-    return { allowed: false, reason: "Loopback not allowed" };
+  if (host.startsWith("[") || host.includes(":")) {
+    if (isPrivateIpV6(host)) {
+      return { allowed: false, reason: "Private/reserved IP addresses are not allowed" };
+    }
   }
   return { allowed: true };
+}
+
+/**
+ * Resolve a hostname and reject it if any A/AAAA record points at a
+ * private/internal address (defends against DNS names like 127.0.0.1.nip.io).
+ * DNS errors fail closed.
+ */
+async function assertResolvesToPublicIp(hostname: string): Promise<void> {
+  // Literal IPs were already validated by isWebhookUrlAllowed.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":")) return;
+  const records: string[] = [];
+  for (const type of ["A", "AAAA"] as const) {
+    try {
+      records.push(...(await Deno.resolveDns(hostname, type)) as string[]);
+    } catch {
+      // Missing record type is fine; both failing leaves records empty -> fail closed.
+    }
+  }
+  if (records.length === 0) {
+    throw new Error("Webhook host did not resolve");
+  }
+  for (const ip of records) {
+    if (isPrivateIpV4(ip) || isPrivateIpV6(ip)) {
+      throw new Error("Webhook host resolves to a private address");
+    }
+  }
 }
 
 // Max request body size (DoS protection).
@@ -82,9 +131,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Anon key + the caller's JWT: queries run as the user with RLS enforced.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } }
     );
     const token = authHeader.replace("Bearer ", "");
@@ -169,6 +219,7 @@ Deno.serve(async (req) => {
         if (!urlCheck.allowed) {
           throw new Error(urlCheck.reason ?? "Webhook URL not allowed");
         }
+        await assertResolvesToPublicIp(new URL(url).hostname.toLowerCase());
         const body = JSON.stringify({ event, payload: payload ?? {}, timestamp: new Date().toISOString() });
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -187,7 +238,15 @@ Deno.serve(async (req) => {
           const sig = await crypto.subtle.sign("HMAC", key, enc.encode(body));
           headers["X-PKS-Signature"] = btoa(String.fromCharCode(...new Uint8Array(sig)));
         }
-        await fetch(url, { method: "POST", headers, body });
+        // No redirect following (a 3xx could point at an internal address) and
+        // a hard timeout so one slow endpoint cannot stall the whole delivery.
+        await fetch(url, {
+          method: "POST",
+          headers,
+          body,
+          redirect: "manual",
+          signal: AbortSignal.timeout(10_000),
+        });
       })
     );
 
@@ -197,8 +256,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
+    console.error("webhook-deliver error:", e);
     return new Response(
-      JSON.stringify({ error: String(e?.message ?? e) }),
+      JSON.stringify({ error: "Server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

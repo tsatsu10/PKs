@@ -4,6 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import BlockNoteMantineProvider from './BlockNoteMantineProvider';
+import { useTheme } from '../context/ThemeContext';
 import './BlockNoteEditor.css';
 
 /**
@@ -66,6 +67,7 @@ function BlockNoteEditor({
   const editorOptions = useMemo(() => ({ pasteHandler: createPasteHandler() }), []);
 
   const editor = useCreateBlockNote(editorOptions);
+  const { resolvedTheme } = useTheme();
   const onChangeRef = useRef(onChange);
   const [initialContentReady, setInitialContentReady] = useState(false);
 
@@ -117,8 +119,8 @@ function BlockNoteEditor({
     <BlockNoteMantineProvider>
     <div
       className="blocknote-editor-wrapper"
-      data-mantine-color-scheme="dark"
-      data-color-scheme="dark"
+      data-mantine-color-scheme={resolvedTheme}
+      data-color-scheme={resolvedTheme}
       style={{ minHeight: `${minHeight}px` }}
       aria-label={ariaLabel}
     >
@@ -127,7 +129,7 @@ function BlockNoteEditor({
           id={id}
           editor={editor}
           onChange={handleChange}
-          theme="dark"
+          theme={resolvedTheme}
           formattingToolbar={true}
           slashMenu={true}
         />

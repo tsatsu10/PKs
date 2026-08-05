@@ -20,18 +20,14 @@ const LINK_PROTOCOLS = ['http', 'https', 'ftp', 'ftps', 'mailto', 'tel', 'callto
 LINK_PROTOCOLS.forEach((scheme) => registerCustomProtocol(scheme))
 init()
 
-// Suppress linkifyjs "already initialized" warnings from Tiptap Link extension
-const isLinkifyInitWarning = (msg) =>
-  typeof msg === 'string' && msg.includes('linkifyjs: already initialized')
-const patchConsole = (method) => {
-  const orig = console[method]
-  console[method] = (...args) => {
-    if (isLinkifyInitWarning(args[0])) return
-    orig.apply(console, args)
-  }
+// Tiptap's Link extension re-registers linkify protocols on every editor
+// mount, which linkifyjs reports via console.warn. Filter exactly that one
+// message on console.warn only; everything else passes through untouched.
+const origWarn = console.warn
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].startsWith('linkifyjs: already initialized')) return
+  origWarn.apply(console, args)
 }
-patchConsole('warn')
-patchConsole('log')
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

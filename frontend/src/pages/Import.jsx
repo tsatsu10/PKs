@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { parseCsvRows } from '../lib/csv';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { OBJECT_TYPES } from '../constants';
@@ -36,16 +37,16 @@ function parseMarkdown(text) {
 }
 
 function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const rows = parseCsvRows(text.trim());
+  if (rows.length < 2) return [];
+  const header = rows[0].map((h) => h.trim().toLowerCase());
   const titleIdx = header.findIndex((h) => h === 'title' || h === 'name');
   const contentIdx = header.findIndex((h) => h === 'content' || h === 'body' || h === 'text');
   const typeIdx = header.findIndex((h) => h === 'type');
   if (titleIdx === -1 && contentIdx === -1) return [];
   const items = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(',').map((c) => c.trim());
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].map((c) => c.trim());
     const title = titleIdx >= 0 ? (cells[titleIdx] || '') : (cells[contentIdx]?.slice(0, 200) || 'Imported');
     const content = contentIdx >= 0 ? (cells[contentIdx] || '') : '';
     const rawType = typeIdx >= 0 && cells[typeIdx] ? cells[typeIdx] : 'note';
