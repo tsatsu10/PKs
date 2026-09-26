@@ -135,6 +135,14 @@ export default function ObjectDetail() {
     if (!id) draftAppliedRef.current = false;
   }, [id]);
 
+  // Warn before closing or reloading the tab mid-edit (drafts cover in-app navigation).
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [editing]);
+
   const editDraftTimerRef = useRef(null);
   useEffect(() => {
     if (!id || !editing) return;
@@ -337,7 +345,7 @@ export default function ObjectDetail() {
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_UPDATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { title: editForm.title.trim() });
       supabase
         .from('knowledge_object_versions')
-        .select('id, version, title, created_at, edited_by')
+        .select('id, version, title, content, summary, key_points, created_at, edited_by')
         .eq('knowledge_object_id', object.id)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -357,17 +365,29 @@ export default function ObjectDetail() {
     setRestoringVersion(ver.id);
     setError('');
     try {
-      const { error: err } = await supabase
+      // Read the snapshot fresh so a partially-loaded version list can never restore blanks.
+      const { data: snap, error: snapErr } = await supabase
+        .from('knowledge_object_versions')
+        .select('title, content, summary, key_points')
+        .eq('id', ver.id)
+        .single();
+      if (snapErr) throw snapErr;
+      const { data: restoredRows, error: err } = await supabase
         .from('knowledge_objects')
         .update({
-          title: ver.title,
-          content: ver.content ?? null,
-          summary: ver.summary ?? null,
-          key_points: ver.key_points ?? [],
+          title: snap.title,
+          content: snap.content ?? null,
+          summary: snap.summary ?? null,
+          key_points: snap.key_points ?? [],
         })
         .eq('id', object.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('current_version', object.current_version)
+        .select('id');
       if (err) throw err;
+      if (!restoredRows || restoredRows.length === 0) {
+        throw new Error('This object was changed elsewhere. Reload to get the latest version, then restore again.');
+      }
       addToast('success', `Restored to v${ver.version}`);
       reload();
     } catch (err) {

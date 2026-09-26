@@ -91,8 +91,9 @@ function BlockNoteEditor({
           editor.replaceBlocks(editor.document, blocks);
         }
       } catch {
+        // Keep the raw text visible rather than an empty editor, so an edit can't wipe it.
         if (mounted) {
-          editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: [] }]);
+          editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: md }]);
         }
       }
       if (mounted) {
@@ -111,7 +112,7 @@ function BlockNoteEditor({
       const trimmed = (md ?? '').trim();
       onChangeRef.current?.(trimmed === '' ? '' : md);
     } catch {
-      onChangeRef.current?.('');
+      // Conversion failed: leave the last good value in place instead of reporting empty content.
     }
   }, [editor]);
 

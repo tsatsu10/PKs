@@ -2,6 +2,7 @@
  * Route configuration and loading fallback for the app.
  */
 import { lazy } from 'react';
+import { useParams } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
@@ -51,6 +52,12 @@ export const publicRoutes = [
   { path: '/reset-password', element: withErrorBoundary(<ResetPassword />) },
 ];
 
+/** Remount ObjectDetail per object so edit state never carries over to another object. */
+function ObjectDetailRoute() {
+  const { id } = useParams();
+  return <ObjectDetail key={id} />;
+}
+
 /**
  * Authenticated child routes under a single AppShell (no remount on navigation).
  */
@@ -60,7 +67,7 @@ export const protectedChildRoutes = [
   { path: '/objects/new', element: withErrorBoundary(<ObjectNew />) },
   { path: '/objects/by-slug/:slug', element: withErrorBoundary(<ObjectBySlug />) },
   { path: '/quick', element: withErrorBoundary(<QuickCapture />) },
-  { path: '/objects/:id', element: withErrorBoundary(<ObjectDetail />) },
+  { path: '/objects/:id', element: withErrorBoundary(<ObjectDetailRoute />) },
   { path: '/settings', element: withErrorBoundary(<Settings />) },
   { path: '/prompts', element: withErrorBoundary(<PromptBank />) },
   { path: '/templates', element: withErrorBoundary(<Templates />) },
