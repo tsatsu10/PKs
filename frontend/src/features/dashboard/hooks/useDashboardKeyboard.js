@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+function isTypingTarget(el) {
+  if (!el) return false;
+  return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+}
+
+function isModalOpen() {
+  return document.querySelector('[role="dialog"][aria-modal="true"]') != null;
+}
+
 /**
  * Dashboard keyboard shortcuts, command palette, and scroll progress.
  */
@@ -99,8 +108,7 @@ export function useDashboardKeyboard({
       const listEl = listScrollRef.current;
       if (!listEl || !objects.length) return;
       if (!listEl.contains(document.activeElement)) return;
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (isTypingTarget(document.activeElement) || isModalOpen()) return;
       const key = e.key;
       const isDown = key === 'j' || key === 'J' || key === 'ArrowDown';
       const isUp = key === 'k' || key === 'K' || key === 'ArrowUp';
@@ -133,8 +141,7 @@ export function useDashboardKeyboard({
 
   useEffect(() => {
     function onKeyDown(e) {
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (isTypingTarget(document.activeElement) || isModalOpen()) return;
 
       if ((e.metaKey || e.ctrlKey) && e.key === '[' && totalPages > 1 && page > 1) {
         e.preventDefault();
@@ -155,7 +162,7 @@ export function useDashboardKeyboard({
 
       if (e.altKey) {
         const trail = [resumeObject, pendingObject, sparkObject];
-        const idx = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1;
+        const idx = e.code === 'Digit1' ? 0 : e.code === 'Digit2' ? 1 : e.code === 'Digit3' ? 2 : -1;
         if (idx >= 0 && trail[idx]) {
           e.preventDefault();
           navigate(`/objects/${trail[idx].id}${runPromptSuffix}`);
@@ -184,13 +191,14 @@ export function useDashboardKeyboard({
           closeQuickAdd();
           return;
         }
-        if (selectedIdsSize > 0 && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+        // With a bulk/export dialog open, Escape must not empty the selection it acts on.
+        if (selectedIdsSize > 0 && !isTypingTarget(document.activeElement) && !isModalOpen()) {
           e.preventDefault();
           clearSelection();
           return;
         }
       }
-      if (e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+      if (e.key === '/' && !isTypingTarget(document.activeElement) && !isModalOpen()) {
         e.preventDefault();
         if (location.pathname === '/') {
           setShowQuickAdd(true);

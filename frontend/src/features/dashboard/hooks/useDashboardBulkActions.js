@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
@@ -6,6 +6,20 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../../../lib/export';
 import { getErrorMessage } from '../../../lib/errors';
 import { resolveOwnedObjectIds } from '../lib/dashboardUtils';
+
+// Keep `.in()` filters well under URL length limits (~36 chars per UUID).
+const IN_CHUNK = 100;
+
+/** Select rows where `column` is in `ids`, chunked; throws on any failed chunk. */
+async function selectInChunks(table, columns, column, ids) {
+  const rows = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const { data, error } = await supabase.from(table).select(columns).in(column, ids.slice(i, i + IN_CHUNK));
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+  return rows;
+}
 
 /**
  * Dashboard selection, export, and bulk-action state/handlers.
@@ -16,17 +30,16 @@ export function useDashboardBulkActions({
   setError,
   objects,
   runSearch,
-  searchQuery,
-  typeFilter,
-  statusFilter,
-  domainFilter,
-  tagFilter,
-  dateFrom,
-  dateTo,
-  dueFrom,
-  dueTo,
+  appliedRpcPayload,
 }) {
-  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState(new Set());
+  // Only rows in the current result set count as selected, so a new search can't leave
+  // hidden rows in the selection (bulk actions and "export selected" act on what's shown).
+  const selectedIds = useMemo(() => {
+    const visible = new Set(objects.map((o) => o.id));
+    const next = new Set([...rawSelectedIds].filter((id) => visible.has(id)));
+    return next.size === rawSelectedIds.size ? rawSelectedIds : next;
+  }, [rawSelectedIds, objects]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportScope, setExportScope] = useState('selected');
   const [exportFormat, setExportFormat] = useState('md');
@@ -67,28 +80,22 @@ export function useDashboardBulkActions({
     const ids = [];
     const limit = 100;
     let offset = 0;
-    const rpcName = searchQuery?.trim() ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
+    const payload = appliedRpcPayload ?? {};
+    const rpcName = payload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
     while (true) {
       const { data, error: err } = await supabase.rpc(rpcName, {
-        search_query: searchQuery?.trim() || null,
-        type_filter: typeFilter || null,
-        domain_id_f: domainFilter || null,
-        tag_id_f: tagFilter || null,
-        date_from_f: dateFrom ? `${dateFrom}T00:00:00Z` : null,
-        date_to_f: dateTo ? `${dateTo}T23:59:59Z` : null,
-        status_filter: statusFilter || null,
-        due_from_f: dueFrom ? `${dueFrom}T00:00:00Z` : null,
-        due_to_f: dueTo ? `${dueTo}T23:59:59Z` : null,
+        ...payload,
         limit_n: limit,
         offset_n: offset,
       });
-      if (err || !data?.length) break;
+      if (err) throw err;
+      if (!data?.length) break;
       ids.push(...data.map((o) => o.id));
       if (data.length < limit) break;
       offset += limit;
     }
     return ids;
-  }, [searchQuery, typeFilter, domainFilter, tagFilter, dateFrom, dateTo, statusFilter, dueFrom, dueTo]);
+  }, [appliedRpcPayload]);
 
   const handleExportSelected = useCallback(async () => {
     setExporting(true);
@@ -120,25 +127,25 @@ export function useDashboardBulkActions({
       }).select('id').single();
       if (jobErr) throw jobErr;
       jobId = job?.id;
-      await supabase.from('export_job_items').insert(
+      const { error: itemsErr } = await supabase.from('export_job_items').insert(
         ids.map((knowledge_object_id, i) => ({ export_job_id: jobId, knowledge_object_id, sort_order: i }))
       );
+      if (itemsErr) throw itemsErr;
 
-      const { data: objs, error: objsErr } = await supabase.from('knowledge_objects').select('*').in('id', ids);
-      if (objsErr) throw objsErr;
-      if (!objs?.length) throw new Error('No objects found');
+      const objs = await selectInChunks('knowledge_objects', '*', 'id', ids);
+      if (!objs.length) throw new Error('No objects found');
       const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));
-      const [kodRes, kotRes] = await Promise.all([
-        supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', ids),
-        supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', ids),
+      const [kodRows, kotRows] = await Promise.all([
+        selectInChunks('knowledge_object_domains', 'knowledge_object_id, domain_id, domains(id, name)', 'knowledge_object_id', ids),
+        selectInChunks('knowledge_object_tags', 'knowledge_object_id, tag_id, tags(id, name)', 'knowledge_object_id', ids),
       ]);
       const domainsByObj = {};
-      (kodRes.data || []).forEach((r) => {
+      kodRows.forEach((r) => {
         if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
         if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
       });
       const tagsByObj = {};
-      (kotRes.data || []).forEach((r) => {
+      kotRows.forEach((r) => {
         if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
         if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
       });

@@ -67,6 +67,7 @@ export function useDashboardPage() {
     goToPage,
     hasActiveFilters,
     resumeObject,
+    appliedRpcPayload,
   } = useDashboardSearch({ userId: user?.id ?? null });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState(() => loadViewMode());
@@ -103,15 +104,7 @@ export function useDashboardPage() {
     setError,
     objects,
     runSearch,
-    searchQuery,
-    typeFilter,
-    statusFilter,
-    domainFilter,
-    tagFilter,
-    dateFrom,
-    dateTo,
-    dueFrom,
-    dueTo,
+    appliedRpcPayload,
   });
 
   const streamItems = useMemo(
@@ -310,6 +303,8 @@ export function useDashboardPage() {
       setDateTo('');
       setDueFrom('');
       setDueTo('');
+      setDomainFilter('');
+      setTagFilter('');
       overrides = createEmptyFiltersOverride();
     }
     runSearch(0, null, overrides);

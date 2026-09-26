@@ -44,12 +44,15 @@ export default function AppLayout({ children }) {
   const { resolvedTheme, cycleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const { pathname } = location;
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        // The dashboard has its own palette (actions + recent objects); don't open both.
+        if (pathname === '/') return;
         e.preventDefault();
         setCommandOpen((v) => !v);
         return;
@@ -76,7 +79,7 @@ export default function AppLayout({ children }) {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate]);
+  }, [navigate, pathname]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {

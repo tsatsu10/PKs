@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { getErrorMessage } from '../lib/errors';
@@ -99,6 +99,12 @@ export function useDashboardSearch({ userId }) {
   const [domains, setDomains] = useState([]);
   const [tags, setTags] = useState([]);
   const [resumeObject, setResumeObject] = useState(null);
+  // Filters of the last search that actually ran; paging and export reuse these, so
+  // unapplied edits in the filter panel don't leak into page 2 or "export all matching".
+  const [appliedRpcPayload, setAppliedRpcPayload] = useState(null);
+  const appliedRpcPayloadRef = useRef(null);
+  // Only the most recent search may write results (older responses can resolve later).
+  const requestIdRef = useRef(0);
 
   const filterState = useMemo(
     () => ({
@@ -143,13 +149,21 @@ export function useDashboardSearch({ userId }) {
     async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
       if (!userId) return;
       const isNewQuery = nextOffset === 0;
-      const filters = resolveSearchRpcFilters(filtersOverride, filterState, queryOverride);
-      const rpcPayload = buildRpcPayload(filters);
+      const hasOverride = queryOverride != null || filtersOverride != null;
+      let rpcPayload;
+      if (!isNewQuery && !hasOverride && appliedRpcPayloadRef.current) {
+        rpcPayload = appliedRpcPayloadRef.current;
+      } else {
+        rpcPayload = buildRpcPayload(resolveSearchRpcFilters(filtersOverride, filterState, queryOverride));
+        appliedRpcPayloadRef.current = rpcPayload;
+        setAppliedRpcPayload(rpcPayload);
+      }
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError('');
       measureSearchStart();
       try {
-        const rpcName = filters.q ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
+        const rpcName = rpcPayload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
         const searchPromise = supabase.rpc(rpcName, {
           ...rpcPayload,
           limit_n: PAGE_SIZE,
@@ -157,6 +171,7 @@ export function useDashboardSearch({ userId }) {
         });
         const countPromise = supabase.rpc('count_knowledge_objects', rpcPayload);
         const [{ data, error: err }, countRes] = await Promise.all([searchPromise, countPromise]);
+        if (requestId !== requestIdRef.current) return;
         if (err) throw err;
         const list = data || [];
         const currentPage = Math.floor(nextOffset / PAGE_SIZE) + 1;
@@ -187,6 +202,7 @@ export function useDashboardSearch({ userId }) {
           }
         }
       } catch (e) {
+        if (requestId !== requestIdRef.current) return;
         setError(getErrorMessage(e, 'Search failed'));
         if (isNewQuery) {
           setObjects([]);
@@ -194,7 +210,7 @@ export function useDashboardSearch({ userId }) {
         }
       } finally {
         measureSearchEnd();
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
     },
     [userId, filterState]
@@ -332,5 +348,6 @@ export function useDashboardSearch({ userId }) {
     resumeObject,
     createEmptyFiltersOverride,
     filterState,
+    appliedRpcPayload,
   };
 }
