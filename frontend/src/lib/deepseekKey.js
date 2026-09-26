@@ -33,6 +33,9 @@ export function validateDeepSeekApiKey(raw) {
         'DeepSeek API keys start with sk-. Copy yours from platform.deepseek.com/api_keys — do not use OpenAI or Supabase keys.',
     };
   }
+  if (key.startsWith('sk-ant-')) {
+    return { ok: false, message: 'This is a Claude (Anthropic) key. Choose Claude as the provider instead.' };
+  }
   return { ok: true, key };
 }
 

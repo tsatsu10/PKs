@@ -100,17 +100,32 @@ export const AUDIT_ACTION_LIST = [
 /** SessionStorage key for "use prompt on object" flow from Prompt Bank */
 export const RUN_PROMPT_STORAGE_KEY = 'pks_run_prompt_template';
 
-/** Only DeepSeek is supported for Run prompt (must match supabase/functions/run-prompt). */
-export const AI_PROVIDER = 'deepseek';
+/** Run prompt providers (must match PROVIDERS in supabase/functions/run-prompt). */
+export const AI_PROVIDERS = [
+  { id: 'deepseek', label: 'DeepSeek', keyPlaceholder: 'sk-… (from platform.deepseek.com/api_keys)' },
+  { id: 'anthropic', label: 'Claude', keyPlaceholder: 'sk-ant-… (from console.anthropic.com)' },
+];
 
-export const DEFAULT_AI_MODEL = 'deepseek-chat';
+export const AI_PROVIDER_IDS = AI_PROVIDERS.map((p) => p.id);
+
+export const DEFAULT_AI_PROVIDER = 'deepseek';
 
 /**
  * AI/LLM models for "Run prompt".
  */
 export const AI_MODELS = [
-  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: AI_PROVIDER },
-  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: AI_PROVIDER },
+  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: 'deepseek' },
+  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: 'deepseek' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic' },
 ];
 
-export const DEEPSEEK_MODEL_IDS = AI_MODELS.map((m) => m.id);
+export const DEFAULT_AI_MODEL_BY_PROVIDER = {
+  deepseek: 'deepseek-chat',
+  anthropic: 'claude-opus-5',
+};
+
+export const DEFAULT_AI_MODEL = DEFAULT_AI_MODEL_BY_PROVIDER[DEFAULT_AI_PROVIDER];
+
+export function aiProviderLabel(providerId) {
+  return AI_PROVIDERS.find((p) => p.id === providerId)?.label ?? providerId;
+}

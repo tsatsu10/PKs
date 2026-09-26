@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
-import { AI_PROVIDER } from '../constants';
-import { validateDeepSeekApiKey } from '../lib/deepseekKey';
+import { AI_PROVIDERS, AI_PROVIDER_IDS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
+import { validateApiKeyForProvider } from '../lib/aiProviders';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
@@ -34,6 +34,7 @@ export default function Settings() {
   const [aiProviders, setAiProviders] = useState([]);
   const [aiProviderName, setAiProviderName] = useState('');
   const [aiProviderKey, setAiProviderKey] = useState('');
+  const [aiProviderType, setAiProviderType] = useState(DEFAULT_AI_PROVIDER);
   const [addingAiProvider, setAddingAiProvider] = useState(false);
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileTimezone, setProfileTimezone] = useState('');
@@ -147,7 +148,7 @@ export default function Settings() {
       const [dRes, tRes, pRes] = await Promise.all([
         supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
         supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).eq('provider_type', AI_PROVIDER).order('name'),
+        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).in('provider_type', AI_PROVIDER_IDS).order('name'),
       ]);
       if (cancelled) return;
       setDomains(dRes.data || []);
@@ -232,7 +233,7 @@ export default function Settings() {
   async function addAiProvider(e) {
     e.preventDefault();
     const name = aiProviderName.trim();
-    const keyCheck = validateDeepSeekApiKey(aiProviderKey);
+    const keyCheck = validateApiKeyForProvider(aiProviderType, aiProviderKey);
     if (!name) return;
     if (!keyCheck.ok) {
       setError(keyCheck.message);
@@ -244,7 +245,7 @@ export default function Settings() {
       const { error: err } = await supabase.from('user_ai_providers').insert({
         user_id: user.id,
         name,
-        provider_type: AI_PROVIDER,
+        provider_type: aiProviderType,
         api_key: keyCheck.key,
       });
       if (err) throw err;
@@ -254,7 +255,7 @@ export default function Settings() {
         .from('user_ai_providers')
         .select('id, name, provider_type')
         .eq('user_id', user.id)
-        .eq('provider_type', AI_PROVIDER)
+        .in('provider_type', AI_PROVIDER_IDS)
         .order('name');
       if (refetchErr && import.meta.env.DEV) console.warn('AI providers refetch failed:', refetchErr);
       setAiProviders(data || []);
@@ -594,13 +595,23 @@ export default function Settings() {
 
       <section className="settings-section page-section">
         <h2 className="page-section-title">AI API keys</h2>
-        <p className="settings-desc page-section-desc">Add your own DeepSeek API key and give it a name. You can then choose it in the Run prompt dropdown instead of the server default.</p>
+        <p className="settings-desc page-section-desc">Add your own DeepSeek or Claude API key and give it a name. You can then choose it in the Run prompt dropdown instead of the server default. Keys are write-only: they can't be read back, only removed.</p>
         <form onSubmit={addAiProvider} className="settings-form form">
+          <select
+            value={aiProviderType}
+            onChange={(e) => setAiProviderType(e.target.value)}
+            disabled={addingAiProvider}
+            aria-label="Provider"
+          >
+            {AI_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
           <input
             type="text"
             value={aiProviderName}
             onChange={(e) => setAiProviderName(e.target.value)}
-            placeholder="e.g. My DeepSeek"
+            placeholder={`e.g. My ${aiProviderLabel(aiProviderType)}`}
             disabled={addingAiProvider}
             aria-label="Provider name"
           />
@@ -608,7 +619,7 @@ export default function Settings() {
             type="password"
             value={aiProviderKey}
             onChange={(e) => setAiProviderKey(e.target.value)}
-            placeholder="sk-… (from platform.deepseek.com/api_keys)"
+            placeholder={AI_PROVIDERS.find((p) => p.id === aiProviderType)?.keyPlaceholder}
             disabled={addingAiProvider}
             autoComplete="off"
             aria-label="API key"
@@ -620,7 +631,7 @@ export default function Settings() {
         <ul className="settings-list">
           {aiProviders.map((p) => (
             <li key={p.id}>
-              <span><strong>{p.name}</strong> (DeepSeek)</span>
+              <span><strong>{p.name}</strong> ({aiProviderLabel(p.provider_type)})</span>
               <button
                 type="button"
                 className="btn btn-small btn-danger"

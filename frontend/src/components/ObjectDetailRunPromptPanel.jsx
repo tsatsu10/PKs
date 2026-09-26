@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { AI_MODELS, DEFAULT_AI_MODEL } from '../constants';
+import { AI_PROVIDERS, aiProviderLabel } from '../constants';
+import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection } from '../lib/aiProviders';
 
 /**
  * Run prompt overlay: source, template, prompt, provider (default or user's API), model, context, generate, output.
@@ -33,13 +34,13 @@ export default function ObjectDetailRunPromptPanel({
   onSaveOutputAsObject,
   onClose,
 }) {
-  const allowedModels = AI_MODELS;
-  const modelInAllowed = allowedModels.some((m) => m.id === runAiModel);
-  const effectiveModel = modelInAllowed ? runAiModel : (allowedModels[0]?.id ?? DEFAULT_AI_MODEL);
+  const { provider } = resolveRunSelection(runAiProviderId, aiProviders);
+  const allowedModels = modelsForProvider(provider);
+  const effectiveModel = modelForProvider(provider, runAiModel);
 
   useEffect(() => {
-    if (!modelInAllowed && allowedModels[0]) setRunAiModel(allowedModels[0].id);
-  }, [modelInAllowed, allowedModels, setRunAiModel]);
+    if (effectiveModel && effectiveModel !== runAiModel) setRunAiModel(effectiveModel);
+  }, [effectiveModel, runAiModel, setRunAiModel]);
 
   const syncTemplateText = () => {
     if (runTemplateId) {
@@ -52,10 +53,11 @@ export default function ObjectDetailRunPromptPanel({
   const objectTitle = object?.title?.trim() || 'Untitled';
   const objectType = object?.type || 'note';
 
-  const handleProviderChange = (providerId) => {
-    const id = providerId === '' ? null : providerId;
-    setRunAiProviderId(id);
-    if (!AI_MODELS.some((m) => m.id === runAiModel)) setRunAiModel(DEFAULT_AI_MODEL);
+  const handleProviderChange = (selection) => {
+    const next = selection === '' ? null : selection;
+    setRunAiProviderId(next);
+    const nextProvider = resolveRunSelection(next, aiProviders).provider;
+    setRunAiModel(modelForProvider(nextProvider, runAiModel));
   };
 
   return (
@@ -181,9 +183,13 @@ export default function ObjectDetailRunPromptPanel({
               className="run-prompt-template-select"
               aria-label="AI provider"
             >
-              <option value="">Default (server DeepSeek key)</option>
+              {AI_PROVIDERS.map((p, i) => (
+                <option key={p.id} value={i === 0 ? '' : serverSelection(p.id)}>
+                  Default (server {p.label} key)
+                </option>
+              ))}
               {aiProviders.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.name} ({aiProviderLabel(p.provider_type)})</option>
               ))}
             </select>
           </div>

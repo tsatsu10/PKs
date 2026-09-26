@@ -16,9 +16,10 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER, formatObjectTypeLabel } from '../constants';
+import { OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER_IDS, formatObjectTypeLabel } from '../constants';
 import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
+import { resolveRunSelection, modelForProvider, isServerSelection } from '../lib/aiProviders';
 import { getErrorMessage } from '../lib/errors';
 import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
@@ -216,7 +217,7 @@ export default function ObjectDetail() {
         .from('user_ai_providers')
         .select('id, name, provider_type')
         .eq('user_id', user.id)
-        .eq('provider_type', AI_PROVIDER)
+        .in('provider_type', AI_PROVIDER_IDS)
         .order('name');
       if (cancelled) return;
       if (err && import.meta.env.DEV) console.warn('Failed to load AI providers:', err);
@@ -227,7 +228,7 @@ export default function ObjectDetail() {
 
   // Clear provider selection if the selected provider was removed (e.g. in another tab)
   useEffect(() => {
-    if (runAiProviderId && aiProviders.length > 0 && !aiProviders.some((p) => p.id === runAiProviderId)) {
+    if (!isServerSelection(runAiProviderId) && aiProviders.length > 0 && !aiProviders.some((p) => p.id === runAiProviderId)) {
       setRunAiProviderId(null);
     }
   }, [runAiProviderId, aiProviders]);
@@ -665,13 +666,15 @@ export default function ObjectDetail() {
       if (insertErr) throw insertErr;
       runId = runRow?.id;
 
+      const { provider, userProviderId } = resolveRunSelection(runAiProviderId, aiProviders);
       const { data, error: fnErr } = await supabase.functions.invoke('run-prompt', {
         body: {
           promptText: promptToUse,
           objectTitle: object.title,
           objectContent: object.content || '',
-          model: runAiModel || DEFAULT_AI_MODEL,
-          user_provider_id: runAiProviderId || undefined,
+          provider,
+          model: modelForProvider(provider, runAiModel || DEFAULT_AI_MODEL),
+          user_provider_id: userProviderId || undefined,
         },
       });
       if (fnErr) {

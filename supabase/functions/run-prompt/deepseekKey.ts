@@ -31,6 +31,13 @@ export function validateDeepSeekApiKey(raw: string): { ok: true; key: string } |
         "DeepSeek API keys start with sk-. Do not use OpenAI keys or Supabase anon/service keys in DEEPSEEK_API_KEY.",
     };
   }
+  if (key.startsWith("sk-ant-")) {
+    return {
+      ok: false,
+      code: "INVALID_DEEPSEEK_API_KEY",
+      hint: "This is a Claude (Anthropic) key. Save it as a Claude key in Settings → AI API keys.",
+    };
+  }
   return { ok: true, key };
 }
 
