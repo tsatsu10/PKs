@@ -13,6 +13,9 @@ const corsHeaders = {
 };
 
 const RATE_LIMIT_PER_MINUTE = 20;
+// Daily cap per user on the shared server key (users with their own key are not capped).
+const SERVER_KEY_DAILY_LIMIT = Number(Deno.env.get("SERVER_KEY_DAILY_LIMIT") ?? "50") || 50;
+const UPSTREAM_TIMEOUT_MS = 60_000;
 const MAX_PROMPT_TEXT = 16_384;
 const MAX_OBJECT_TITLE = 200;
 const MAX_OBJECT_CONTENT = 50_000;
@@ -97,8 +100,17 @@ Deno.serve(async (req) => {
 
     let apiKey: string;
 
+    const usingServerKey = !userProviderId;
+
     if (userProviderId) {
-      const { data: providerRow, error: providerErr } = await supabase
+      // api_key has no SELECT grant for app users; read it with the service role, scoped to the
+      // already-verified caller.
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false } }
+      );
+      const { data: providerRow, error: providerErr } = await admin
         .from("user_ai_providers")
         .select("api_key, provider_type")
         .eq("id", userProviderId)
@@ -134,6 +146,20 @@ Deno.serve(async (req) => {
             hint: "Set DEEPSEEK_API_KEY in Edge Function Secrets or add your own DeepSeek key in Settings.",
           }),
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { data: quota, error: quotaErr } = await supabase.rpc("consume_server_key_quota", {
+        p_daily_limit: SERVER_KEY_DAILY_LIMIT,
+      });
+      const q = quota as { limited?: boolean } | null;
+      if (quotaErr || q?.limited !== false) {
+        return new Response(
+          JSON.stringify({
+            error: "Daily limit reached",
+            code: "SERVER_KEY_QUOTA",
+            hint: `The shared AI key allows ${SERVER_KEY_DAILY_LIMIT} runs per day. Add your own DeepSeek key in Settings → AI API keys to keep going.`,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       apiKey = deepseekKey;
@@ -184,7 +210,18 @@ Deno.serve(async (req) => {
         messages: [{ role: "user", content: userMessage }],
         max_tokens: 4096,
       }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    }).catch((e) => {
+      if (e instanceof DOMException && e.name === "TimeoutError") return null;
+      throw e;
     });
+
+    if (!res) {
+      return new Response(
+        JSON.stringify({ error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." }),
+        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!res.ok) {
       let upstreamCode = "DEEPSEEK_ERROR";
@@ -203,6 +240,14 @@ Deno.serve(async (req) => {
           upstreamCode;
       } catch {
         /* ignore parse errors */
+      }
+      if (usingServerKey) {
+        // Upstream errors for the shared key can echo key fragments or config details; keep them server-side.
+        console.error("DeepSeek error (server key)", res.status, upstreamCode, upstreamMessage);
+        return new Response(
+          JSON.stringify({ error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       const hint = hintForDeepSeekAuthCode(String(upstreamCode)) || upstreamMessage ||
         "Check your DeepSeek API key in Settings → AI API keys, or DEEPSEEK_API_KEY in Edge Function secrets.";
