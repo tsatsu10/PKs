@@ -19,3 +19,27 @@ export const supabase =
   (globalThis[GLOBAL_KEY] = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { lock: noOpLock },
   }));
+
+// Password recovery: /reset-password may only change the password when this tab arrived via a
+// recovery link, not merely because some session exists. Detect it at module load so the
+// PASSWORD_RECOVERY event (fired while the client initializes) is never missed.
+const PASSWORD_RECOVERY_KEY = 'pks-password-recovery';
+
+function markPasswordRecovery() {
+  try { sessionStorage.setItem(PASSWORD_RECOVERY_KEY, '1'); } catch { /* ignore */ }
+}
+
+export function isPasswordRecovery() {
+  try { return sessionStorage.getItem(PASSWORD_RECOVERY_KEY) === '1'; } catch { return false; }
+}
+
+export function clearPasswordRecovery() {
+  try { sessionStorage.removeItem(PASSWORD_RECOVERY_KEY); } catch { /* ignore */ }
+}
+
+if (typeof window !== 'undefined' && /(?:^|[#&?])type=recovery(?:&|$)/.test(window.location.hash + window.location.search)) {
+  markPasswordRecovery();
+}
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') markPasswordRecovery();
+});

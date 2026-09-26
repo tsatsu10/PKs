@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -24,14 +25,27 @@ async function fetchProfile(userId) {
   return data;
 }
 
-/** Verify JWT with server and load profile (parallel). */
+/**
+ * Verify JWT with server and load profile (parallel).
+ * Returns the mapped user, `null` when the server rejected the session, or
+ * `undefined` when it couldn't be checked (offline, network error, Supabase down).
+ */
 async function verifyAndEnrichUser(session) {
   if (!session?.user) return null;
-  const [{ data: { user: verifiedUser }, error: userError }, profile] = await Promise.all([
-    supabase.auth.getUser(),
-    fetchProfile(session.user.id).catch(() => null),
-  ]);
-  if (userError || !verifiedUser) return null;
+  let result;
+  try {
+    result = await Promise.all([
+      supabase.auth.getUser(),
+      fetchProfile(session.user.id).catch(() => null),
+    ]);
+  } catch {
+    return undefined;
+  }
+  const [{ data: { user: verifiedUser }, error: userError }, profile] = result;
+  if (userError) {
+    return isAuthApiError(userError) || isAuthSessionMissingError(userError) ? null : undefined;
+  }
+  if (!verifiedUser) return null;
   return mapUser(verifiedUser, profile);
 }
 
@@ -85,9 +99,10 @@ export function AuthProvider({ children }) {
         if (mapped) {
           setUser(mapped);
           setHasValidSession(true);
-        } else {
+        } else if (mapped === null) {
           clearAuthenticated(true);
         }
+        // undefined: couldn't reach the server; keep the stored session rather than logging out.
       });
     };
 

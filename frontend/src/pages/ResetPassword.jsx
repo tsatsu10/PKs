@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, isPasswordRecovery, clearPasswordRecovery } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
 import './Auth.css';
@@ -16,7 +16,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session?.user);
+      setHasSession(!!session?.user && isPasswordRecovery());
     }).catch(() => setHasSession(false));
   }, []);
 
@@ -35,6 +35,7 @@ export default function ResetPassword() {
     try {
       const { error: err } = await supabase.auth.updateUser({ password });
       if (err) throw err;
+      clearPasswordRecovery();
       setDone(true);
       setTimeout(() => navigate('/', { replace: true }), 2000);
     } catch (err) {
