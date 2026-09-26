@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useLinkedObjectsOptional } from '../context/LinkedObjectsContext';
+import { useLinkedObjectsOptional } from '../context/linkedObjectsHooks';
 
 /**
  * Register a list row with the linked-objects batch loader when it enters the viewport.

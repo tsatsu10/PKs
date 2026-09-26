@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { getErrorMessage } from '../lib/errors';
@@ -100,17 +100,20 @@ export function useDashboardSearch({ userId }) {
   const [tags, setTags] = useState([]);
   const [resumeObject, setResumeObject] = useState(null);
 
-  const filterState = {
-    searchQuery,
-    typeFilter,
-    statusFilter,
-    domainFilter,
-    tagFilter,
-    dateFrom,
-    dateTo,
-    dueFrom,
-    dueTo,
-  };
+  const filterState = useMemo(
+    () => ({
+      searchQuery,
+      typeFilter,
+      statusFilter,
+      domainFilter,
+      tagFilter,
+      dateFrom,
+      dateTo,
+      dueFrom,
+      dueTo,
+    }),
+    [searchQuery, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]
+  );
 
   const refreshDomains = useCallback(async () => {
     if (!userId) return;
@@ -194,7 +197,7 @@ export function useDashboardSearch({ userId }) {
         setLoading(false);
       }
     },
-    [userId, searchQuery, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]
+    [userId, filterState]
   );
 
   const goToPage = useCallback(

@@ -194,6 +194,14 @@ export function useDashboardPage() {
       dueTo,
       domains,
       tags,
+      setTypeFilter,
+      setStatusFilter,
+      setDomainFilter,
+      setTagFilter,
+      setDateFrom,
+      setDateTo,
+      setDueFrom,
+      setDueTo,
       runSearch,
       searchQuery,
     ]
@@ -205,11 +213,12 @@ export function useDashboardPage() {
     setQuickAddContent('');
   }, []);
 
+  const clearBulkSelection = bulk.clearSelection;
   const handlePageChange = useCallback((nextPage) => {
     goToPage(nextPage);
-    bulk.clearSelection();
+    clearBulkSelection();
     listScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [goToPage, bulk.clearSelection]);
+  }, [goToPage, clearBulkSelection]);
 
   const keyboard = useDashboardKeyboard({
     navigate,

@@ -6,7 +6,6 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
-import { formatObjectTypeLabel } from '../constants';
 import TypeMark from '../components/TypeMark';
 import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';

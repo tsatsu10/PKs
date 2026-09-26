@@ -67,6 +67,9 @@ export function usePulseCelebration(values, targets, loading) {
 
       if (complete && !wasComplete && !celebratedToday(ring)) {
         markCelebratedToday(ring);
+        // One-shot animation trigger in response to new pulse data; not derivable during render
+        // because it also persists "celebrated today" to localStorage.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCelebrateRing(ring);
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => setCelebrateRing(null), CELEBRATE_MS);

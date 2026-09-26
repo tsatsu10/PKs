@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { formatObjectTypeLabel } from '../constants';
 import TypeMark from '../components/TypeMark';
 import { SkeletonList } from '../components/Skeleton';
 import './Trash.css';

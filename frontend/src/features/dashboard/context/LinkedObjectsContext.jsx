@@ -1,7 +1,6 @@
-import { createContext, useContext, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useObjectLinksBatch } from '../hooks/useObjectLinksBatch';
-
-const LinkedObjectsContext = createContext(null);
+import { LinkedObjectsContext } from './linkedObjectsHooks';
 
 export function LinkedObjectsProvider({ userId, scrollRootRef, children }) {
   const { registerVisible, getLinksFor } = useObjectLinksBatch(userId);
@@ -16,17 +15,4 @@ export function LinkedObjectsProvider({ userId, scrollRootRef, children }) {
       {children}
     </LinkedObjectsContext.Provider>
   );
-}
-
-export function useLinkedObjects() {
-  const ctx = useContext(LinkedObjectsContext);
-  if (!ctx) {
-    throw new Error('useLinkedObjects must be used within LinkedObjectsProvider');
-  }
-  return ctx;
-}
-
-/** Optional hook for rows outside provider (returns no-op). */
-export function useLinkedObjectsOptional() {
-  return useContext(LinkedObjectsContext);
 }

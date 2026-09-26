@@ -19,7 +19,7 @@ import DashboardModals from './DashboardModals';
 
 export default function DashboardView(props) {
   const {
-    user, navigate, location, loading, error, objects, searchQuery, setSearchQuery,
+    user, navigate, loading, error, objects, searchQuery, setSearchQuery,
     typeFilter, setTypeFilter, statusFilter, setStatusFilter, domainFilter, setDomainFilter,
     tagFilter, setTagFilter, dateFrom, setDateFrom, dateTo, setDateTo, dueFrom, setDueFrom,
     dueTo, setDueTo, runSearch, clearFilters, domains, tags, createDomainInline, createTagInline,
@@ -43,7 +43,7 @@ export default function DashboardView(props) {
     toggleSelect, selectAllOnPage, clearSelection, handleQuickAddCreate, handleExportSelected,
     bulkAddDomain, bulkAddTag, bulkRemoveDomain, bulkRemoveTag, bulkDelete, bulkChangeType,
     bulkSetStatus, dismissOnboarding, saveCurrentFilters, applySavedFilter, deleteSavedFilter,
-    showBanner, bannerKind, showOnboarding
+    showBanner, bannerKind
   } = props;
 
   return (

@@ -1,3 +1,5 @@
+import { useLayoutEffect } from 'react';
+
 /**
  * Cmd/Ctrl+K command palette overlay.
  */
@@ -14,8 +16,6 @@ export default function DashboardCommandPalette({
   objects,
   navigate,
 }) {
-  if (!open) return null;
-
   const q = query.trim().toLowerCase();
   const actions = [
     { id: 'new', label: 'New object', run: () => { onClose(); navigate('/objects/new'); } },
@@ -29,8 +29,16 @@ export default function DashboardCommandPalette({
     })),
   ];
   const filtered = q ? actions.filter((a) => a.label.toLowerCase().includes(q)) : actions;
-  filteredLengthRef.current = filtered.length;
-  actionsRef.current = filtered;
+
+  // Expose the visible actions to the keyboard handler after commit, not during render.
+  useLayoutEffect(() => {
+    if (!open) return;
+    filteredLengthRef.current = filtered.length;
+    actionsRef.current = filtered;
+  });
+
+  if (!open) return null;
+
   const selected = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
 
   return (

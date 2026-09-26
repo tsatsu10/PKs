@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
-import { useLinkedObjectsOptional } from '../../context/LinkedObjectsContext';
+import { useLinkedObjectsOptional } from '../../context/linkedObjectsHooks';
 import './LinkedBar.css';
 
 function truncateTitle(title, max = 14) {

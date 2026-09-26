@@ -8,7 +8,9 @@ const FETCH_DEBOUNCE_MS = 120;
  * @param {string | null} userId
  */
 export function useObjectLinksBatch(userId) {
-  const [linksByObject, setLinksByObject] = useState(/** @type {Record<string, { links: object[], total: number }>} */ ({}));
+  // Keyed by userId so a user switch never serves the previous user's links.
+  const [linksState, setLinksState] = useState(/** @type {{ userId: string | null, map: Record<string, { links: object[], total: number }> }} */ ({ userId: null, map: {} }));
+  const activeUserRef = useRef(userId);
   const pendingIdsRef = useRef(new Set());
   const visibleIdsRef = useRef(new Set());
   const timerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
@@ -24,7 +26,7 @@ export function useObjectLinksBatch(userId) {
       p_limit_per: 3,
     });
 
-    if (error || !data) return;
+    if (error || !data || activeUserRef.current !== userId) return;
 
     const next = { ...cacheRef.current };
     for (const id of ids) {
@@ -34,7 +36,7 @@ export function useObjectLinksBatch(userId) {
         : { links: [], total: 0 };
     }
     cacheRef.current = next;
-    setLinksByObject({ ...next });
+    setLinksState({ userId, map: { ...next } });
   }, [userId]);
 
   const scheduleFetch = useCallback(() => {
@@ -58,7 +60,9 @@ export function useObjectLinksBatch(userId) {
     }
   }, [scheduleFetch]);
 
+  const linksByObject = linksState.userId === userId ? linksState.map : null;
   const getLinksFor = useCallback((objectId) => {
+    if (!linksByObject) return null;
     return linksByObject[objectId] ?? cacheRef.current[objectId] ?? null;
   }, [linksByObject]);
 
@@ -67,10 +71,10 @@ export function useObjectLinksBatch(userId) {
   }, []);
 
   useEffect(() => {
+    activeUserRef.current = userId;
     cacheRef.current = {};
     pendingIdsRef.current.clear();
     visibleIdsRef.current.clear();
-    setLinksByObject({});
   }, [userId]);
 
   return { registerVisible, getLinksFor };

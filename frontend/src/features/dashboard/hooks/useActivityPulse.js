@@ -14,36 +14,29 @@ const EMPTY_ACTIVITY = {
  * @param {string | null} userId
  */
 export function useActivityPulse(userId) {
-  const [activity, setActivity] = useState(EMPTY_ACTIVITY);
-  const [loading, setLoading] = useState(true);
+  // Keyed by userId: loading is derived as "no result yet for this user".
+  const [result, setResult] = useState({ userId: null, activity: EMPTY_ACTIVITY });
 
   useEffect(() => {
-    if (!userId) {
-      setActivity(EMPTY_ACTIVITY);
-      setLoading(false);
-      return;
-    }
+    if (!userId) return;
 
     let cancelled = false;
     const cancelDefer = deferAfterPaint(() => {
       (async () => {
-        setLoading(true);
         const { data, error } = await supabase.rpc('get_dashboard_activity');
         if (cancelled) return;
 
         if (error || !data) {
-          setActivity(EMPTY_ACTIVITY);
-          setLoading(false);
+          setResult({ userId, activity: EMPTY_ACTIVITY });
           return;
         }
 
-        setActivity({
+        setResult({ userId, activity: {
           capture7d: Array.isArray(data.capture_7d) ? data.capture_7d : [],
           tend7d: Array.isArray(data.tend_7d) ? data.tend_7d : [],
           trendingTags: Array.isArray(data.trending_tags) ? data.trending_tags : [],
           recentLinks: Array.isArray(data.recent_links) ? data.recent_links : [],
-        });
-        setLoading(false);
+        } });
       })();
     });
 
@@ -53,5 +46,7 @@ export function useActivityPulse(userId) {
     };
   }, [userId]);
 
-  return { activity, loading };
+  if (!userId) return { activity: EMPTY_ACTIVITY, loading: false };
+  const loaded = result.userId === userId;
+  return { activity: loaded ? result.activity : EMPTY_ACTIVITY, loading: !loaded };
 }

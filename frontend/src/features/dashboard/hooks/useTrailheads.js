@@ -7,20 +7,15 @@ import { deferAfterPaint } from '../../../lib/defer';
  * @param {{ userId: string | null, resumeObject: { id: string, title: string } | null }} options
  */
 export function useTrailheads({ userId, resumeObject }) {
-  const [pendingObject, setPendingObject] = useState(null);
-  const [sparkObject, setSparkObject] = useState(null);
+  // Keyed by userId so a user switch never shows the previous user's trailheads.
+  const [trailheads, setTrailheads] = useState({ userId: null, pending: null, spark: null });
 
   useEffect(() => {
-    if (!userId) {
-      setPendingObject(null);
-      setSparkObject(null);
-      return;
-    }
+    if (!userId) return;
 
     let cancelled = false;
     const cancelDefer = deferAfterPaint(() => {
       (async () => {
-        const nowIso = new Date().toISOString();
         const [pendingRes, sparkRes] = await Promise.all([
           supabase
             .from('knowledge_objects')
@@ -47,14 +42,17 @@ export function useTrailheads({ userId, resumeObject }) {
           if (!o.due_at) return false;
           return true;
         });
-        setPendingObject(pendingList[0] ?? null);
 
         const sparkCandidates = (sparkRes.data || []).filter((o) => {
           if (resumeObject?.id === o.id) return false;
           if (pendingList.some((p) => p.id === o.id)) return false;
           return true;
         });
-        setSparkObject(sparkCandidates[0] ?? null);
+        setTrailheads({
+          userId,
+          pending: pendingList[0] ?? null,
+          spark: sparkCandidates[0] ?? null,
+        });
       })();
     });
 
@@ -64,5 +62,10 @@ export function useTrailheads({ userId, resumeObject }) {
     };
   }, [userId, resumeObject?.id]);
 
-  return { resumeObject, pendingObject, sparkObject };
+  const current = userId && trailheads.userId === userId ? trailheads : null;
+  return {
+    resumeObject,
+    pendingObject: current?.pending ?? null,
+    sparkObject: current?.spark ?? null,
+  };
 }
