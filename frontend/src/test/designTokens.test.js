@@ -81,6 +81,13 @@ describe('stylesheet hygiene', () => {
     const offenders = allCss.filter(({ text }) => /@media[^{]*var\(/.test(text)).map(({ file }) => file.slice(SRC.length + 1));
     expect(offenders).toEqual([]);
   });
+  it('no rule pairs the low-contrast accent gradient with a text color', () => {
+    const offenders = allCss.flatMap(({ file, text }) =>
+      [...text.matchAll(/([^{}]*)\{([^}]*)\}/g)]
+        .filter((m) => /var\(--accent-gradient\)/.test(m[2]) && /(?:^|[^-])color:/.test(m[2]))
+        .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
+    expect(offenders).toEqual([]);
+  });
 });
 
 describe('mobile shell', () => {

@@ -9,13 +9,13 @@ Fixes for the gaps found by the post-merge audit of Phase −1A (2026-09-27). Br
 ## Todo
 
 ### Group A: mobile layout, contrast, drawer focus
-- [ ] A1 Bottom nav on notched iPhones: `.app-layout-bottom-nav` height becomes `calc(56px + env(safe-area-inset-bottom, 0px))` so the 44px links fit (`AppLayout.css`).
-- [ ] A2 Contrast: the Auth submit button, dashboard FAB, active pagination page, error-boundary button and any other rule pairing `--accent-gradient` with light text use `--accent-strong-start/end` + `--on-accent` (`Auth.css`, `Dashboard.css`, `App.css`).
-- [ ] A3 Widen `designTokens.test.js`: any rule that sets `background: var(--accent-gradient)` together with a text colour fails.
-- [ ] A4 M7 remnant: `.app-layout-sidebar-collapsed` rules apply only on desktop (≥769px), so the mobile drawer shows headings and left-aligned links.
-- [ ] A5 Activity drawer (`Dashboard.css`, `bottom: 0`) sits above the bottom nav on mobile via `--mobile-nav-offset`.
-- [ ] A6 `.update-prompt` is full-width-capped on phones (the `max-width` was ineffective with `left: 50%`).
-- [ ] A7 A4 focus: opening the mobile drawer moves focus into it; closing returns focus to the menu button.
+- [x] A1 Bottom nav on notched iPhones: `.app-layout-bottom-nav` height becomes `calc(56px + env(safe-area-inset-bottom, 0px))` so the 44px links fit (`AppLayout.css`).
+- [x] A2 Contrast: the Auth submit button, dashboard FAB, active pagination page, error-boundary button and any other rule pairing `--accent-gradient` with light text use `--accent-strong-start/end` + `--on-accent` (`Auth.css`, `Dashboard.css`, `App.css`).
+- [x] A3 Widen `designTokens.test.js`: any rule that sets `background: var(--accent-gradient)` together with a text colour fails.
+- [x] A4 M7 remnant: `.app-layout-sidebar-collapsed` rules apply only on desktop (≥769px), so the mobile drawer shows headings and left-aligned links.
+- [x] A5 Activity drawer (`Dashboard.css`, `bottom: 0`) sits above the bottom nav on mobile via `--mobile-nav-offset`.
+- [x] A6 `.update-prompt` is full-width-capped on phones (the `max-width` was ineffective with `left: 50%`).
+- [x] A7 A4 focus: opening the mobile drawer moves focus into it; closing returns focus to the menu button.
 
 ### Group B: object pages and copy
 - [ ] B1 B7: owners see one "Run prompt" button on ObjectDetail, not two.

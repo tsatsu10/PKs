@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -20,6 +20,19 @@ export default function AppLayout({ children }) {
   const { pathname } = location;
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const isMobile = useIsMobile(768);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarRef = useRef(null);
+  const menuBtnRef = useRef(null);
+  const mobileMenuOpenedRef = useRef(false);
+  const focusWasInDrawerRef = useRef(false);
+
+  const closeMobileMenu = () => {
+    const active = document.activeElement;
+    focusWasInDrawerRef.current = !!(active && sidebarRef.current?.contains(active));
+    setMobileMenuOpen(false);
+  };
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -49,10 +62,13 @@ export default function AppLayout({ children }) {
         e.preventDefault();
         setShortcutsOpen(true);
       }
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        closeMobileMenu();
+      }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate, pathname]);
+  }, [navigate, pathname, mobileMenuOpen]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -62,10 +78,25 @@ export default function AppLayout({ children }) {
     }
   });
 
-  const isMobile = useIsMobile(768);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // The mobile drawer always shows labels, even if the desktop sidebar is collapsed.
   const showLabels = !collapsed || isMobile;
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (mobileMenuOpen) {
+      mobileMenuOpenedRef.current = true;
+      const focusable = sidebarRef.current?.querySelector(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      focusable?.focus();
+    } else if (mobileMenuOpenedRef.current) {
+      mobileMenuOpenedRef.current = false;
+      if (focusWasInDrawerRef.current) {
+        menuBtnRef.current?.focus();
+      }
+      focusWasInDrawerRef.current = false;
+    }
+  }, [mobileMenuOpen, isMobile]);
 
   useEffect(() => {
     try {
@@ -77,11 +108,9 @@ export default function AppLayout({ children }) {
     queueMicrotask(() => setMobileMenuOpen(false));
   }, [location.pathname]);
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
-
   return (
     <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''}`}>
-      <aside className="app-layout-sidebar" aria-label="Main navigation" inert={isMobile && !mobileMenuOpen}>
+      <aside ref={sidebarRef} className="app-layout-sidebar" aria-label="Main navigation" inert={isMobile && !mobileMenuOpen}>
         <div className="app-layout-sidebar-top">
           <button
             type="button"
@@ -184,6 +213,7 @@ export default function AppLayout({ children }) {
       <main className="app-layout-main" id="main-content" role="main">
         <div className="app-layout-mobile-header">
           <button
+            ref={menuBtnRef}
             type="button"
             className="app-layout-mobile-menu-btn"
             aria-label="Open menu"
