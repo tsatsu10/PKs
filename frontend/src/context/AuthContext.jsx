@@ -10,7 +10,7 @@ import {
   readExplicitLogoutMark,
   clearExplicitLogoutMark,
 } from '../lib/authEvents';
-import { clearUserData, clearOrphanedLocalData } from '../lib/userStorage';
+import { clearUserData, clearOrphanedLocalData, claimUserData } from '../lib/userStorage';
 
 const AuthContext = createContext(null);
 
@@ -107,8 +107,8 @@ export function AuthProvider({ children }) {
       // Invalidate any in-flight verify so it can't bring the user back.
       ++verifyGenerationRef.current;
       verifyInFlightRef.current = false;
-      // Session expiry and a logout in another tab end here, not in logout().
-      clearUserData();
+      // Per-user data is NOT cleared here: on expiry the user may be mid-edit.
+      // It stays owned by them; claimUserData drops it if someone else signs in.
       setUser(null);
       setHasValidSession(false);
     };
@@ -118,6 +118,7 @@ export function AuthProvider({ children }) {
     const endSession = () => {
       const kind = resolveSignOut(hadUserRef.current, readExplicitLogoutMark(), Date.now());
       if (kind === 'logout') {
+        clearUserData();
         clearAuthenticated(false);
         setExplicitLogout(true);
       } else {
@@ -155,6 +156,8 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      // A different user than the one whose data is stored: drop it before any page reads it.
+      claimUserData(session.user.id);
       hadUserRef.current = true;
       sessionUserIdRef.current = session.user.id;
       setEnriched(false);
@@ -238,6 +241,7 @@ export function AuthProvider({ children }) {
     clearExplicitLogoutMark();
     hadUserRef.current = true;
     const userId = session.user?.id ?? userData?.id ?? null;
+    claimUserData(userId);
     // The SIGNED_IN event usually got here first and its verify may already have
     // loaded the profile; don't swap that for userData's possibly-default one.
     const alreadyEnriched = enrichedRef.current && sessionUserIdRef.current === userId;

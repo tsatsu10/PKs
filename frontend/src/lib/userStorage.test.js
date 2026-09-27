@@ -5,6 +5,10 @@ import {
   clearUserLocalData,
   clearOrphanedLocalData,
   clearUserData,
+  claimUserData,
+  shouldClearForOwner,
+  DRAFT_OWNER_KEY,
+  DATA_OWNER_KEY,
 } from './userStorage';
 import { SAVED_FILTERS_KEY } from '../features/dashboard/lib/dashboardUtils';
 import { RUN_PROMPT_STORAGE_KEY } from '../constants';
@@ -68,5 +72,75 @@ describe('clearUserData', () => {
     localStorage.setItem('pks-explicit-logout', '123');
     clearUserData();
     expect(localStorage.getItem('pks-explicit-logout')).toBe('123');
+  });
+});
+
+describe('shouldClearForOwner', () => {
+  it('keeps data for the same user and when no owner was recorded', () => {
+    expect(shouldClearForOwner('u1', 'u1')).toBe(false);
+    expect(shouldClearForOwner(null, 'u1')).toBe(false);
+  });
+
+  it('clears data recorded for a different user', () => {
+    expect(shouldClearForOwner('u1', 'u2')).toBe(true);
+  });
+});
+
+describe('claimUserData (a user becomes signed in)', () => {
+  function seed() {
+    setDraft(DRAFT_KEYS.new, { form: { title: 'unsaved' } });
+    sessionStorage.setItem(RUN_PROMPT_STORAGE_KEY, '{"id":"p1"}');
+    localStorage.setItem(SAVED_FILTERS_KEY, '[{"id":"saved-1"}]');
+    localStorage.setItem('pks-theme', 'dark');
+  }
+
+  it('same user signs back in after an expiry: drafts, run prompt and saved filters are kept', () => {
+    claimUserData('u1');
+    seed();
+    // session expires: nothing is cleared, the owner markers stay
+    claimUserData('u1');
+    expect(getDraft(DRAFT_KEYS.new)).toEqual({ form: { title: 'unsaved' } });
+    expect(sessionStorage.getItem(RUN_PROMPT_STORAGE_KEY)).toBe('{"id":"p1"}');
+    expect(localStorage.getItem(SAVED_FILTERS_KEY)).toBe('[{"id":"saved-1"}]');
+    expect(sessionStorage.getItem(DRAFT_OWNER_KEY)).toBe('u1');
+    expect(localStorage.getItem(DATA_OWNER_KEY)).toBe('u1');
+  });
+
+  it('a different user signs in: the previous user\'s data is cleared and the owner becomes the new user', () => {
+    claimUserData('u1');
+    seed();
+    claimUserData('u2');
+    expect(getDraft(DRAFT_KEYS.new)).toBeNull();
+    expect(sessionStorage.getItem(RUN_PROMPT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(SAVED_FILTERS_KEY)).toBeNull();
+    expect(localStorage.getItem('pks-theme')).toBe('dark');
+    expect(sessionStorage.getItem(DRAFT_OWNER_KEY)).toBe('u2');
+    expect(localStorage.getItem(DATA_OWNER_KEY)).toBe('u2');
+  });
+
+  it('checks the tab owner separately: a tab holding u1 drafts clears them even after another tab already claimed shared data for u2', () => {
+    claimUserData('u1');
+    seed();
+    localStorage.setItem(DATA_OWNER_KEY, 'u2'); // another tab signed u2 in first
+    claimUserData('u2');
+    expect(getDraft(DRAFT_KEYS.new)).toBeNull();
+    expect(sessionStorage.getItem(RUN_PROMPT_STORAGE_KEY)).toBeNull();
+  });
+
+  it('adopts unowned data (written before owners were recorded) instead of discarding it', () => {
+    seed();
+    claimUserData('u1');
+    expect(getDraft(DRAFT_KEYS.new)).not.toBeNull();
+    expect(localStorage.getItem(SAVED_FILTERS_KEY)).not.toBeNull();
+  });
+
+  it('deliberate logout (clearUserData) clears the data and the owner markers', () => {
+    claimUserData('u1');
+    seed();
+    clearUserData();
+    expect(getDraft(DRAFT_KEYS.new)).toBeNull();
+    expect(localStorage.getItem(SAVED_FILTERS_KEY)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_OWNER_KEY)).toBeNull();
+    expect(localStorage.getItem(DATA_OWNER_KEY)).toBeNull();
   });
 });
