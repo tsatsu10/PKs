@@ -279,12 +279,22 @@ export default function ObjectDetail() {
       if (touchesVersioned) {
         query = query.eq('current_version', editBaseVersionRef.current ?? object.current_version);
       }
-      const { data: updatedRows, error: err } = await query.select(
-        'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at'
-      );
+      const OBJECT_ROW_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at';
+      const { data: updatedRows, error: err } = await query.select(OBJECT_ROW_COLS);
       if (err) throw err;
       if (!updatedRows || updatedRows.length === 0) {
-        const msg = 'This object was changed elsewhere (another tab or device). Your draft is kept — copy your edits, then reload to get the latest version.';
+        // Refresh this tab's copy so Cancel then Edit starts from the latest
+        // version. Stay in edit mode: the effect that resets editForm skips
+        // while editing, and the draft stays until the user cancels.
+        try {
+          const { data: fresh } = await supabase
+            .from('knowledge_objects')
+            .select(OBJECT_ROW_COLS)
+            .eq('id', object.id)
+            .maybeSingle();
+          if (fresh) setObject((o) => ({ ...o, ...fresh }));
+        } catch (_e) { void _e; }
+        const msg = 'This object was changed elsewhere (another tab or device). Your text is still in the editor — copy it, click Cancel, then Edit again and paste it back.';
         setError(msg);
         addToast('error', msg);
         return;
