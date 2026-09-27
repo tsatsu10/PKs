@@ -33,11 +33,5 @@ pnpm-debug.log*
 # Supabase
 .supabase/
 
-# Markdown (excluded from repo)
-*.md
-
-# Plain text docs (excluded from repo)
-*.txt
-
 # Supabase CLI scratch
 **/supabase/.temp/
