@@ -99,9 +99,11 @@ export function buildObjectMarkdown(obj, include, opts = {}) {
  * characters illegal in file names, and falls back to 'untitled' when
  * nothing usable remains.
  * @param {string} title
+ * @param {number} [maxLength=80] Maximum length in code points, applied before
+ *   leading/trailing '-' and '.' are trimmed (so a cut never leaves one behind).
  * @returns {string}
  */
-export function safeFileBase(title) {
+export function safeFileBase(title, maxLength = 80) {
   const chars = Array.from(
     String(title ?? '')
       .normalize('NFKC')
@@ -109,7 +111,7 @@ export function safeFileBase(title) {
       .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
       .trim()
       .replace(/\s+/g, '-')
-  ).slice(0, 80); // Array.from splits by code point, so emoji/CJK are never cut in half
+  ).slice(0, maxLength); // Array.from splits by code point, so emoji/CJK are never cut in half
   return chars.join('').replace(/^[-.]+|[-.]+$/g, '') || 'untitled';
 }
 

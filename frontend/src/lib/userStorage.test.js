@@ -55,6 +55,7 @@ describe('clearOrphanedLocalData', () => {
 
 describe('clearUserData', () => {
   it('clears drafts, the pending run prompt and per-user localStorage in one call', () => {
+    sessionStorage.setItem(DRAFT_OWNER_KEY, 'u1');
     setDraft(DRAFT_KEYS.new, { form: { title: 'secret' } });
     sessionStorage.setItem(RUN_PROMPT_STORAGE_KEY, '{"id":"p1"}');
     sessionStorage.setItem('other-app-key', 'keep');
@@ -88,7 +89,9 @@ describe('shouldClearForOwner', () => {
 
 describe('claimUserData (a user becomes signed in)', () => {
   function seed() {
-    setDraft(DRAFT_KEYS.new, { form: { title: 'unsaved' } });
+    // Written directly: setDraft refuses to write while the tab has no owner,
+    // and the "unowned data" case needs a draft left by an older build.
+    sessionStorage.setItem(DRAFT_KEYS.new, JSON.stringify({ form: { title: 'unsaved' } }));
     sessionStorage.setItem(RUN_PROMPT_STORAGE_KEY, '{"id":"p1"}');
     localStorage.setItem(SAVED_FILTERS_KEY, '[{"id":"saved-1"}]');
     localStorage.setItem('pks-theme', 'dark');

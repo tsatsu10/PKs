@@ -849,11 +849,6 @@
   font-size: 0.8125rem;
 }
 
-.run-prompt-open-btn {
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
 /* —— Run prompt overlay (LLM-style panel) —— */
 .run-prompt-overlay {
   position: fixed;

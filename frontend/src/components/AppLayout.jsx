@@ -27,11 +27,20 @@ export default function AppLayout({ children }) {
   const menuBtnRef = useRef(null);
   const mobileMenuOpenedRef = useRef(false);
   const focusWasInDrawerRef = useRef(false);
+  // The drawer is closing because the user navigated from it: focus the page,
+  // not the menu button (and never leave focus on a now-inert drawer link).
+  const focusMainOnCloseRef = useRef(false);
+  const mainRef = useRef(null);
 
   const closeMobileMenu = () => {
     const active = document.activeElement;
     focusWasInDrawerRef.current = !!(active && sidebarRef.current?.contains(active));
     setMobileMenuOpen(false);
+  };
+
+  const closeMobileMenuForNavigation = () => {
+    if (mobileMenuOpenedRef.current) focusMainOnCloseRef.current = true;
+    closeMobileMenu();
   };
 
   useEffect(() => {
@@ -63,12 +72,14 @@ export default function AppLayout({ children }) {
         setShortcutsOpen(true);
       }
       if (e.key === 'Escape' && mobileMenuOpen) {
+        // The palette or shortcuts modal sits on top of the drawer: Escape is theirs.
+        if (commandOpen || shortcutsOpen) return;
         closeMobileMenu();
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate, pathname, mobileMenuOpen]);
+  }, [navigate, pathname, mobileMenuOpen, commandOpen, shortcutsOpen]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -85,16 +96,20 @@ export default function AppLayout({ children }) {
     if (!isMobile) return;
     if (mobileMenuOpen) {
       mobileMenuOpenedRef.current = true;
+      focusMainOnCloseRef.current = false;
       const focusable = sidebarRef.current?.querySelector(
         'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
       focusable?.focus();
     } else if (mobileMenuOpenedRef.current) {
       mobileMenuOpenedRef.current = false;
-      if (focusWasInDrawerRef.current) {
+      if (focusMainOnCloseRef.current) {
+        mainRef.current?.focus();
+      } else if (focusWasInDrawerRef.current) {
         menuBtnRef.current?.focus();
       }
       focusWasInDrawerRef.current = false;
+      focusMainOnCloseRef.current = false;
     }
   }, [mobileMenuOpen, isMobile]);
 
@@ -105,6 +120,8 @@ export default function AppLayout({ children }) {
   }, [collapsed]);
 
   useEffect(() => {
+    // Route changed with the drawer still open (e.g. Back): focus the new page once it closes.
+    if (mobileMenuOpenedRef.current) focusMainOnCloseRef.current = true;
     queueMicrotask(() => setMobileMenuOpen(false));
   }, [location.pathname]);
 
@@ -120,7 +137,7 @@ export default function AppLayout({ children }) {
           >
             ✕
           </button>
-          <Link to="/" className="app-layout-brand" title="Personal Knowledge System">
+          <Link to="/" className="app-layout-brand" title="Personal Knowledge System" onClick={closeMobileMenuForNavigation}>
             <img src="/pks-logo.svg" alt="" className="app-layout-logo" width="32" height="32" />
             {showLabels && (
               <span className="app-layout-brand-words">
@@ -162,7 +179,7 @@ export default function AppLayout({ children }) {
                         className={`app-layout-nav-link ${isActive ? 'active' : ''}`}
                         aria-current={isActive ? 'page' : undefined}
                         title={showLabels ? undefined : label}
-                        onClick={closeMobileMenu}
+                        onClick={closeMobileMenuForNavigation}
                       >
                         <span className="app-layout-nav-icon" aria-hidden>{icon}</span>
                         {showLabels && <span className="app-layout-nav-label">{label}</span>}
@@ -210,7 +227,7 @@ export default function AppLayout({ children }) {
         aria-hidden="true"
         onClick={closeMobileMenu}
       />
-      <main className="app-layout-main" id="main-content" role="main">
+      <main ref={mainRef} className="app-layout-main" id="main-content" role="main" tabIndex={-1}>
         <div className="app-layout-mobile-header">
           <button
             ref={menuBtnRef}

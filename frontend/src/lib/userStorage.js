@@ -10,7 +10,7 @@
  * Device preferences stay: pks-theme, pks-sidebar-collapsed,
  * pks-dashboard-density, pks-dashboard-view, pks-onboarding-dismissed.
  */
-import { clearAllDrafts } from './draftStorage';
+import { clearAllDrafts, DRAFT_OWNER_KEY } from './draftStorage';
 import { RUN_PROMPT_STORAGE_KEY } from '../constants';
 import { SAVED_FILTERS_KEY } from '../features/dashboard/lib/dashboardUtils';
 
@@ -20,12 +20,8 @@ export const ORPHANED_LOCAL_STORAGE_KEYS = ['pks-pulse-targets', 'pks-main-menu-
 /** Every per-user localStorage key: the single list to extend when a feature stores user data. */
 export const USER_LOCAL_STORAGE_KEYS = [SAVED_FILTERS_KEY, ...ORPHANED_LOCAL_STORAGE_KEYS];
 
-/**
- * sessionStorage: id of the user who owns this tab's drafts and run prompt.
- * Per tab, like the drafts ('pks-drafts-', not 'pks-draft-', so clearAllDrafts
- * doesn't treat it as a draft).
- */
-export const DRAFT_OWNER_KEY = 'pks-drafts-owner';
+// Defined in draftStorage (setDraft checks it); re-exported so callers keep one import site.
+export { DRAFT_OWNER_KEY };
 
 /** localStorage: id of the user who owns the per-user localStorage keys (shared by all tabs). */
 export const DATA_OWNER_KEY = 'pks-data-owner';

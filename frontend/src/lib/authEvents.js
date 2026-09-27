@@ -39,6 +39,12 @@ export const EXPLICIT_LOGOUT_KEY = 'pks-explicit-logout';
 /**
  * How long a logout mark counts as "this sign-out was deliberate". Covers the
  * signOut round-trip plus the broadcast to other tabs, with plenty of margin.
+ *
+ * If signOut takes longer than this (a very slow network), other tabs see the
+ * relayed SIGNED_OUT after the mark has aged out and treat it as an expiry:
+ * they show "session expired" and keep their drafts, still owned by the user
+ * who signed out. That is safe: claimUserData discards them if a different
+ * user signs in next.
  */
 export const EXPLICIT_LOGOUT_WINDOW_MS = 10_000;
 

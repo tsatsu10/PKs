@@ -141,4 +141,19 @@ describe('safeFileBase', () => {
     expect(safeFileBase('')).toBe('untitled');
     expect(safeFileBase('   ')).toBe('untitled');
   });
+
+  it('cuts to maxLength by code point, never splitting an emoji at the cut', () => {
+    // 49 letters then an emoji (2 UTF-16 units): .slice(0, 50) would keep half of it
+    const title = `${'a'.repeat(49)}😀tail`;
+    expect(safeFileBase(title, 50)).toBe(`${'a'.repeat(49)}😀`);
+  });
+
+  it('trims a dash left at the cut point by maxLength', () => {
+    // character 50 is the dash that replaced the space between words
+    expect(safeFileBase(`${'a'.repeat(49)} bcd`, 50)).toBe('a'.repeat(49));
+  });
+
+  it('defaults maxLength to 80', () => {
+    expect(safeFileBase('x'.repeat(100))).toHaveLength(80);
+  });
 });

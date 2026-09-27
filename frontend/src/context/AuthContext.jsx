@@ -258,20 +258,23 @@ export function AuthProvider({ children }) {
   }, [setEnriched]);
 
   const logout = useCallback(async () => {
-    loggingOutRef.current = true;
-    // Other tabs receive our SIGNED_OUT over auth-js's BroadcastChannel; this
-    // shared mark tells them it was deliberate, not an expiry.
-    markExplicitLogout();
-    // Deliberate sign-out: not a session expiry, and no "return to" page for the next user.
-    hadUserRef.current = false;
-    sessionUserIdRef.current = null;
-    setEnriched(false);
-    // Invalidate any in-flight verify so it can't bring the user back.
-    ++verifyGenerationRef.current;
-    verifyInFlightRef.current = false;
-    setExplicitLogout(true);
-    clearUserData();
     try {
+      // Set inside the try so the finally below always resets it.
+      loggingOutRef.current = true;
+      // Other tabs receive our SIGNED_OUT over auth-js's BroadcastChannel; this
+      // shared mark tells them it was deliberate, not an expiry.
+      markExplicitLogout();
+      // Deliberate sign-out: not a session expiry, and no "return to" page for the next user.
+      hadUserRef.current = false;
+      sessionUserIdRef.current = null;
+      setEnriched(false);
+      // Invalidate any in-flight verify so it can't bring the user back.
+      ++verifyGenerationRef.current;
+      verifyInFlightRef.current = false;
+      setExplicitLogout(true);
+      // Also removes the tab's draft owner, so setDraft ignores any draft timer
+      // that fires while signOut is pending (the editors stay mounted until setUser(null)).
+      clearUserData();
       const { error } = await supabase.auth.signOut();
       // Offline: auth-js returns a network error *before* removing the stored
       // session, for every scope including 'local'. Remove it directly so a
@@ -285,6 +288,8 @@ export function AuthProvider({ children }) {
       }
     } finally {
       loggingOutRef.current = false;
+      // Again, in case anything was written during the await.
+      clearUserData();
       setUser(null);
       setHasValidSession(false);
       setSessionExpired(false);

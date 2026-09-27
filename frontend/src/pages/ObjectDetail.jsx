@@ -863,7 +863,7 @@ export default function ObjectDetail() {
   async function handleExport(jobOverrides) {
     const fmt = jobOverrides?.format ?? exportFormat;
     const inc = jobOverrides?.include ?? exportInclude;
-    const slug = safeFileBase(object.title).slice(0, 50);
+    const slug = safeFileBase(object.title, 50);
     const ext = fmt === 'pdf' ? 'pdf' : fmt === 'docx' ? 'docx' : fmt;
     const suggestedFilename = `${slug}.${ext}`;
     try {
@@ -1312,7 +1312,7 @@ export default function ObjectDetail() {
           )}
           {isOwner && (
             <div className="detail-section-card">
-              <h3 className="detail-section-card-title">Run prompt</h3>
+              <h3 className="detail-section-card-title">Prompt runs</h3>
               <h4 className="detail-section-card-sub">History</h4>
               <ul className="prompt-runs-list">
                 {promptRuns.slice(0, 5).map((r) => (
