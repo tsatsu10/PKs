@@ -7,8 +7,8 @@ import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS } from '../lib/export';
-import { slugify } from '../lib/slugify';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
+import { objectToEditForm, buildObjectPatch, draftFromForm, formFromDraft } from '../lib/objectForm';
 import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { useToast } from '../context/ToastContext';
 import NotificationCenter from '../components/NotificationCenter';
@@ -101,6 +101,8 @@ export default function ObjectDetail() {
   const [linkSearchResults, setLinkSearchResults] = useState([]);
   const [linkSearchOpen, setLinkSearchOpen] = useState(false);
   const editInitialContentRef = useRef('');
+  // Version the current edit is based on; used for the optimistic-concurrency check on save.
+  const editBaseVersionRef = useRef(null);
   const linkSearchRef = useRef(null);
 
   useEffect(() => {
@@ -110,16 +112,7 @@ export default function ObjectDetail() {
 
   useEffect(() => {
     if (!object || editing) return;
-    setEditForm({
-      title: object.title,
-      content: object.content || '',
-      summary: object.summary || '',
-      source: object.source || '',
-      status: object.status || 'active',
-      due_at: object.due_at ? object.due_at.slice(0, 16) : '',
-      remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '',
-      cover_url: object.cover_url || '',
-    });
+    setEditForm(objectToEditForm(object));
   }, [object, editing]);
 
   const draftAppliedRef = useRef(false);
@@ -128,8 +121,10 @@ export default function ObjectDetail() {
     const d = draft && (draft.title !== undefined || draft.content !== undefined || draft.summary !== undefined) ? draft : null;
     if (!d) return;
     draftAppliedRef.current = true;
-    editInitialContentRef.current = d.content ?? object.content ?? '';
-    setEditForm((prev) => ({ ...prev, ...d }));
+    const restored = formFromDraft(d, object);
+    editInitialContentRef.current = restored.form.content;
+    editBaseVersionRef.current = restored.baseVersion;
+    setEditForm(restored.form);
     setEditing(true);
     addToast('success', 'Draft restored');
   }, [object, id, draft, addToast]);
@@ -150,7 +145,7 @@ export default function ObjectDetail() {
     if (!id || !editing) return;
     if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current);
     editDraftTimerRef.current = setTimeout(() => {
-      setDraft(DRAFT_KEYS.object(id), editForm);
+      setDraft(DRAFT_KEYS.object(id), draftFromForm(editForm, editBaseVersionRef.current));
     }, 500);
     return () => { if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current); };
   }, [id, editing, editForm]);
@@ -300,47 +295,34 @@ export default function ObjectDetail() {
     setSaving(true);
     setError('');
     try {
-      const newSlug = slugify(editForm.title.trim()) || null;
-      // Optimistic concurrency: only update if the row is still at the version
-      // we loaded; a version trigger bumps current_version on every update.
-      const { data: updatedRows, error: err } = await supabase
-        .from('knowledge_objects')
-        .update({
-          title: editForm.title.trim(),
-          content: editForm.content.trim() || null,
-          summary: editForm.summary.trim() || null,
-          source: editForm.source.trim() || null,
-          status: editForm.status || 'active',
-          due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
-          remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
-          cover_url: editForm.cover_url?.trim() || null,
-          slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : null,
-        })
-        .eq('id', object.id)
-        .eq('current_version', object.current_version)
-        .select('current_version, updated_at');
+      const patch = buildObjectPatch(object, editForm);
+      if (Object.keys(patch).length === 0) {
+        setEditing(false);
+        clearDraft(DRAFT_KEYS.object(object.id));
+        return;
+      }
+      // Optimistic concurrency, only for versioned fields: the DB trigger bumps
+      // current_version when title/content/summary change, so a metadata-only
+      // patch (status, dates…) must not be rejected just because another tab
+      // edited the text. Plan −1B replaces this with a `revision` column that
+      // bumps on every update.
+      const touchesVersioned = ['title', 'content', 'summary'].some((k) => k in patch);
+      let query = supabase.from('knowledge_objects').update(patch).eq('id', object.id);
+      if (touchesVersioned) {
+        query = query.eq('current_version', editBaseVersionRef.current ?? object.current_version);
+      }
+      const { data: updatedRows, error: err } = await query.select(
+        'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at'
+      );
       if (err) throw err;
       if (!updatedRows || updatedRows.length === 0) {
-        const msg = 'This object was changed elsewhere (another tab or device). Copy your edits, then reload to get the latest version.';
+        const msg = 'This object was changed elsewhere (another tab or device). Your draft is kept — copy your edits, then reload to get the latest version.';
         setError(msg);
         addToast('error', msg);
         return;
       }
-      const savedRow = updatedRows[0];
-      setObject((o) => ({
-        ...o,
-        title: editForm.title.trim(),
-        content: editForm.content.trim() || null,
-        summary: editForm.summary.trim() || null,
-        source: editForm.source.trim() || null,
-        status: editForm.status || 'active',
-        due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
-        remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
-        cover_url: editForm.cover_url?.trim() || null,
-        slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : o.slug,
-        updated_at: savedRow.updated_at ?? new Date().toISOString(),
-        current_version: savedRow.current_version ?? o.current_version + 1,
-      }));
+      // Merge the full saved row so a stale tab also picks up other tabs' changes.
+      setObject((o) => ({ ...o, ...updatedRows[0] }));
       setEditing(false);
       clearDraft(DRAFT_KEYS.object(object.id));
       addToast('success', 'Changes saved');
@@ -1173,12 +1155,12 @@ export default function ObjectDetail() {
           )}
           {!editing ? (
             <>
-              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; setEditing(true); }}>Edit</button>}
+              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; editBaseVersionRef.current = object.current_version; setEditing(true); }}>Edit</button>}
               {isOwner && <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>}
             </>
           ) : (
             <>
-              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm({ title: object.title, content: object.content || '', summary: object.summary || '', source: object.source || '', status: object.status || 'active', due_at: object.due_at ? object.due_at.slice(0, 16) : '', remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '', cover_url: object.cover_url || '' }); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
+              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm(objectToEditForm(object)); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
               <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </>
           )}
