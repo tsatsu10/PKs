@@ -11,7 +11,6 @@ import { FILES_BUCKET, getStoragePath } from '../lib/storage';
 import { objectToEditForm, buildObjectPatch, draftFromForm, formFromDraft } from '../lib/objectForm';
 import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { useToast } from '../context/ToastContext';
-import NotificationCenter from '../components/NotificationCenter';
 import { SkeletonDetail } from '../components/Skeleton';
 import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
@@ -400,7 +399,7 @@ export default function ObjectDetail() {
   }
 
   async function handleDelete() {
-    if (!object || !window.confirm('Soft-delete this object? It will disappear from the list but can be restored from the database.')) return;
+    if (!object || !window.confirm('Move this object to Trash? You can restore it from Trash later.')) return;
     setDeleting(true);
     setError('');
     try {
@@ -411,7 +410,7 @@ export default function ObjectDetail() {
         .eq('user_id', user.id);
       if (err) throw err;
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_DELETE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { title: object.title });
-      addToast('success', 'Object deleted');
+      addToast('success', 'Moved to Trash');
       navigate('/', { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Delete failed');
@@ -1021,7 +1020,6 @@ export default function ObjectDetail() {
       <header className="object-detail-header">
         <div className="object-detail-header-left">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: object.title || 'Object' }]} />
-          <NotificationCenter />
         </div>
         {canEdit && (
           <div className="detail-header-link-search" ref={linkSearchRef}>
@@ -1390,6 +1388,7 @@ export default function ObjectDetail() {
               </>
             )}
           </div>
+          {!(isOwner && versions.length > 0) && (
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Version history</h3>
             {versions.length === 0 ? (
@@ -1406,6 +1405,7 @@ export default function ObjectDetail() {
               </ul>
             )}
           </div>
+          )}
         </aside>
       </div>
 
