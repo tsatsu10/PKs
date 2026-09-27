@@ -96,7 +96,6 @@ export default function ObjectDetail() {
   const [shareEmail, setShareEmail] = useState('');
   const [shareRole, setShareRole] = useState('viewer');
   const [sharing, setSharing] = useState(false);
-  const [recentExportJobs, setRecentExportJobs] = useState([]);
   const [linkSearchQuery, setLinkSearchQuery] = useState('');
   const [linkSearchResults, setLinkSearchResults] = useState([]);
   const [linkSearchOpen, setLinkSearchOpen] = useState(false);
@@ -149,37 +148,6 @@ export default function ObjectDetail() {
     }, 500);
     return () => { if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current); };
   }, [id, editing, editForm]);
-
-  const loadRecentExportJobs = useCallback(async () => {
-    if (!id || !user?.id) return;
-    const { data, error: err } = await supabase
-      .from('export_jobs')
-      .select('id, format, template, status, error_message, completed_at, created_at, include_content, include_summary, include_key_points, include_tags, include_domains, include_links')
-      .eq('knowledge_object_id', id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    if (err) {
-      if (import.meta.env.DEV) console.warn('Failed to load export jobs:', err);
-      setRecentExportJobs([]);
-      return;
-    }
-    setRecentExportJobs(data || []);
-  }, [id, user?.id]);
-
-  useEffect(() => {
-    loadRecentExportJobs();
-  }, [loadRecentExportJobs]);
-
-  useEffect(() => {
-    if (showExportPanel) loadRecentExportJobs();
-  }, [showExportPanel, loadRecentExportJobs]);
-
-  useEffect(() => {
-    const inProgress = recentExportJobs.some((j) => j.status === 'queued' || j.status === 'processing');
-    if (!inProgress) return;
-    const t = setInterval(loadRecentExportJobs, 3000);
-    return () => clearInterval(t);
-  }, [loadRecentExportJobs, recentExportJobs]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -884,31 +852,11 @@ export default function ObjectDetail() {
 
   async function handleExport(jobOverrides) {
     const fmt = jobOverrides?.format ?? exportFormat;
-    const tpl = jobOverrides?.template ?? exportTemplate;
     const inc = jobOverrides?.include ?? exportInclude;
     const slug = object.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
     const ext = fmt === 'pdf' ? 'pdf' : fmt === 'docx' ? 'docx' : fmt;
     const suggestedFilename = `${slug}.${ext}`;
-    let jobId = null;
     try {
-      const { data: job, error: insertErr } = await supabase.from('export_jobs').insert({
-        user_id: user.id,
-        knowledge_object_id: object.id,
-        format: fmt,
-        template: tpl,
-        include_content: inc.content,
-        include_summary: inc.summary,
-        include_key_points: inc.key_points,
-        include_tags: inc.tags,
-        include_domains: inc.domains,
-        include_links: inc.links,
-        filename: suggestedFilename,
-        status: 'queued',
-      }).select('id').single();
-      if (insertErr) throw insertErr;
-      jobId = job?.id;
-      await supabase.from('export_jobs').update({ status: 'processing' }).eq('id', jobId);
-
       if (fmt === 'txt') {
         const blob = new Blob([buildExportText(false, inc)], { type: 'text/plain;charset=utf-8' });
         downloadBlob(blob, suggestedFilename);
@@ -940,19 +888,14 @@ export default function ObjectDetail() {
         }
       }
 
-      await supabase.from('export_jobs').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', jobId);
       const formatLabel = EXPORT_FORMAT_LABELS[fmt] || fmt;
       createNotification(user.id, 'export_completed', 'Export completed', `"${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}" as ${formatLabel}`, { type: 'knowledge_object', id: object.id });
       logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { format: fmt, title: object.title });
       deliverWebhookEvent('export.completed', { objectId: object.id, title: object.title, format: fmt });
       addToast('success', `Export downloaded as ${formatLabel}`);
-      loadRecentExportJobs();
       setShowExportPanel(false);
     } catch (err) {
       const msg = getErrorMessage(err, 'Export failed');
-      if (jobId) {
-        await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
-      }
       setError(msg);
       addToast('error', msg);
     }
@@ -964,18 +907,6 @@ export default function ObjectDetail() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
-  }
-
-  function retryExport(job) {
-    const inc = {
-      content: job.include_content ?? true,
-      summary: job.include_summary ?? true,
-      key_points: job.include_key_points ?? true,
-      tags: job.include_tags ?? true,
-      domains: job.include_domains ?? true,
-      links: job.include_links ?? true,
-    };
-    handleExport({ format: job.format, template: job.template, include: inc });
   }
 
   async function buildExportDocxBlob(include = exportInclude) {
@@ -1191,9 +1122,7 @@ export default function ObjectDetail() {
           exportInclude={exportInclude}
           setExportInclude={setExportInclude}
           applyExportTemplate={applyExportTemplate}
-          recentExportJobs={recentExportJobs}
           onExport={() => handleExport()}
-          onRetryExport={retryExport}
           onClose={() => setShowExportPanel(false)}
         />
       )}

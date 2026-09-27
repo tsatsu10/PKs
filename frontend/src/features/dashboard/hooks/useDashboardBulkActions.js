@@ -100,7 +100,6 @@ export function useDashboardBulkActions({
   const handleExportSelected = useCallback(async () => {
     setExporting(true);
     setError('');
-    let jobId = null;
     try {
       const ids = exportScope === 'filtered'
         ? await fetchFilteredIds()
@@ -111,27 +110,6 @@ export function useDashboardBulkActions({
         return;
       }
       const include = getExportIncludeFromTemplate(exportTemplate, { includeLinks: false });
-      const { data: job, error: jobErr } = await supabase.from('export_jobs').insert({
-        user_id: user.id,
-        knowledge_object_id: null,
-        format: exportFormat,
-        template: exportTemplate,
-        include_content: include.content,
-        include_summary: include.summary,
-        include_key_points: include.key_points,
-        include_tags: include.tags,
-        include_domains: include.domains,
-        include_links: false,
-        filename: `export-${ids.length}-objects.zip`,
-        status: 'processing',
-      }).select('id').single();
-      if (jobErr) throw jobErr;
-      jobId = job?.id;
-      const { error: itemsErr } = await supabase.from('export_job_items').insert(
-        ids.map((knowledge_object_id, i) => ({ export_job_id: jobId, knowledge_object_id, sort_order: i }))
-      );
-      if (itemsErr) throw itemsErr;
-
       const objs = await selectInChunks('knowledge_objects', '*', 'id', ids);
       if (!objs.length) throw new Error('No objects found');
       const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));
@@ -178,15 +156,13 @@ export function useDashboardBulkActions({
       a.click();
       URL.revokeObjectURL(a.href);
 
-      await supabase.from('export_jobs').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', jobId);
       createNotification(user.id, 'export_completed', 'Bundle export completed', `${ids.length} objects exported as ZIP`, {});
-      logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, jobId, { objectCount: ids.length, format: exportFormat });
+      logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, null, { objectCount: ids.length, format: exportFormat });
       addToast('success', `Exported ${ids.length} objects`);
       setShowExportModal(false);
       if (exportScope === 'selected') clearSelection();
     } catch (err) {
       const msg = getErrorMessage(err, 'Export failed');
-      if (jobId) await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
       setError(msg);
       addToast('error', msg);
     } finally {
