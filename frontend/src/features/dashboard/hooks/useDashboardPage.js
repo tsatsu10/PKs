@@ -90,6 +90,7 @@ export function useDashboardPage() {
   const [cardColumns, setCardColumns] = useState(1);
   const [runPromptTemplate, setRunPromptTemplate] = useState(null);
   const [heroStats, setHeroStats] = useState(null);
+  const [showActivityPanel, setShowActivityPanel] = useState(false);
 
   const { pendingObject, sparkObject } = useTrailheads({ userId: user?.id ?? null, resumeObject });
   const runPromptSuffix = runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : '';
@@ -351,6 +352,13 @@ export function useDashboardPage() {
     setRunPromptTemplate(null);
   }
 
+  const handleTagFilterFromActivity = useCallback((tagId) => {
+    setTagFilter(tagId);
+    setShowFilters(true);
+    runSearch(0, null, { tagFilter: tagId });
+  }, [runSearch, setTagFilter]);
+
+
   function handleSearchSubmit(e) {
     e.preventDefault();
     runSearch(0);
@@ -539,6 +547,8 @@ export function useDashboardPage() {
     cardColumns,
     runPromptTemplate,
     heroStats,
+    showActivityPanel,
+    setShowActivityPanel,
     pendingObject,
     sparkObject,
     resumeObject,
@@ -549,6 +559,7 @@ export function useDashboardPage() {
     handlePageChange,
     dismissRunPromptBanner,
     closeQuickAdd,
+    handleTagFilterFromActivity,
     handleSearchSubmit,
     handleQuickAddCreate,
     dismissOnboarding,

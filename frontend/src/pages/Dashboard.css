@@ -6,6 +6,7 @@
 @import '../features/dashboard/components/Views/StreamView.css';
 @import '../features/dashboard/components/Views/TableView.css';
 @import '../features/dashboard/components/Selection/BulkActionRibbon.css';
+@import '../features/dashboard/components/Sidebar/ActivityPulse.css';
 @import '../features/dashboard/components/Views/LinkedBar.css';
 @import '../features/dashboard/components/Empty/DashboardEmptyStates.css';
 
@@ -125,6 +126,16 @@
 }
 .dashboard-sidebar {
   display: none;
+}
+
+.dashboard-activity-toggle {
+  display: inline-flex;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-activity-toggle {
+    display: none;
+  }
 }
 
 .dashboard-sidebar--open-mobile {

@@ -10,6 +10,7 @@ import TimelineRow from './Views/TimelineRow';
 import StreamBucketHeader from './Views/StreamBucketHeader';
 import TableViewRow from './Views/TableView';
 import { LinkedObjectsProvider } from '../context/LinkedObjectsContext';
+import ActivityPulse from './Sidebar/ActivityPulse';
 import { DashboardEmptyFirstRun, DashboardEmptyNoResults } from './Empty/DashboardEmptyStates';
 import DashboardObjectCard from '../../../components/DashboardObjectCard';
 import DashboardPagination from '../../../components/DashboardPagination';
@@ -35,10 +36,10 @@ export default function DashboardView(props) {
     quickAddSaving, bulkModal, setBulkModal, bulkDomainId, setBulkDomainId, bulkTagId,
     setBulkTagId, bulkType, setBulkType, bulkStatus, setBulkStatus, bulkActionLoading,
     searchInputRef, quickAddInputRef, listScrollRef, cardColumns, runPromptTemplate,
-    heroStats, pendingObject, sparkObject,
+    heroStats, showActivityPanel, setShowActivityPanel, pendingObject, sparkObject,
     resumeObject,
     selectionMode, runPromptSuffix, streamItems, listVirtualizer, filterChips, handlePageChange,
-    dismissRunPromptBanner, closeQuickAdd, handleSearchSubmit,
+    dismissRunPromptBanner, closeQuickAdd, handleTagFilterFromActivity, handleSearchSubmit,
     toggleSelect, selectAllOnPage, clearSelection, handleQuickAddCreate, handleExportSelected,
     bulkAddDomain, bulkAddTag, bulkRemoveDomain, bulkRemoveTag, bulkDelete, bulkChangeType,
     bulkSetStatus, dismissOnboarding, saveCurrentFilters, applySavedFilter, deleteSavedFilter,
@@ -174,6 +175,14 @@ export default function DashboardView(props) {
         />
 
         <div className="dashboard-toolbar-extras">
+          <button
+            type="button"
+            className={`quick-filter-pill dashboard-activity-toggle${showActivityPanel ? ' active' : ''}`}
+            onClick={() => setShowActivityPanel((v) => !v)}
+            aria-expanded={showActivityPanel}
+          >
+            Activity
+          </button>
           <div className="dashboard-filter-presets" aria-label="Filter presets">
             <button
               type="button"
@@ -506,6 +515,14 @@ export default function DashboardView(props) {
           </>
         )}
           </div>
+          <aside className={`dashboard-sidebar${showActivityPanel ? ' dashboard-sidebar--open-mobile' : ''}`} aria-label="Activity">
+            <ActivityPulse
+              userId={user?.id ?? null}
+              heroStats={heroStats}
+              dueSoonCount={heroStats?.due_next_7_days ?? 0}
+              onTagFilter={handleTagFilterFromActivity}
+            />
+          </aside>
         </div>
         </LinkedObjectsProvider>
 
