@@ -4,6 +4,7 @@ import {
   buildObjectMarkdown,
   EXPORT_TEMPLATE_IDS,
   EXPORT_FORMAT_LABELS,
+  zipEntryName,
 } from './export.js';
 
 describe('getExportIncludeFromTemplate', () => {
@@ -85,5 +86,38 @@ describe('export constants', () => {
   it('EXPORT_FORMAT_LABELS has md and txt', () => {
     expect(EXPORT_FORMAT_LABELS.md).toBe('Markdown');
     expect(EXPORT_FORMAT_LABELS.txt).toBe('TXT');
+  });
+});
+
+describe('zipEntryName', () => {
+  it('keeps same-titled objects as separate files', () => {
+    const used = new Set();
+    const a = zipEntryName('Meeting', 'aaaaaaaa-1', 'md', used);
+    const b = zipEntryName('Meeting', 'bbbbbbbb-2', 'md', used);
+    expect(a).toBe('Meeting.md');
+    expect(b).toBe('Meeting-bbbbbbbb.md');
+  });
+
+  it('treats names that differ only in case as duplicates (Windows/macOS unzip)', () => {
+    const used = new Set();
+    zipEntryName('Meeting', 'aaaaaaaa', 'md', used);
+    expect(zipEntryName('meeting', 'cccccccc', 'md', used)).toBe('meeting-cccccccc.md');
+  });
+
+  it('never ends a long name with a dash', () => {
+    const name = zipEntryName(`${'a'.repeat(79)} b`, 'dddddddd', 'md', new Set());
+    expect(name.endsWith('-.md')).toBe(false);
+  });
+
+  it('keeps non-Latin titles readable instead of collapsing to "-"', () => {
+    const used = new Set();
+    expect(zipEntryName('会議メモ', 'cccccccc', 'md', used)).toBe('会議メモ.md');
+    expect(zipEntryName('日記', 'dddddddd', 'md', used)).toBe('日記.md');
+  });
+
+  it('strips characters that are illegal in file names and handles empty titles', () => {
+    const used = new Set();
+    expect(zipEntryName('a/b:c*?', 'eeeeeeee', 'txt', used)).toBe('abc.txt');
+    expect(zipEntryName('   ', 'ffffffff', 'md', used)).toBe('untitled.md');
   });
 });

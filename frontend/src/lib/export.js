@@ -92,3 +92,32 @@ export function buildObjectMarkdown(obj, include, opts = {}) {
   }
   return lines.join('\n');
 }
+
+/**
+ * Unique, filesystem-safe name for an entry in an export ZIP. Keeps Unicode
+ * letters (e.g. CJK titles) and disambiguates duplicates with the id prefix.
+ * @param {string} title
+ * @param {string} id
+ * @param {string} ext - extension without dot
+ * @param {Set<string>} used - lower-cased names already in the archive (mutated);
+ *   compared case-insensitively because Windows/macOS unzip is case-insensitive
+ * @returns {string}
+ */
+export function zipEntryName(title, id, ext, used) {
+  const chars = Array.from(
+    String(title ?? '')
+      .normalize('NFKC')
+      // eslint-disable-next-line no-control-regex -- strip control chars, illegal in file names
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+  ).slice(0, 80); // Array.from splits by code point, so emoji/CJK are never cut in half
+  const base = chars.join('').replace(/^[-.]+|[-.]+$/g, '') || 'untitled';
+  const shortId = String(id).slice(0, 8);
+  const taken = (candidate) => used.has(candidate.toLowerCase());
+  let name = `${base}.${ext}`;
+  if (taken(name)) name = `${base}-${shortId}.${ext}`;
+  for (let n = 2; taken(name); n += 1) name = `${base}-${shortId}-${n}.${ext}`;
+  used.add(name.toLowerCase());
+  return name;
+}

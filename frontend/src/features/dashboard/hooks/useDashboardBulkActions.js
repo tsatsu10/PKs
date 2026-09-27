@@ -3,7 +3,8 @@ import { supabase } from '../../../lib/supabase';
 import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
-import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../../../lib/export';
+import { getExportIncludeFromTemplate, buildObjectMarkdown, zipEntryName } from '../../../lib/export';
+import { downloadBlob } from '../../../lib/download';
 import { getErrorMessage } from '../../../lib/errors';
 import { resolveOwnedObjectIds } from '../lib/dashboardUtils';
 
@@ -137,24 +138,20 @@ export function useDashboardBulkActions({
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       const ZIP_CHUNK = 20;
+      const usedNames = new Set();
       for (let i = 0; i < ids.length; i += ZIP_CHUNK) {
         const chunk = ids.slice(i, i + ZIP_CHUNK);
         for (const id of chunk) {
           const obj = objMap[id];
           if (!obj) continue;
-          const slug = obj.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
           const ext = exportFormat === 'txt' ? 'txt' : 'md';
           const text = buildObjectMarkdown(obj, include, { asPlainText: exportFormat === 'txt' });
-          zip.file(`${slug}.${ext}`, text);
+          zip.file(zipEntryName(obj.title, obj.id, ext, usedNames), text);
         }
         if (i + ZIP_CHUNK < ids.length) await new Promise((r) => setTimeout(r, 0));
       }
       const blob = await zip.generateAsync({ type: 'blob' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-export-${ids.length}-objects.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-export-${ids.length}-objects.zip`);
 
       createNotification(user.id, 'export_completed', 'Bundle export completed', `${ids.length} objects exported as ZIP`, {});
       logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, null, { objectCount: ids.length, format: exportFormat });

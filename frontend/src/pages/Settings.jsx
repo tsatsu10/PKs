@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useDeckEnabled } from '../components/MainMenuDeckContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
+import { downloadBlob } from '../lib/download';
 import PulseTargetsForm from '../features/dashboard/components/Settings/PulseTargetsForm';
 import './Settings.css';
 
@@ -361,11 +362,7 @@ export default function Settings() {
         '}',
       );
       const blob = new Blob([parts.join('')], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
@@ -406,11 +403,7 @@ export default function Settings() {
       }
       parts.push(']}');
       const blob = new Blob([parts.join('')], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
@@ -448,11 +441,7 @@ export default function Settings() {
         zip.file(`${String(i + 1).padStart(3, '0')}-${safeTitle}.md`, md);
       });
       const blob = await zip.generateAsync({ type: 'blob' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-backup-${new Date().toISOString().slice(0, 10)}.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.zip`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {

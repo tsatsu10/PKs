@@ -22,6 +22,7 @@ import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { resolveRunSelection, modelForProvider, isServerSelection } from '../lib/aiProviders';
 import { getErrorMessage } from '../lib/errors';
+import { downloadBlob, printHtml } from '../lib/download';
 import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
@@ -873,40 +874,24 @@ export default function ObjectDetail() {
         const blob = await buildExportDocxBlob(inc);
         if (blob) downloadBlob(blob, suggestedFilename);
       } else {
-        const html = buildExportHtml(inc);
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const w = window.open(url, '_blank', 'noopener,noreferrer');
-        if (w) {
-          w.onload = () => {
-            URL.revokeObjectURL(url);
-            w.focus();
-            w.print();
-          };
-        } else {
-          URL.revokeObjectURL(url);
+        if (!printHtml(buildExportHtml(inc))) {
+          throw new Error('Your browser blocked the print window. Allow pop-ups for this site, then try again.');
         }
       }
 
       const formatLabel = EXPORT_FORMAT_LABELS[fmt] || fmt;
-      createNotification(user.id, 'export_completed', 'Export completed', `"${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}" as ${formatLabel}`, { type: 'knowledge_object', id: object.id });
+      if (fmt !== 'pdf') {
+        createNotification(user.id, 'export_completed', 'Export completed', `"${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}" as ${formatLabel}`, { type: 'knowledge_object', id: object.id });
+        deliverWebhookEvent('export.completed', { objectId: object.id, title: object.title, format: fmt });
+      }
       logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { format: fmt, title: object.title });
-      deliverWebhookEvent('export.completed', { objectId: object.id, title: object.title, format: fmt });
-      addToast('success', `Export downloaded as ${formatLabel}`);
+      addToast('success', fmt === 'pdf' ? 'Print dialog opened: choose "Save as PDF"' : `Export downloaded as ${formatLabel}`);
       setShowExportPanel(false);
     } catch (err) {
       const msg = getErrorMessage(err, 'Export failed');
       setError(msg);
       addToast('error', msg);
     }
-  }
-
-  function downloadBlob(blob, filename) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
   }
 
   async function buildExportDocxBlob(include = exportInclude) {
