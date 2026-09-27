@@ -29,7 +29,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['pks-logo.svg', 'manifest.json'],
+      includeAssets: ['pks-logo.svg'],
       manifest: {
         name: 'PKS — Personal Knowledge System',
         short_name: 'PKS',

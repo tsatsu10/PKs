@@ -37,31 +37,6 @@ export function formatObjectTypeLabel(type) {
   return type.replace(/_/g, ' ');
 }
 
-/** Icons for object types (emoji for quick visual recognition) */
-export const OBJECT_TYPE_ICONS = {
-  note: '📝',
-  document: '📄',
-  sop: '📋',
-  report: '📊',
-  proposal: '📑',
-  guideline: '📌',
-  insight: '💡',
-  template: '📐',
-  concept: '🧩',
-  tool: '🔧',
-  incident: '⚠️',
-  case: '📁',
-  research_paper: '📚',
-  decision: '✓',
-  prompt: '💬',
-  bookmark: '🔖',
-  meeting_notes: '📅',
-  quote: '〝',
-  recipe: '🍳',
-  person: '👤',
-  howto: '📖',
-};
-
 /** Integration types (stored in integrations.type) */
 export const INTEGRATION_TYPES = ['generic', 'import', 'webhook', 'api'];
 

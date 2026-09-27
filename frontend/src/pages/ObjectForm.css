@@ -536,33 +536,6 @@
   cursor: not-allowed;
 }
 
-.notion-style .template-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.notion-style .template-picker-option {
-  padding: 0.4rem 0.75rem;
-  min-height: 32px;
-  font-size: 0.8125rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--polar-muted);
-}
-
-.notion-style .template-picker-option:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--polar-white);
-}
-
-.notion-style .template-picker-option.active {
-  background: rgba(236, 72, 153, 0.15);
-  border-color: var(--cosmic-pink);
-  color: var(--cosmic-pink);
-}
-
 .object-form-templates-first {
   margin-bottom: 1.5rem;
   padding: 1.25rem 1.5rem;
@@ -581,38 +554,6 @@
   font-size: 0.875rem;
   color: var(--polar-dim);
   margin: 0 0 1rem 0;
-}
-
-.template-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.template-picker-option {
-  padding: 0.625rem 1.125rem;
-  min-height: 44px;
-  box-sizing: border-box;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--input-radius);
-  color: var(--label-color);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.template-picker-option:hover {
-  background: var(--surface-elevated);
-  border-color: var(--input-border-hover);
-  color: var(--polar-white);
-}
-
-.template-picker-option.active {
-  background: var(--active-highlight-bg);
-  border-color: var(--cosmic-pink);
-  color: var(--cosmic-pink);
 }
 
 .quick-capture-page .object-form-header h1 { margin-bottom: 0.25rem; }

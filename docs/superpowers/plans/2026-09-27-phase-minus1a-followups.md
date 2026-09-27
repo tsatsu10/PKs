@@ -39,6 +39,6 @@ Fixes for the gaps found by the post-merge audit of Phase −1A (2026-09-27). Br
 - [x] D4 README deploy note: users on the old build get the update after closing all PKS tabs once.
 
 ### Group E: dead code
-- [ ] E1 Remove the duplicate `public/manifest.json` link/file (keep the PWA-generated manifest).
-- [ ] E2 Remove unused `template-picker*` CSS, `getStream*Height`, `useLinkedObjects`, `OBJECT_TYPE_ICONS`, `window.__reportError` (verify each is unused first).
-- [ ] E3 Remove the ActivityPulse sparklines (audit §2).
+- [x] E1 Remove the duplicate `public/manifest.json` link/file (keep the PWA-generated manifest).
+- [x] E2 Remove unused `template-picker*` CSS, `getStream*Height`, `useLinkedObjects`, `OBJECT_TYPE_ICONS`, `window.__reportError` (verify each is unused first).
+- [x] E3 Remove the ActivityPulse sparklines (audit §2).
