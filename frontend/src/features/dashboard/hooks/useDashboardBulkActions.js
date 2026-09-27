@@ -357,8 +357,8 @@ export function useDashboardBulkActions({
       const { error: err } = await supabase.from('knowledge_objects').update({ is_deleted: true }).in('id', ownedIds);
       if (err) throw err;
       const msg = skipped > 0
-        ? `${ownedIds.length} object(s) deleted (${skipped} shared object(s) skipped)`
-        : `${ownedIds.length} object(s) deleted`;
+        ? `Moved ${ownedIds.length} to Trash (${skipped} shared object${skipped === 1 ? '' : 's'} skipped)`
+        : `Moved ${ownedIds.length} to Trash`;
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();

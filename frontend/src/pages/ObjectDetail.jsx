@@ -6,7 +6,7 @@ import { isTypingTarget } from '../lib/keyboard';
 import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
-import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS } from '../lib/export';
+import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS, safeFileBase } from '../lib/export';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
 import { objectToEditForm, buildObjectPatch, draftFromForm, formFromDraft } from '../lib/objectForm';
 import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
@@ -863,7 +863,7 @@ export default function ObjectDetail() {
   async function handleExport(jobOverrides) {
     const fmt = jobOverrides?.format ?? exportFormat;
     const inc = jobOverrides?.include ?? exportInclude;
-    const slug = object.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
+    const slug = safeFileBase(object.title).slice(0, 50);
     const ext = fmt === 'pdf' ? 'pdf' : fmt === 'docx' ? 'docx' : fmt;
     const suggestedFilename = `${slug}.${ext}`;
     try {
@@ -1313,7 +1313,6 @@ export default function ObjectDetail() {
           {isOwner && (
             <div className="detail-section-card">
               <h3 className="detail-section-card-title">Run prompt</h3>
-              <button type="button" className="btn btn-primary run-prompt-open-btn" onClick={handleRunPrompt}>Run prompt</button>
               <h4 className="detail-section-card-sub">History</h4>
               <ul className="prompt-runs-list">
                 {promptRuns.slice(0, 5).map((r) => (

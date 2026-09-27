@@ -88,12 +88,24 @@ export default function ObjectNew() {
   }, [fetchDomainsTagsTemplates]);
 
   // Template values restored from a draft; the reset effect below must not wipe them.
+  // Holds { templateId, values } so the reset effect only consumes it once
+  // selectedTemplateId has actually caught up to the restored id — under
+  // StrictMode's double-invoked effects, the reset effect can otherwise run
+  // before the id state update commits and wipe the just-restored values.
   const restoredTemplateValuesRef = useRef(null);
   useEffect(() => {
-    if (restoredTemplateValuesRef.current) {
-      setTemplateValues(restoredTemplateValuesRef.current);
-      restoredTemplateValuesRef.current = null;
-      return;
+    const restored = restoredTemplateValuesRef.current;
+    if (restored) {
+      if (restored.templateId === selectedTemplateId) {
+        setTemplateValues(restored.values);
+        restoredTemplateValuesRef.current = null;
+        return;
+      }
+      if (selectedTemplateId) {
+        // User (or a later render) moved on to a different template; the
+        // stale restore no longer applies.
+        restoredTemplateValuesRef.current = null;
+      }
     }
     if (!schema?.fields?.length) {
       setTemplateValues({});
@@ -115,7 +127,9 @@ export default function ObjectNew() {
     hasRestoredDraft.current = true;
     setForm((f) => ({ ...f, ...draft.form }));
     if (draft.templateValues && Object.keys(draft.templateValues).length) {
-      if (draft.selectedTemplateId) restoredTemplateValuesRef.current = draft.templateValues;
+      if (draft.selectedTemplateId) {
+        restoredTemplateValuesRef.current = { templateId: draft.selectedTemplateId, values: draft.templateValues };
+      }
       setTemplateValues(draft.templateValues);
     }
     if (draft.selectedTemplateId) setSelectedTemplateId(draft.selectedTemplateId);

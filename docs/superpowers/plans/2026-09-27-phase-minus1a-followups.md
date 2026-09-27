@@ -18,10 +18,10 @@ Fixes for the gaps found by the post-merge audit of Phase −1A (2026-09-27). Br
 - [x] A7 A4 focus: opening the mobile drawer moves focus into it; closing returns focus to the menu button.
 
 ### Group B: object pages and copy
-- [ ] B1 B7: owners see one "Run prompt" button on ObjectDetail, not two.
-- [ ] B2 Single-object export filenames keep non-Latin titles (shared helper with `zipEntryName`).
-- [ ] B3 Bulk delete copy says "Move to Trash" / "Moved N to Trash" (modal + toast).
-- [ ] B4 ObjectNew template draft restore also works under React StrictMode (`npm run dev`).
+- [x] B1 B7: owners see one "Run prompt" button on ObjectDetail, not two.
+- [x] B2 Single-object export filenames keep non-Latin titles (shared helper with `zipEntryName`).
+- [x] B3 Bulk delete copy says "Move to Trash" / "Moved N to Trash" (modal + toast).
+- [x] B4 ObjectNew template draft restore also works under React StrictMode (`npm run dev`).
 
 ### Group C: session and per-user data
 - [ ] C1 Drafts and the run-prompt key are also cleared on session expiry and on a logout from another tab.

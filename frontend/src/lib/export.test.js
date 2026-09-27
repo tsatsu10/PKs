@@ -5,6 +5,7 @@ import {
   EXPORT_TEMPLATE_IDS,
   EXPORT_FORMAT_LABELS,
   zipEntryName,
+  safeFileBase,
 } from './export.js';
 
 describe('getExportIncludeFromTemplate', () => {
@@ -119,5 +120,25 @@ describe('zipEntryName', () => {
     const used = new Set();
     expect(zipEntryName('a/b:c*?', 'eeeeeeee', 'txt', used)).toBe('abc.txt');
     expect(zipEntryName('   ', 'ffffffff', 'md', used)).toBe('untitled.md');
+  });
+});
+
+describe('safeFileBase', () => {
+  it('keeps a non-Latin title readable instead of collapsing to "-"', () => {
+    expect(safeFileBase('会議メモ')).toBe('会議メモ');
+  });
+
+  it('falls back to "untitled" for a title made only of illegal characters', () => {
+    expect(safeFileBase('///:::***')).toBe('untitled');
+  });
+
+  it('strips illegal characters and collapses whitespace', () => {
+    expect(safeFileBase('a/b:c*?')).toBe('abc');
+    expect(safeFileBase('  My Notes  ')).toBe('My-Notes');
+  });
+
+  it('returns "untitled" for empty or whitespace-only titles', () => {
+    expect(safeFileBase('')).toBe('untitled');
+    expect(safeFileBase('   ')).toBe('untitled');
   });
 });
