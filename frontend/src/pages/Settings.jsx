@@ -8,7 +8,6 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
-import { useDeckEnabled } from '../components/MainMenuDeckContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
 import './Settings.css';
@@ -26,7 +25,6 @@ export default function Settings() {
   const [addingTag, setAddingTag] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
-  const { deckEnabled: mainMenuDeckEnabled, setDeckEnabled } = useDeckEnabled();
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupError, setBackupError] = useState('');
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -554,21 +552,6 @@ export default function Settings() {
             {passwordSaving ? 'Updating…' : 'Update password'}
           </button>
         </form>
-      </section>
-
-      <section className="settings-section page-section">
-        <h2 className="page-section-title">Bottom menu</h2>
-        <p className="settings-desc page-section-desc">Show the menu wheel at the bottom of the screen. When off, the standard bottom bar (Home, New, Alerts, Settings) is used on mobile.</p>
-        <label className="settings-toggle-label">
-          <input
-            type="checkbox"
-            checked={mainMenuDeckEnabled}
-            onChange={(e) => setDeckEnabled(e.target.checked)}
-            aria-describedby="deck-desc"
-          />
-          <span>Enable bottom menu wheel</span>
-        </label>
-        <p id="deck-desc" className="settings-desc">Tap the Menu button at the bottom to open the wheel and jump to any section.</p>
       </section>
 
       <section className="settings-section page-section">

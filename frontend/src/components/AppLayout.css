@@ -441,11 +441,6 @@
   display: none;
 }
 
-/* When menu deck (wheel) is enabled, reserve space above the trigger */
-.app-layout-deck-enabled .app-layout-main {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
-}
-
 @media (max-width: 768px) {
   .app-layout-sidebar {
     transform: translateX(-100%);
