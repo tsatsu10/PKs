@@ -1,9 +1,16 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { resolveSessionEvent } from '../lib/authEvents';
-import { clearAllDrafts } from '../lib/draftStorage';
-import { RUN_PROMPT_STORAGE_KEY } from '../constants';
+import {
+  resolveSessionEvent,
+  resolveSignOut,
+  shouldIgnoreWhileLoggingOut,
+  isSameUser,
+  markExplicitLogout,
+  readExplicitLogoutMark,
+  clearExplicitLogoutMark,
+} from '../lib/authEvents';
+import { clearUserData, clearOrphanedLocalData } from '../lib/userStorage';
 
 const AuthContext = createContext(null);
 
@@ -67,10 +74,20 @@ export function AuthProvider({ children }) {
   // same-user refocus/refresh event re-verifies instead of being skipped, so an
   // offline boot (or a failed profile fetch) doesn't leave default settings.
   const enrichedRef = useRef(false);
+  // Mirrors enrichedRef for rendering (Settings won't save defaults over an unloaded profile).
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const verifyInFlightRef = useRef(false);
+  // True while logout() awaits signOut: auth events other than SIGNED_OUT are ignored.
+  const loggingOutRef = useRef(false);
+
+  const setEnriched = useCallback((value) => {
+    enrichedRef.current = value;
+    setProfileLoaded(value);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    clearOrphanedLocalData();
     const globalTimeoutId = setTimeout(() => {
       if (!cancelled) setLoading(false);
     }, 8000);
@@ -86,12 +103,26 @@ export function AuthProvider({ children }) {
       }
       hadUserRef.current = false;
       sessionUserIdRef.current = null;
-      enrichedRef.current = false;
+      setEnriched(false);
       // Invalidate any in-flight verify so it can't bring the user back.
       ++verifyGenerationRef.current;
       verifyInFlightRef.current = false;
+      // Session expiry and a logout in another tab end here, not in logout().
+      clearUserData();
       setUser(null);
       setHasValidSession(false);
+    };
+
+    // The session ended without this tab calling logout(): either another tab
+    // signed out on purpose (it marked localStorage first) or the session expired.
+    const endSession = () => {
+      const kind = resolveSignOut(hadUserRef.current, readExplicitLogoutMark(), Date.now());
+      if (kind === 'logout') {
+        clearAuthenticated(false);
+        setExplicitLogout(true);
+      } else {
+        clearAuthenticated(kind === 'expired');
+      }
     };
 
     // Verify with the server and load the profile, without first resetting the user.
@@ -102,27 +133,31 @@ export function AuthProvider({ children }) {
         if (cancelled || generation !== verifyGenerationRef.current) return;
         verifyInFlightRef.current = false;
         if (result) {
-          enrichedRef.current = result.profileLoaded;
-          setUser(result.user);
+          setEnriched(result.profileLoaded);
+          // Keep the same object when nothing changed, so a refocus re-verify of
+          // an un-enriched user doesn't re-render consumers keyed on `user`.
+          setUser((prev) => (isSameUser(prev, result.user) ? prev : result.user));
           setHasValidSession(true);
         } else if (result === null) {
-          clearAuthenticated(true);
+          endSession();
         }
         // undefined: couldn't reach the server; keep the stored session rather than logging out.
       });
     };
 
     const applyFastSession = (session) => {
+      // logout() owns the state until signOut settles; never restore the user mid-logout.
+      if (loggingOutRef.current) return;
       const sessionOk = !!session?.access_token;
       if (!session?.user || !sessionOk) {
-        clearAuthenticated(hadUserRef.current);
+        endSession();
         finishLoading();
         return;
       }
 
       hadUserRef.current = true;
       sessionUserIdRef.current = session.user.id;
-      enrichedRef.current = false;
+      setEnriched(false);
       setUser(mapUser(session.user, null));
       setHasValidSession(true);
       setExplicitLogout(false);
@@ -151,7 +186,7 @@ export function AuthProvider({ children }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
+      if (cancelled || shouldIgnoreWhileLoggingOut(event, loggingOutRef.current)) return;
 
       const action = resolveSessionEvent(event, session, sessionUserIdRef.current, enrichedRef.current);
       if (action === 'skip') {
@@ -164,7 +199,7 @@ export function AuthProvider({ children }) {
       }
 
       if (event === 'SIGNED_OUT' || !session?.user) {
-        clearAuthenticated(hadUserRef.current);
+        endSession();
         finishLoading();
         return;
       }
@@ -191,7 +226,7 @@ export function AuthProvider({ children }) {
       // A verify started by this effect is ignored once cancelled; don't let it block the next run.
       verifyInFlightRef.current = false;
     };
-  }, []);
+  }, [setEnriched]);
 
   /** Only set user when Supabase has a JWT (required for RLS). Returns false if no session. */
   const login = useCallback(async (userData) => {
@@ -200,54 +235,74 @@ export function AuthProvider({ children }) {
       setHasValidSession(false);
       return false;
     }
+    clearExplicitLogoutMark();
     hadUserRef.current = true;
-    sessionUserIdRef.current = session.user?.id ?? userData?.id ?? null;
-    // userData may carry a default profile (its fetch can time out); let the
-    // next same-user event re-verify rather than trusting it.
-    enrichedRef.current = false;
-    setUser(userData);
+    const userId = session.user?.id ?? userData?.id ?? null;
+    // The SIGNED_IN event usually got here first and its verify may already have
+    // loaded the profile; don't swap that for userData's possibly-default one.
+    const alreadyEnriched = enrichedRef.current && sessionUserIdRef.current === userId;
+    sessionUserIdRef.current = userId;
+    if (!alreadyEnriched) {
+      // userData may carry a default profile (its fetch can time out); let the
+      // next same-user event re-verify rather than trusting it.
+      setEnriched(false);
+      setUser(userData);
+    }
     setHasValidSession(true);
     setExplicitLogout(false);
     return true;
-  }, []);
+  }, [setEnriched]);
 
   const logout = useCallback(async () => {
+    loggingOutRef.current = true;
+    // Other tabs receive our SIGNED_OUT over auth-js's BroadcastChannel; this
+    // shared mark tells them it was deliberate, not an expiry.
+    markExplicitLogout();
     // Deliberate sign-out: not a session expiry, and no "return to" page for the next user.
     hadUserRef.current = false;
     sessionUserIdRef.current = null;
-    enrichedRef.current = false;
+    setEnriched(false);
     // Invalidate any in-flight verify so it can't bring the user back.
     ++verifyGenerationRef.current;
     verifyInFlightRef.current = false;
     setExplicitLogout(true);
-    clearAllDrafts();
-    try { sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY); } catch (_e) { void _e; }
-    const { error } = await supabase.auth.signOut();
-    // Offline: auth-js returns a network error *before* removing the stored
-    // session, for every scope including 'local'. Remove it directly so a
-    // reload can't log the user back in. storageKey is a runtime field on
-    // GoTrueClient (protected in its TypeScript types).
-    if (error) {
-      try {
-        localStorage.removeItem(supabase.auth.storageKey);
-        localStorage.removeItem(`${supabase.auth.storageKey}-code-verifier`);
-      } catch (_e) { void _e; }
+    clearUserData();
+    try {
+      const { error } = await supabase.auth.signOut();
+      // Offline: auth-js returns a network error *before* removing the stored
+      // session, for every scope including 'local'. Remove it directly so a
+      // reload can't log the user back in. storageKey is a runtime field on
+      // GoTrueClient (protected in its TypeScript types).
+      if (error) {
+        try {
+          localStorage.removeItem(supabase.auth.storageKey);
+          localStorage.removeItem(`${supabase.auth.storageKey}-code-verifier`);
+        } catch (_e) { void _e; }
+      }
+    } finally {
+      loggingOutRef.current = false;
+      setUser(null);
+      setHasValidSession(false);
+      setSessionExpired(false);
     }
-    setUser(null);
-    setHasValidSession(false);
-    setSessionExpired(false);
-  }, []);
+  }, [setEnriched]);
 
   const refreshUser = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    const generation = verifyGenerationRef.current;
+    if (!session?.user || sessionUserIdRef.current !== session.user.id) return;
+    // Take a new generation: an older verify still in flight (a refocus
+    // re-verify, the boot verify) is discarded instead of landing after us with
+    // pre-save data. We own the in-flight flag until we finish.
+    const generation = ++verifyGenerationRef.current;
+    verifyInFlightRef.current = true;
     const result = await verifyAndEnrichUser(session);
-    // Ignore a result that lands after logout or a user change.
-    if (!result || generation !== verifyGenerationRef.current || sessionUserIdRef.current !== session.user.id) return;
-    if (result.profileLoaded) enrichedRef.current = true;
-    setUser(result.user);
-  }, []);
+    // Ignore a result that lands after logout, a user change or a newer verify.
+    if (generation !== verifyGenerationRef.current) return;
+    verifyInFlightRef.current = false;
+    if (!result || sessionUserIdRef.current !== session.user.id) return;
+    if (result.profileLoaded) setEnriched(true);
+    setUser((prev) => (isSameUser(prev, result.user) ? prev : result.user));
+  }, [setEnriched]);
 
   const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
 
@@ -263,8 +318,9 @@ export function AuthProvider({ children }) {
       sessionExpired,
       clearSessionExpired,
       explicitLogout,
+      profileLoaded,
     }),
-    [user, hasValidSession, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired, explicitLogout]
+    [user, hasValidSession, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired, explicitLogout, profileLoaded]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

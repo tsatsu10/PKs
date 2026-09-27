@@ -13,7 +13,7 @@ import { downloadBlob } from '../lib/download';
 import './Settings.css';
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, profileLoaded } = useAuth();
   const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
   const [domains, setDomains] = useState([]);
@@ -66,14 +66,22 @@ export default function Settings() {
     setInstallPrompt(null);
   }
 
-  useEffect(() => {
-    if (!user?.id) return;
+  // Fill the profile form once per user, and again when the stored profile
+  // arrives, never on other user-object changes (a refocus re-verify would
+  // otherwise wipe in-progress edits). Adjusting state during render, per React docs.
+  const profileFormKey = user?.id ? `${user.id}:${profileLoaded ? 'loaded' : 'pending'}` : null;
+  const [profileFormFor, setProfileFormFor] = useState(null);
+  if (profileFormKey && profileFormKey !== profileFormFor) {
+    setProfileFormFor(profileFormKey);
     setProfileDisplayName(user.displayName ?? '');
     setProfileTimezone(user.timezone ?? 'Africa/Accra');
-  }, [user?.id, user?.displayName, user?.timezone]);
+  }
 
   async function saveProfile(e) {
     e.preventDefault();
+    // Until the profile loads the form holds defaults ('Africa/Accra'); saving
+    // them would overwrite the stored timezone and display name.
+    if (!profileLoaded) return;
     setProfileError('');
     setProfileSaving(true);
     try {
@@ -498,7 +506,17 @@ export default function Settings() {
               <option value="UTC" />
             </datalist>
           </label>
-          <button type="submit" className="btn btn-primary" disabled={profileSaving}>
+          {!profileLoaded && (
+            <p id="profile-loading-hint" className="settings-desc" role="status">
+              Loading your saved profile… You can save once it has loaded.
+            </p>
+          )}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={profileSaving || !profileLoaded}
+            aria-describedby={profileLoaded ? undefined : 'profile-loading-hint'}
+          >
             {profileSaving ? 'Saving…' : 'Save profile'}
           </button>
         </form>

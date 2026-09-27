@@ -24,13 +24,13 @@ Fixes for the gaps found by the post-merge audit of Phase −1A (2026-09-27). Br
 - [x] B4 ObjectNew template draft restore also works under React StrictMode (`npm run dev`).
 
 ### Group C: session and per-user data
-- [ ] C1 Drafts and the run-prompt key are also cleared on session expiry and on a logout from another tab.
-- [ ] C2 Per-user localStorage (saved filters and similar) is keyed by user id or cleared on logout.
-- [ ] C3 R4 cross-tab: a logout in another tab doesn't show "session expired" or keep a return-to page.
-- [ ] C4 R1 residual: re-verifying an un-enriched user doesn't reset the Settings form when nothing changed.
-- [ ] C5 Settings doesn't save the default timezone before the profile has loaded.
-- [ ] C6 `refreshUser` bumps the verify generation so an older verify can't overwrite it.
-- [ ] C7 Logout race: an auth event arriving while `signOut` is pending can't restore the user.
+- [x] C1 Drafts and the run-prompt key are also cleared on session expiry and on a logout from another tab.
+- [x] C2 Per-user localStorage (saved filters and similar) is keyed by user id or cleared on logout.
+- [x] C3 R4 cross-tab: a logout in another tab doesn't show "session expired" or keep a return-to page.
+- [x] C4 R1 residual: re-verifying an un-enriched user doesn't reset the Settings form when nothing changed.
+- [x] C5 Settings doesn't save the default timezone before the profile has loaded.
+- [x] C6 `refreshUser` bumps the verify generation so an older verify can't overwrite it.
+- [x] C7 Logout race: an auth event arriving while `signOut` is pending can't restore the user.
 
 ### Group D: PWA, tests, CI, dependencies, docs
 - [ ] D1 Service-worker tests don't leak intervals or document listeners.
