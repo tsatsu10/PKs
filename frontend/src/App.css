@@ -195,8 +195,10 @@ body {
   transform: translateX(-50%);
   z-index: 1000;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-6);
+  max-width: calc(100vw - 32px);
   padding: var(--space-6) var(--space-8);
   background: var(--surface-elevated);
   color: var(--polar-white);

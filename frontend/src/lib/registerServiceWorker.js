@@ -6,18 +6,25 @@
  * Reload, this tab reloads directly instead of posting SKIP_WAITING again.
  * The generated sw.js (vite-plugin-pwa, registerType 'prompt') activates on
  * a { type: 'SKIP_WAITING' } message.
+ * Long-lived tabs also check for a new worker every `updateIntervalMs` and
+ * whenever the tab becomes visible again; failed checks (offline) are ignored.
  * @param {{
  *   onUpdateReady: (apply: () => void) => void,
  *   container?: ServiceWorkerContainer,
  *   reload?: () => void,
  *   url?: string,
- * }} options
+ *   updateIntervalMs?: number,
+ *   doc?: Document,
+ * }} options - `updateIntervalMs` defaults to 60 minutes (0 disables the
+ *   interval); `doc` is the document whose visibilitychange triggers a check.
  */
 export async function registerServiceWorker({
   onUpdateReady,
   container = navigator.serviceWorker,
   reload = () => window.location.reload(),
   url = '/sw.js',
+  updateIntervalMs = 60 * 60 * 1000,
+  doc = typeof document === 'undefined' ? undefined : document,
 }) {
   if (!container) return;
   let reloadRequested = false;
@@ -43,11 +50,26 @@ export async function registerServiceWorker({
     });
   };
 
-  if (registration.waiting) offer(registration.waiting);
-  registration.addEventListener('updatefound', () => {
-    const installing = registration.installing;
+  // Offer a worker once it finishes installing and is waiting.
+  const watchInstalling = (installing) => {
     installing?.addEventListener('statechange', () => {
       if (installing.state === 'installed') offer(installing);
     });
+  };
+
+  if (registration.waiting) offer(registration.waiting);
+  // An update may already be installing by the time register() resolves;
+  // its updatefound has fired, so watch it directly.
+  watchInstalling(registration.installing);
+  registration.addEventListener('updatefound', () => watchInstalling(registration.installing));
+
+  const checkForUpdate = () => {
+    try {
+      registration.update()?.catch?.(() => {});
+    } catch (_e) { void _e; }
+  };
+  if (updateIntervalMs > 0) setInterval(checkForUpdate, updateIntervalMs);
+  doc?.addEventListener('visibilitychange', () => {
+    if (doc.visibilityState === 'visible') checkForUpdate();
   });
 }
