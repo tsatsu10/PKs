@@ -317,15 +317,6 @@
   flex-direction: column;
 }
 
-.notion-content-block .markdown-editor-wrapper .w-md-editor {
-  flex: 1;
-  min-height: 100%;
-}
-
-.notion-content-block .markdown-editor-wrapper .w-md-editor-area {
-  flex: 1;
-}
-
 .notion-content-block .blocknote-editor-wrapper {
   width: 100%;
 }

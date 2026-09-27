@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { getErrorMessage } from '../lib/errors';
 import { deferAfterPaint } from '../lib/defer';
 import { createDomain, createTag } from '../lib/entities';
@@ -161,7 +160,6 @@ export function useDashboardSearch({ userId }) {
       const requestId = ++requestIdRef.current;
       setLoading(true);
       setError('');
-      measureSearchStart();
       try {
         const rpcName = rpcPayload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
         const searchPromise = supabase.rpc(rpcName, {
@@ -209,7 +207,6 @@ export function useDashboardSearch({ userId }) {
           setTotalCount(null);
         }
       } finally {
-        measureSearchEnd();
         if (requestId === requestIdRef.current) setLoading(false);
       }
     },

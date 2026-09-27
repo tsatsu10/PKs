@@ -7,7 +7,6 @@ import { getErrorMessage } from '../lib/errors';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import TypeMark from '../components/TypeMark';
-import { measureSearchStart, measureSearchEnd } from '../lib/performance';
 import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
@@ -61,7 +60,6 @@ export default function Search() {
     if (!isLoadMore) setLoading(true);
     else setLoadingMore(true);
     setError('');
-    measureSearchStart();
     try {
       const { data, error: err } = await supabase.rpc(
         searchQ ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects',
@@ -89,7 +87,6 @@ export default function Search() {
       setError(getErrorMessage(e, 'Search failed'));
       if (!isLoadMore) setObjects([]);
     } finally {
-      measureSearchEnd();
       setLoading(false);
       setLoadingMore(false);
     }

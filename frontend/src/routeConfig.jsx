@@ -85,10 +85,3 @@ export const protectedChildRoutes = [
 /** Layout route element wrapping all protectedChildRoutes. */
 /* eslint-disable-next-line react-refresh/only-export-components */
 export const protectedLayoutRoute = { element: protectedLayout, children: protectedChildRoutes };
-
-/** @deprecated Use publicRoutes + protectedLayoutRoute — kept for tests importing routeConfig */
-/* eslint-disable-next-line react-refresh/only-export-components */
-export const routeConfig = [
-  ...publicRoutes,
-  ...protectedChildRoutes.map(({ path }) => ({ path, element: protectedLayout })),
-];

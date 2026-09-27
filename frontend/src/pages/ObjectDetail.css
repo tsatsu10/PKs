@@ -417,26 +417,6 @@
   margin-bottom: 2rem;
 }
 
-/* Rendered Markdown in detail view */
-.markdown-content {
-  line-height: 1.65;
-  margin-bottom: 2rem;
-}
-.markdown-content h1 { font-size: 1.5rem; margin: 1.25rem 0 0.5rem; font-weight: 700; }
-.markdown-content h2 { font-size: 1.25rem; margin: 1rem 0 0.5rem; font-weight: 600; }
-.markdown-content h3 { font-size: 1.125rem; margin: 0.75rem 0 0.35rem; font-weight: 600; }
-.markdown-content p { margin: 0.5rem 0; }
-.markdown-content ul, .markdown-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
-.markdown-content li { margin: 0.25rem 0; }
-.markdown-content code { background: var(--glass-bg, #1e293b); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
-.markdown-content pre { background: var(--glass-bg, #1e293b); padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; }
-.markdown-content pre code { padding: 0; background: none; }
-.markdown-content a { color: var(--link-color, #60a5fa); text-decoration: none; }
-.markdown-content a:hover { text-decoration: underline; }
-.markdown-content blockquote { border-left: 3px solid var(--glass-border, #334155); margin: 0.5rem 0; padding-left: 1rem; color: var(--polar-muted); }
-.markdown-content table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
-.markdown-content th, .markdown-content td { border: 1px solid var(--glass-border, #334155); padding: 0.35rem 0.6rem; text-align: left; }
-
 .detail-edit label,
 .detail-edit .detail-edit-field {
   display: block;
