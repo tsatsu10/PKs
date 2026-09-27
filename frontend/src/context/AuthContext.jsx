@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { shouldSkipSessionApply } from '../lib/authEvents';
+import { clearAllDrafts } from '../lib/draftStorage';
+import { RUN_PROMPT_STORAGE_KEY } from '../constants';
 
 const AuthContext = createContext(null);
 
@@ -54,6 +57,7 @@ export function AuthProvider({ children }) {
   const [hasValidSession, setHasValidSession] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [explicitLogout, setExplicitLogout] = useState(false);
   const hadUserRef = useRef(false);
   const sessionUserIdRef = useRef(null);
   const verifyGenerationRef = useRef(0);
@@ -91,6 +95,7 @@ export function AuthProvider({ children }) {
       sessionUserIdRef.current = session.user.id;
       setUser(mapUser(session.user, null));
       setHasValidSession(true);
+      setExplicitLogout(false);
       finishLoading();
 
       const generation = ++verifyGenerationRef.current;
@@ -107,7 +112,8 @@ export function AuthProvider({ children }) {
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) applyFastSession(session);
+      if (cancelled || shouldSkipSessionApply('INITIAL_SESSION', session, sessionUserIdRef.current)) return;
+      applyFastSession(session);
     }).catch(() => {
       if (!cancelled) {
         clearAuthenticated(false);
@@ -118,7 +124,7 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
 
-      if (event === 'TOKEN_REFRESHED' && session?.user?.id && session.user.id === sessionUserIdRef.current) {
+      if (shouldSkipSessionApply(event, session, sessionUserIdRef.current)) {
         setHasValidSession(!!session?.access_token);
         return;
       }
@@ -150,15 +156,30 @@ export function AuthProvider({ children }) {
     sessionUserIdRef.current = session.user?.id ?? userData?.id ?? null;
     setUser(userData);
     setHasValidSession(true);
+    setExplicitLogout(false);
     return true;
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    // Deliberate sign-out: not a session expiry, and no "return to" page for the next user.
     hadUserRef.current = false;
     sessionUserIdRef.current = null;
+    setExplicitLogout(true);
+    clearAllDrafts();
+    try { sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY); } catch (_e) { void _e; }
+    const { error } = await supabase.auth.signOut();
+    // Offline: auth-js returns a network error *before* removing the stored
+    // session, for every scope including 'local'. Remove it directly so a
+    // reload can't log the user back in. storageKey is public on GoTrueClient.
+    if (error) {
+      try {
+        localStorage.removeItem(supabase.auth.storageKey);
+        localStorage.removeItem(`${supabase.auth.storageKey}-code-verifier`);
+      } catch (_e) { void _e; }
+    }
     setUser(null);
     setHasValidSession(false);
+    setSessionExpired(false);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -181,8 +202,9 @@ export function AuthProvider({ children }) {
       supabase,
       sessionExpired,
       clearSessionExpired,
+      explicitLogout,
     }),
-    [user, hasValidSession, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired]
+    [user, hasValidSession, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired, explicitLogout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

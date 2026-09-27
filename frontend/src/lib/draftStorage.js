@@ -32,3 +32,15 @@ export function clearDraft(key) {
     sessionStorage.removeItem(key);
   } catch (_e) { void _e; }
 }
+
+/** Remove every PKS draft (e.g. on logout, so the next user of this tab never sees them). */
+export function clearAllDrafts() {
+  try {
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => sessionStorage.removeItem(key));
+  } catch (_e) { void _e; }
+}
