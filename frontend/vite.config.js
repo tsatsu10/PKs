@@ -27,7 +27,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['pks-logo.svg', 'manifest.json'],
       manifest: {
         name: 'PKS — Personal Knowledge System',
@@ -43,8 +44,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
         navigateFallback: 'index.html',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Emoji data is lazy-loaded by the editor's emoji picker; skip it.

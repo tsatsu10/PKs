@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import UpdatePrompt from './components/UpdatePrompt';
 import { publicRoutes, protectedLayoutRoute, PageLoadFallback } from './routeConfig';
 import './App.css';
 
@@ -28,6 +29,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
+          <UpdatePrompt />
         </BrowserRouter>
         </ToastProvider>
         </ThemeProvider>

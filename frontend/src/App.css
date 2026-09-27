@@ -187,3 +187,20 @@ body {
 .skeleton-detail {
   padding: 0.5rem 0;
 }
+
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + var(--mobile-nav-offset, 0px));
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  background: var(--surface-elevated);
+  color: var(--polar-white);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--modal-shadow);
+}
