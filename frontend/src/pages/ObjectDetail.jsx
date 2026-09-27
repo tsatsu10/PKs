@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isTypingTarget } from '../lib/keyboard';
 import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
@@ -188,7 +189,7 @@ export default function ObjectDetail() {
   useEffect(() => {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'R') {
-        if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+        if (isTypingTarget(document.activeElement)) return;
         e.preventDefault();
         if (!object || !promptTemplates?.length) return;
         const applicable = promptTemplates.filter(

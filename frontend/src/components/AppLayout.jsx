@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../breakpoints';
+import { isTypingTarget } from '../lib/keyboard';
 import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
@@ -72,7 +73,7 @@ export default function AppLayout({ children }) {
         navigate('/search');
         return;
       }
-      if (e.key === '?' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+      if (e.key === '?' && !isTypingTarget(document.activeElement)) {
         e.preventDefault();
         setShortcutsOpen(true);
       }

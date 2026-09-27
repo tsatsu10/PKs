@@ -1,9 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-function isTypingTarget(el) {
-  if (!el) return false;
-  return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
-}
+import { isTypingTarget } from '../../../lib/keyboard';
 
 function isModalOpen() {
   return document.querySelector('[role="dialog"][aria-modal="true"]') != null;
