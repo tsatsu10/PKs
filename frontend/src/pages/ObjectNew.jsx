@@ -87,6 +87,8 @@ export default function ObjectNew() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchDomainsTagsTemplates]);
 
+  // Template values restored from a draft; the reset effect below must not wipe them.
+  const restoredTemplateValuesRef = useRef(null);
   useEffect(() => {
     if (!schema?.fields?.length) {
       setTemplateValues({});
@@ -94,6 +96,11 @@ export default function ObjectNew() {
     }
     const initial = {};
     schema.fields.forEach((f) => { initial[f.key] = ''; });
+    if (restoredTemplateValuesRef.current) {
+      setTemplateValues(restoredTemplateValuesRef.current);
+      restoredTemplateValuesRef.current = null;
+      return;
+    }
     setTemplateValues(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form when template selection changes only
   }, [selectedTemplateId]);
@@ -103,11 +110,15 @@ export default function ObjectNew() {
     if (hasRestoredDraft.current) return;
     const draft = getDraft(DRAFT_KEYS.new);
     if (!draft?.form) return;
-    if (!draft.form.title?.trim() && !draft.form.content?.trim()) return;
+    const hasTemplateInput = Object.values(draft.templateValues || {}).some((v) => String(v ?? '').trim());
+    if (!draft.form.title?.trim() && !draft.form.content?.trim() && !hasTemplateInput) return;
     hasRestoredDraft.current = true;
     setForm((f) => ({ ...f, ...draft.form }));
+    if (draft.templateValues && Object.keys(draft.templateValues).length) {
+      if (draft.selectedTemplateId) restoredTemplateValuesRef.current = draft.templateValues;
+      setTemplateValues(draft.templateValues);
+    }
     if (draft.selectedTemplateId) setSelectedTemplateId(draft.selectedTemplateId);
-    if (draft.templateValues && Object.keys(draft.templateValues).length) setTemplateValues(draft.templateValues);
     addToast('success', 'Draft restored');
   }, [addToast]);
 

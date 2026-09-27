@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
+import OptionsInput from '../components/OptionsInput';
 import './Templates.css';
 
 const FIELD_TYPES = [
@@ -574,20 +575,13 @@ export default function Templates() {
                               {f.type === 'select' && (
                                 <div className="templates-field-options-wrap">
                                   <span className="templates-field-options-label">Options (comma-separated)</span>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. Draft, In review, Done"
+                                  <OptionsInput
+                                    key={`${editingId}:${i}:${f.key}`}
+                                    options={f.options}
+                                    onCommit={(opts) => updateField(i, { options: opts })}
                                     className="templates-field-options"
-                                    value={Array.isArray(f.options) ? f.options.join(', ') : ''}
-                                    onChange={(e) =>
-                                      updateField(i, {
-                                        options: e.target.value
-                                          .split(',')
-                                          .map((s) => s.trim())
-                                          .filter(Boolean),
-                                      })
-                                    }
-                                    aria-label="Dropdown options"
+                                    placeholder="e.g. Draft, In review, Done"
+                                    ariaLabel="Dropdown options"
                                   />
                                 </div>
                               )}
