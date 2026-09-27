@@ -90,17 +90,17 @@ export default function ObjectNew() {
   // Template values restored from a draft; the reset effect below must not wipe them.
   const restoredTemplateValuesRef = useRef(null);
   useEffect(() => {
+    if (restoredTemplateValuesRef.current) {
+      setTemplateValues(restoredTemplateValuesRef.current);
+      restoredTemplateValuesRef.current = null;
+      return;
+    }
     if (!schema?.fields?.length) {
       setTemplateValues({});
       return;
     }
     const initial = {};
     schema.fields.forEach((f) => { initial[f.key] = ''; });
-    if (restoredTemplateValuesRef.current) {
-      setTemplateValues(restoredTemplateValuesRef.current);
-      restoredTemplateValuesRef.current = null;
-      return;
-    }
     setTemplateValues(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form when template selection changes only
   }, [selectedTemplateId]);
