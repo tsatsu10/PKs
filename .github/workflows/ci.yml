@@ -23,6 +23,4 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check:bundle
-      # A new upstream advisory must not block unrelated pushes; the step still shows red in the log.
       - run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true

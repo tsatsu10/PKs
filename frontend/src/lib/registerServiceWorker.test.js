@@ -12,12 +12,19 @@ function fakeContainer({ controlled = true, waiting = true } = {}) {
   return { container, registration };
 }
 
+// Every test registers against a fake EventTarget `doc` (never the real jsdom
+// `document`) and disables the update interval unless a test explicitly needs
+// it, so no test leaks a real timer or a listener on the shared document.
+function register(options) {
+  return registerServiceWorker({ updateIntervalMs: 0, doc: new EventTarget(), ...options });
+}
+
 describe('registerServiceWorker', () => {
   it('offers a waiting worker, and reloads only the tab whose user applied it', async () => {
     const { container, registration } = fakeContainer();
     const reload = vi.fn();
     const onUpdateReady = vi.fn();
-    await registerServiceWorker({ container, onUpdateReady, reload });
+    await register({ container, onUpdateReady, reload });
     expect(onUpdateReady).toHaveBeenCalledTimes(1);
 
     // Another tab activated the new worker: this tab must NOT reload.
@@ -34,7 +41,7 @@ describe('registerServiceWorker', () => {
   it('does not offer an update on first install (page not yet controlled)', async () => {
     const { container } = fakeContainer({ controlled: false });
     const onUpdateReady = vi.fn();
-    await registerServiceWorker({ container, onUpdateReady, reload: vi.fn() });
+    await register({ container, onUpdateReady, reload: vi.fn() });
     expect(onUpdateReady).not.toHaveBeenCalled();
   });
 
@@ -42,7 +49,7 @@ describe('registerServiceWorker', () => {
     const { container, registration } = fakeContainer();
     const reload = vi.fn();
     const onUpdateReady = vi.fn();
-    await registerServiceWorker({ container, onUpdateReady, reload });
+    await register({ container, onUpdateReady, reload });
 
     // Another tab clicked Reload first: the waiting worker activates, then
     // this tab observes the controller change (the browser flips the
@@ -63,7 +70,7 @@ describe('registerServiceWorker', () => {
     installing.postMessage = vi.fn();
     registration.installing = installing;
     const onUpdateReady = vi.fn();
-    await registerServiceWorker({ container, onUpdateReady, reload: vi.fn(), doc: new EventTarget() });
+    await register({ container, onUpdateReady, reload: vi.fn() });
     expect(onUpdateReady).not.toHaveBeenCalled();
 
     installing.state = 'installed';
@@ -78,7 +85,7 @@ describe('registerServiceWorker', () => {
     registration.update = vi.fn(async () => { throw new Error('offline'); });
     const doc = new EventTarget();
     doc.visibilityState = 'hidden';
-    await registerServiceWorker({ container, onUpdateReady: vi.fn(), reload: vi.fn(), doc, updateIntervalMs: 0 });
+    await register({ container, onUpdateReady: vi.fn(), reload: vi.fn(), doc });
 
     doc.dispatchEvent(new Event('visibilitychange'));
     expect(registration.update).not.toHaveBeenCalled();
@@ -93,7 +100,7 @@ describe('registerServiceWorker', () => {
     vi.useFakeTimers();
     try {
       const { container, registration } = fakeContainer({ waiting: false });
-      await registerServiceWorker({ container, onUpdateReady: vi.fn(), reload: vi.fn(), doc: new EventTarget(), updateIntervalMs: 1000 });
+      await register({ container, onUpdateReady: vi.fn(), reload: vi.fn(), updateIntervalMs: 1000 });
       expect(registration.update).not.toHaveBeenCalled();
       vi.advanceTimersByTime(2000);
       expect(registration.update).toHaveBeenCalledTimes(2);

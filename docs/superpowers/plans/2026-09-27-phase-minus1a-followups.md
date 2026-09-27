@@ -33,10 +33,10 @@ Fixes for the gaps found by the post-merge audit of Phase −1A (2026-09-27). Br
 - [x] C7 Logout race: an auth event arriving while `signOut` is pending can't restore the user.
 
 ### Group D: PWA, tests, CI, dependencies, docs
-- [ ] D1 Service-worker tests don't leak intervals or document listeners.
-- [ ] D2 CI's production audit step fails the run on high/critical advisories.
-- [ ] D3 Dev dependencies patched (vite ≥ 7.3.6, vitest past the critical advisory); `npm audit` clean or explained.
-- [ ] D4 README deploy note: users on the old build get the update after closing all PKS tabs once.
+- [x] D1 Service-worker tests don't leak intervals or document listeners.
+- [x] D2 CI's production audit step fails the run on high/critical advisories.
+- [x] D3 Dev dependencies patched (vite ≥ 7.3.6, vitest past the critical advisory); `npm audit` clean or explained.
+- [x] D4 README deploy note: users on the old build get the update after closing all PKS tabs once.
 
 ### Group E: dead code
 - [ ] E1 Remove the duplicate `public/manifest.json` link/file (keep the PWA-generated manifest).
