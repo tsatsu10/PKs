@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { shouldSkipSessionApply } from '../lib/authEvents';
+import { resolveSessionEvent } from '../lib/authEvents';
 import { clearAllDrafts } from '../lib/draftStorage';
 import { RUN_PROMPT_STORAGE_KEY } from '../constants';
 
@@ -30,8 +30,10 @@ async function fetchProfile(userId) {
 
 /**
  * Verify JWT with server and load profile (parallel).
- * Returns the mapped user, `null` when the server rejected the session, or
- * `undefined` when it couldn't be checked (offline, network error, Supabase down).
+ * Returns `{ user, profileLoaded }` (the mapped user, and whether the profile row
+ * actually loaded rather than falling back to defaults), `null` when the server
+ * rejected the session, or `undefined` when it couldn't be checked (offline,
+ * network error, Supabase down).
  */
 async function verifyAndEnrichUser(session) {
   if (!session?.user) return null;
@@ -49,7 +51,7 @@ async function verifyAndEnrichUser(session) {
     return isAuthApiError(userError) || isAuthSessionMissingError(userError) ? null : undefined;
   }
   if (!verifiedUser) return null;
-  return mapUser(verifiedUser, profile);
+  return { user: mapUser(verifiedUser, profile), profileLoaded: profile != null };
 }
 
 export function AuthProvider({ children }) {
@@ -61,6 +63,11 @@ export function AuthProvider({ children }) {
   const hadUserRef = useRef(false);
   const sessionUserIdRef = useRef(null);
   const verifyGenerationRef = useRef(0);
+  // True once the current user was mapped with a loaded profile. Until then a
+  // same-user refocus/refresh event re-verifies instead of being skipped, so an
+  // offline boot (or a failed profile fetch) doesn't leave default settings.
+  const enrichedRef = useRef(false);
+  const verifyInFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,8 +86,30 @@ export function AuthProvider({ children }) {
       }
       hadUserRef.current = false;
       sessionUserIdRef.current = null;
+      enrichedRef.current = false;
+      // Invalidate any in-flight verify so it can't bring the user back.
+      ++verifyGenerationRef.current;
+      verifyInFlightRef.current = false;
       setUser(null);
       setHasValidSession(false);
+    };
+
+    // Verify with the server and load the profile, without first resetting the user.
+    const verifySession = (session) => {
+      const generation = ++verifyGenerationRef.current;
+      verifyInFlightRef.current = true;
+      verifyAndEnrichUser(session).then((result) => {
+        if (cancelled || generation !== verifyGenerationRef.current) return;
+        verifyInFlightRef.current = false;
+        if (result) {
+          enrichedRef.current = result.profileLoaded;
+          setUser(result.user);
+          setHasValidSession(true);
+        } else if (result === null) {
+          clearAuthenticated(true);
+        }
+        // undefined: couldn't reach the server; keep the stored session rather than logging out.
+      });
     };
 
     const applyFastSession = (session) => {
@@ -93,27 +122,27 @@ export function AuthProvider({ children }) {
 
       hadUserRef.current = true;
       sessionUserIdRef.current = session.user.id;
+      enrichedRef.current = false;
       setUser(mapUser(session.user, null));
       setHasValidSession(true);
       setExplicitLogout(false);
       finishLoading();
+      verifySession(session);
+    };
 
-      const generation = ++verifyGenerationRef.current;
-      verifyAndEnrichUser(session).then((mapped) => {
-        if (cancelled || generation !== verifyGenerationRef.current) return;
-        if (mapped) {
-          setUser(mapped);
-          setHasValidSession(true);
-        } else if (mapped === null) {
-          clearAuthenticated(true);
-        }
-        // undefined: couldn't reach the server; keep the stored session rather than logging out.
-      });
+    // Same user, profile not loaded yet: finish enriching unless a verify is already running.
+    const reverifySession = (session) => {
+      setHasValidSession(!!session?.access_token);
+      finishLoading();
+      if (!verifyInFlightRef.current) verifySession(session);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled || shouldSkipSessionApply('INITIAL_SESSION', session, sessionUserIdRef.current)) return;
-      applyFastSession(session);
+      if (cancelled) return;
+      const action = resolveSessionEvent('INITIAL_SESSION', session, sessionUserIdRef.current, enrichedRef.current);
+      if (action === 'skip') return;
+      if (action === 'reverify') reverifySession(session);
+      else applyFastSession(session);
     }).catch(() => {
       if (!cancelled) {
         clearAuthenticated(false);
@@ -124,8 +153,13 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
 
-      if (shouldSkipSessionApply(event, session, sessionUserIdRef.current)) {
+      const action = resolveSessionEvent(event, session, sessionUserIdRef.current, enrichedRef.current);
+      if (action === 'skip') {
         setHasValidSession(!!session?.access_token);
+        return;
+      }
+      if (action === 'reverify') {
+        reverifySession(session);
         return;
       }
 
@@ -138,10 +172,24 @@ export function AuthProvider({ children }) {
       applyFastSession(session);
     });
 
+    // Back online after an offline boot: load the profile we couldn't get earlier.
+    const onOnline = () => {
+      if (cancelled || enrichedRef.current || !sessionUserIdRef.current) return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled || enrichedRef.current || !session?.user) return;
+        if (session.user.id !== sessionUserIdRef.current) return;
+        reverifySession(session);
+      }).catch(() => {});
+    };
+    window.addEventListener('online', onOnline);
+
     return () => {
       cancelled = true;
       clearTimeout(globalTimeoutId);
       subscription.unsubscribe();
+      window.removeEventListener('online', onOnline);
+      // A verify started by this effect is ignored once cancelled; don't let it block the next run.
+      verifyInFlightRef.current = false;
     };
   }, []);
 
@@ -154,6 +202,9 @@ export function AuthProvider({ children }) {
     }
     hadUserRef.current = true;
     sessionUserIdRef.current = session.user?.id ?? userData?.id ?? null;
+    // userData may carry a default profile (its fetch can time out); let the
+    // next same-user event re-verify rather than trusting it.
+    enrichedRef.current = false;
     setUser(userData);
     setHasValidSession(true);
     setExplicitLogout(false);
@@ -164,13 +215,18 @@ export function AuthProvider({ children }) {
     // Deliberate sign-out: not a session expiry, and no "return to" page for the next user.
     hadUserRef.current = false;
     sessionUserIdRef.current = null;
+    enrichedRef.current = false;
+    // Invalidate any in-flight verify so it can't bring the user back.
+    ++verifyGenerationRef.current;
+    verifyInFlightRef.current = false;
     setExplicitLogout(true);
     clearAllDrafts();
     try { sessionStorage.removeItem(RUN_PROMPT_STORAGE_KEY); } catch (_e) { void _e; }
     const { error } = await supabase.auth.signOut();
     // Offline: auth-js returns a network error *before* removing the stored
     // session, for every scope including 'local'. Remove it directly so a
-    // reload can't log the user back in. storageKey is public on GoTrueClient.
+    // reload can't log the user back in. storageKey is a runtime field on
+    // GoTrueClient (protected in its TypeScript types).
     if (error) {
       try {
         localStorage.removeItem(supabase.auth.storageKey);
@@ -185,8 +241,12 @@ export function AuthProvider({ children }) {
   const refreshUser = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-    const mapped = await verifyAndEnrichUser(session);
-    if (mapped) setUser(mapped);
+    const generation = verifyGenerationRef.current;
+    const result = await verifyAndEnrichUser(session);
+    // Ignore a result that lands after logout or a user change.
+    if (!result || generation !== verifyGenerationRef.current || sessionUserIdRef.current !== session.user.id) return;
+    if (result.profileLoaded) enrichedRef.current = true;
+    setUser(result.user);
   }, []);
 
   const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
