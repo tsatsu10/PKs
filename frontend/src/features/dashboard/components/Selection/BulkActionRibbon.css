@@ -49,7 +49,7 @@
 }
 
 .bulk-action-ribbon-danger {
-  color: #f87171;
+  color: var(--error-text);
 }
 
 .bulk-action-ribbon-dismiss {

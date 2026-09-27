@@ -196,11 +196,6 @@
   border: 1px solid transparent;
 }
 
-.paste-bin-page .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
-}
-
 .paste-bin-page .btn-secondary {
   background: var(--glass-bg);
   color: var(--polar-muted);

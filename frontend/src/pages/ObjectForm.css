@@ -513,8 +513,6 @@
 }
 
 .object-form-page .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 

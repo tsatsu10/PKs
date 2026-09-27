@@ -721,8 +721,6 @@
 }
 
 .dashboard-actions .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 
@@ -1208,11 +1206,6 @@
   border-color: var(--midnight-purple-accent);
   box-shadow: 0 0 0 3px var(--midnight-purple-glow);
 }
-.dashboard-main .btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--cosmic-pink-glow);
-}
-
 .search-bar .btn {
   flex-shrink: 0;
 }

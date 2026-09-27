@@ -173,7 +173,7 @@
 }
 
 .detail-link-search-input:focus {
-  border-color: var(--accent);
+  border-color: var(--cosmic-pink);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
@@ -223,7 +223,7 @@
 }
 
 .detail-link-search-title:hover {
-  color: var(--accent);
+  color: var(--cosmic-pink);
 }
 
 .detail-link-search-type {
@@ -249,8 +249,6 @@
 }
 
 .object-detail .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 
@@ -1052,7 +1050,7 @@
 }
 
 .run-prompt-edit-check input {
-  accent-color: var(--accent-primary);
+  accent-color: var(--cosmic-pink);
 }
 
 .run-prompt-prompt-block {
