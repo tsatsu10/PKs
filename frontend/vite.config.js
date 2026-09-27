@@ -4,20 +4,21 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  resolve: {
-    dedupe: ['linkifyjs'],
-  },
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Vite's preload helper must not live in a lazy vendor chunk, or every
+          // page that lazy-loads anything imports that chunk.
+          if (id.includes('vite/preload-helper') || id.includes('vite/modulepreload-polyfill')) return 'vite-runtime';
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'react-vendor';
           if (id.includes('node_modules/@supabase/')) return 'supabase';
+          if (id.includes('node_modules/@mantine/hooks')) return 'mantine-hooks';
           if (
             id.includes('node_modules/@blocknote/')
             || id.includes('node_modules/@tiptap/')
             || id.includes('node_modules/prosemirror')
-            || id.includes('node_modules/@mantine/')
+            || id.includes('node_modules/@mantine/core')
           ) return 'blocknote';
         },
       },
@@ -45,8 +46,10 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         navigateFallback: 'index.html',
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,woff}'],
-        globIgnores: ['**/blocknote-*.js', '**/blocknote-*.css', '**/native-*.js'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Emoji data is lazy-loaded by the editor's emoji picker; skip it.
+        globIgnores: ['**/native-*.js'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
