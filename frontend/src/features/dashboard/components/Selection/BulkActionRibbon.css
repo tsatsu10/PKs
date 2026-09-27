@@ -56,10 +56,15 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 768px) {
+  .bulk-action-ribbon {
+    bottom: calc(16px + var(--mobile-nav-offset));
+  }
+}
+
 @media (max-width: 600px) {
   .bulk-action-ribbon {
     flex-wrap: wrap;
-    bottom: calc(16px + var(--mobile-nav-offset));
   }
 
   .bulk-action-ribbon-actions {
