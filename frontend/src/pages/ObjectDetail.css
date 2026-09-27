@@ -1428,10 +1428,10 @@
   .share-panel,
   .export-panel {
     position: fixed;
-    bottom: 0;
+    bottom: var(--mobile-nav-offset);
     left: 0;
     right: 0;
-    max-height: 85vh;
+    max-height: calc(85dvh - var(--mobile-nav-offset));
     overflow-y: auto;
     margin: 0;
     border-radius: 16px 16px 0 0;
@@ -1449,7 +1449,7 @@
   }
   .run-prompt-overlay-panel {
     max-width: 100%;
-    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem - var(--mobile-nav-offset));
     border-radius: 12px;
   }
   .run-prompt-overlay-body {

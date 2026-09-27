@@ -442,6 +442,10 @@
 }
 
 @media (max-width: 768px) {
+  :root {
+    /* Everything fixed to the bottom must sit above the 56px bottom nav */
+    --mobile-nav-offset: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
   .app-layout-sidebar {
     transform: translateX(-100%);
     width: 220px;

@@ -82,3 +82,14 @@ describe('stylesheet hygiene', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('mobile shell', () => {
+  it('enables safe-area insets via viewport-fit=cover', () => {
+    const html = readFileSync(join(SRC, '..', 'index.html'), 'utf8');
+    expect(html).toMatch(/<meta name="viewport"[^>]*viewport-fit=cover/);
+  });
+  it('sets --mobile-nav-offset on small screens', () => {
+    const layout = readFileSync(join(SRC, 'components', 'AppLayout.css'), 'utf8');
+    expect(layout).toMatch(/@media \(max-width: 768px\)[\s\S]*--mobile-nav-offset:\s*calc\(56px \+ env\(safe-area-inset-bottom/);
+  });
+});

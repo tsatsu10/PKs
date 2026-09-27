@@ -1692,6 +1692,7 @@
   }
   .dashboard-fab {
     display: flex;
+    bottom: calc(1rem + var(--mobile-nav-offset));
   }
   .dashboard-actions {
     gap: 0.75rem;
