@@ -10,8 +10,6 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../..
 import { getErrorMessage } from '../../../lib/errors';
 import { useDashboardSearch, createEmptyFiltersOverride } from '../../../hooks/useDashboardSearch';
 import { useTrailheads } from './useTrailheads';
-import { usePulseMetrics } from './usePulseMetrics';
-import { usePulseCelebration } from './usePulseCelebration';
 import { useDashboardBulkActions } from './useDashboardBulkActions';
 import { useDashboardKeyboard } from './useDashboardKeyboard';
 import { loadViewMode, saveViewMode } from '../lib/viewMode';
@@ -95,7 +93,6 @@ export function useDashboardPage() {
   const [showActivityPanel, setShowActivityPanel] = useState(false);
 
   const { pendingObject, sparkObject } = useTrailheads({ userId: user?.id ?? null, resumeObject });
-  const { values: pulseValues, targets: pulseTargets, loading: pulseLoading } = usePulseMetrics(user?.id ?? null);
   const runPromptSuffix = runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : '';
 
   const bulk = useDashboardBulkActions({
@@ -487,12 +484,6 @@ export function useDashboardPage() {
   const showBanner = runPromptTemplate || showOnboarding;
   const bannerKind = runPromptTemplate ? 'run-prompt' : 'onboarding';
 
-  const { celebrateRing } = usePulseCelebration(
-    pulseValues,
-    pulseTargets,
-    pulseLoading
-  );
-
   return {
     user,
     navigate,
@@ -561,10 +552,6 @@ export function useDashboardPage() {
     pendingObject,
     sparkObject,
     resumeObject,
-    pulseValues,
-    pulseTargets,
-    pulseLoading,
-    celebrateRing,
     runPromptSuffix,
     streamItems,
     listVirtualizer,

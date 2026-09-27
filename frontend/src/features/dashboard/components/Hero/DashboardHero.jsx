@@ -1,4 +1,3 @@
-import PulseRings from './PulseRings';
 import TrailheadRow from './TrailheadRow';
 import './DashboardHero.css';
 
@@ -18,14 +17,10 @@ function formatDateLine() {
 }
 
 /**
- * Constellation v2 hero: greeting + pulse rings + trailheads.
+ * Dashboard hero: greeting + trailheads.
  */
 export default function DashboardHero({
   displayName,
-  pulseValues,
-  pulseTargets,
-  pulseLoading,
-  celebrateRing = null,
   resumeObject,
   pendingObject,
   sparkObject,
@@ -34,7 +29,7 @@ export default function DashboardHero({
 }) {
   return (
     <section
-      className={`dashboard-hero-v2${celebrateRing ? ' dashboard-hero-v2--celebrate' : ''}`}
+      className="dashboard-hero-v2"
       aria-label="Dashboard overview"
     >
       <div className="dashboard-hero-v2-top">
@@ -45,15 +40,9 @@ export default function DashboardHero({
             {displayName ? `, ${displayName}` : ''}
           </h1>
           {isFirstRun && (
-            <p className="dashboard-hero-v2-hint">Create your first object to start your daily rhythm.</p>
+            <p className="dashboard-hero-v2-hint">Create your first object to get started.</p>
           )}
         </div>
-        <PulseRings
-          values={pulseValues}
-          targets={pulseTargets}
-          loading={pulseLoading}
-          celebrateRing={celebrateRing}
-        />
       </div>
 
       {!isFirstRun && (

@@ -1,7 +1,6 @@
 @import '../features/dashboard/components/Hero/DashboardHero.css';
 @import '../features/dashboard/components/Hero/Trailhead.css';
 @import '../features/dashboard/components/Hero/TrailheadRow.css';
-@import '../features/dashboard/components/Hero/PulseRings.css';
 @import '../features/dashboard/components/Toolbar/CommandBar.css';
 @import '../features/dashboard/components/Toolbar/ActiveFiltersStrip.css';
 @import '../features/dashboard/components/Views/StreamView.css';

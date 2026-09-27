@@ -11,7 +11,6 @@ import { getErrorMessage } from '../lib/errors';
 import { useDeckEnabled } from '../components/MainMenuDeckContext';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
-import PulseTargetsForm from '../features/dashboard/components/Settings/PulseTargetsForm';
 import './Settings.css';
 
 export default function Settings() {
@@ -633,12 +632,6 @@ export default function Settings() {
           ))}
           {aiProviders.length === 0 && <li className="muted">No custom AI providers yet.</li>}
         </ul>
-      </section>
-
-      <section className="settings-section page-section" aria-labelledby="pulse-targets-heading">
-        <h2 id="pulse-targets-heading" className="page-section-title">Daily pulse targets</h2>
-        <p className="settings-desc page-section-desc">Goals for Capture, Tend, and Close rings on your dashboard.</p>
-        <PulseTargetsForm />
       </section>
 
       <section className="settings-section page-section">
