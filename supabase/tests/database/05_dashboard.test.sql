@@ -1,10 +1,12 @@
 BEGIN;
-SELECT plan(5);
+SELECT plan(6);
 
 SELECT tests.create_user('alice');
 SELECT tests.create_user('bob');
+SELECT tests.create_user('carol');
 UPDATE public.users SET timezone = 'Asia/Tokyo' WHERE id = tests.uid('alice');
 UPDATE public.users SET timezone = 'Not/AZone' WHERE id = tests.uid('bob');
+UPDATE public.users SET timezone = NULL WHERE id = tests.uid('carol');
 
 -- S3 fixture: bob shares X with alice; X links to bob's private Y.
 INSERT INTO public.knowledge_objects (id, user_id, title) VALUES
@@ -38,6 +40,11 @@ RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
 SELECT tests.act_as('bob');
 SELECT is(public.user_day_start(), date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',
   'an invalid timezone falls back to UTC');
+
+RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
+SELECT tests.act_as('carol');
+SELECT is(public.user_day_start(), date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',
+  'a NULL timezone falls back to UTC');
 
 SELECT * FROM finish();
 ROLLBACK;

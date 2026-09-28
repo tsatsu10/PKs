@@ -2,21 +2,34 @@
 -- get_dashboard_activity (S3), trash-aware link counts in get_object_links_batch (D6).
 
 -- B16: "today" in the user's own timezone (users.timezone), UTC when unset or invalid.
+-- plpgsql + exception handler instead of validating against pg_timezone_names (which
+-- materialises ~1,200 rows per call): let the AT TIME ZONE conversion itself fail fast
+-- (SQLSTATE 22023 invalid_parameter_value for an unrecognized zone) and fall back to UTC.
 CREATE OR REPLACE FUNCTION public.user_day_start()
 RETURNS timestamptz
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH tz AS (
-    SELECT coalesce(
-      (SELECT u.timezone FROM public.users u
-       WHERE u.id = auth.uid()
-         AND u.timezone IN (SELECT name FROM pg_timezone_names)),
-      'UTC') AS name
-  )
-  SELECT date_trunc('day', now() AT TIME ZONE tz.name) AT TIME ZONE tz.name FROM tz;
+DECLARE
+  tz text;
+  result timestamptz;
+BEGIN
+  SELECT u.timezone INTO tz FROM public.users u WHERE u.id = auth.uid();
+
+  IF tz IS NULL OR tz = '' THEN
+    tz := 'UTC';
+  END IF;
+
+  BEGIN
+    result := date_trunc('day', now() AT TIME ZONE tz) AT TIME ZONE tz;
+  EXCEPTION WHEN invalid_parameter_value THEN
+    result := date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
+  END;
+
+  RETURN result;
+END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.user_day_start() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.user_day_start() TO authenticated, service_role;
@@ -44,6 +57,9 @@ AS $$
     WHERE ko.user_id = auth.uid()
       AND ko.is_deleted = false
   ),
+  day_start AS MATERIALIZED (
+    SELECT public.user_day_start() AS ts
+  ),
   totals AS (
     SELECT
       (SELECT count(*) FROM base) AS total,
@@ -57,10 +73,10 @@ AS $$
          AND ko.due_at IS NOT NULL
          AND ko.due_at >= now()
          AND ko.due_at <= now() + interval '7 days') AS due_next_7_days,
-      (SELECT count(*) FROM owned_today WHERE created_at >= public.user_day_start()) AS capture_today,
-      (SELECT count(*) FROM owned_today WHERE updated_at >= public.user_day_start()) AS tend_today,
+      (SELECT count(*) FROM owned_today WHERE created_at >= (SELECT ts FROM day_start)) AS capture_today,
+      (SELECT count(*) FROM owned_today WHERE updated_at >= (SELECT ts FROM day_start)) AS tend_today,
       (SELECT count(*) FROM owned_today
-       WHERE status = 'archived' AND updated_at >= public.user_day_start()) AS close_today
+       WHERE status = 'archived' AND updated_at >= (SELECT ts FROM day_start)) AS close_today
   ),
   by_type AS (
     SELECT jsonb_object_agg(coalesce(type::text, 'unknown'), cnt) AS data
@@ -182,15 +198,18 @@ STABLE
 SECURITY INVOKER
 SET search_path = public
 AS $$
-  WITH days AS (
+  WITH today AS MATERIALIZED (
+    SELECT public.user_day_start() AS ts
+  ),
+  days AS (
     SELECT generate_series(6, 0, -1) AS day_offset
   ),
   day_bounds AS (
     SELECT
-      day_offset,
-      public.user_day_start() - (day_offset || ' days')::interval AS day_start,
-      public.user_day_start() - (day_offset || ' days')::interval + interval '1 day' AS day_end
-    FROM days
+      d.day_offset,
+      t.ts - (d.day_offset || ' days')::interval AS day_start,
+      t.ts - (d.day_offset || ' days')::interval + interval '1 day' AS day_end
+    FROM days d, today t
   ),
   owned AS (
     SELECT id, created_at, updated_at
