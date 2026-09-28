@@ -54,3 +54,13 @@ jobs:
       # running (not verified safe to exclude).
       - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime
       - run: supabase test db
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --config supabase/functions/deno.json supabase/functions/run-prompt/index.ts supabase/functions/webhook-deliver/index.ts
+      - run: deno test --config supabase/functions/deno.json --allow-env --allow-net=none supabase/functions
