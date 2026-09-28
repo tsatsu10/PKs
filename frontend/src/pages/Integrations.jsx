@@ -13,7 +13,7 @@ export default function Integrations() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ name: '', type: 'generic', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
+  const [form, setForm] = useState({ name: '', type: 'webhook', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
   const [adding, setAdding] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [editConfig, setEditConfig] = useState({ url: '', events: [], secret: '' });
@@ -23,7 +23,7 @@ export default function Integrations() {
     (async () => {
       const { data, error: e } = await supabase
         .from('integrations')
-        .select('id, name, type, enabled, config, created_at')
+        .select('id, name, type, enabled, config, created_at, has_secret')
         .eq('user_id', user.id)
         .order('name');
       setList(e ? [] : (data || []));
@@ -53,11 +53,11 @@ export default function Integrations() {
       const { data, error: err } = await supabase
         .from('integrations')
         .insert(payload)
-        .select('id, name, type, enabled, config, created_at')
+        .select('id, name, type, enabled, config, created_at, has_secret')
         .single();
       if (err) throw err;
       setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setForm({ name: '', type: 'generic', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
+      setForm({ name: '', type: 'webhook', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add integration'));
     } finally {
@@ -71,7 +71,7 @@ export default function Integrations() {
     setEditConfig({
       url: c.url || '',
       events: Array.isArray(c.events) ? [...c.events] : [],
-      secret: c.secret ? '********' : '',
+      secret: integration.has_secret ? '********' : '',
     });
     setEditingConfigId(integration.id);
   }
@@ -94,16 +94,13 @@ export default function Integrations() {
         events: editConfig.events,
         ...(editConfig.secret && editConfig.secret !== '********' ? { secret: editConfig.secret.trim() } : {}),
       };
-      const item = list.find((i) => i.id === editingConfigId);
-      if (item?.config?.secret && editConfig.secret === '********') config.secret = item.config.secret;
-
       const { error: err } = await supabase
         .from('integrations')
         .update({ config, updated_at: new Date().toISOString() })
         .eq('id', editingConfigId)
         .eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.map((i) => (i.id === editingConfigId ? { ...i, config } : i)));
+      setList((prev) => prev.map((i) => (i.id === editingConfigId ? { ...i, config, has_secret: config.secret ? true : i.has_secret } : i)));
       setEditingConfigId(null);
       setEditConfig({ url: '', events: [], secret: '' });
     } catch (err) {
@@ -194,6 +191,9 @@ export default function Integrations() {
                 <input type="password" value={form.webhookSecret} onChange={(e) => setForm((f) => ({ ...f, webhookSecret: e.target.value }))} placeholder="Leave blank to skip signing" autoComplete="off" />
               </label>
             </div>
+          )}
+          {form.type === 'webhook' && (
+            <p className="settings-desc">Each request is signed: verify <code>X-PKS-Signature-256: v1=&lt;hex&gt;</code> as HMAC-SHA256 of <code>&lt;X-PKS-Timestamp&gt;.&lt;body&gt;</code> with your secret, and reject timestamps older than 5 minutes.</p>
           )}
           <button type="submit" className="btn btn-primary" disabled={adding}>{adding ? 'Adding…' : 'Add'}</button>
         </form>

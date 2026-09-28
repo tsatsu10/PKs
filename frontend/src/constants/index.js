@@ -38,7 +38,7 @@ export function formatObjectTypeLabel(type) {
 }
 
 /** Integration types (stored in integrations.type) */
-export const INTEGRATION_TYPES = ['generic', 'import', 'webhook', 'api'];
+export const INTEGRATION_TYPES = ['webhook'];
 
 /** Webhook event ids and labels (used by webhook-deliver Edge Function) */
 export const WEBHOOK_EVENTS = [
