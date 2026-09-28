@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
+import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
 export default function Register() {
@@ -12,6 +13,9 @@ export default function Register() {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
   const { login } = useAuth();
   const navigate = useNavigate();
   const formRef = useRef(null);
@@ -34,6 +38,7 @@ export default function Register() {
         password,
         options: {
           data: { display_name: displayName.trim() || undefined, displayName: displayName.trim() || undefined },
+          captchaToken: captchaToken || undefined,
         },
       });
       if (err) throw new Error(getErrorMessage(err, 'Sign up failed'));
@@ -60,7 +65,10 @@ export default function Register() {
       }
       setTimeout(() => navigate('/', { replace: true }), 50);
     } catch (err) {
-      setError(getErrorMessage(err, 'Registration failed'));
+      const msg = getErrorMessage(err, 'Registration failed');
+      setError(msg.toLowerCase().includes('captcha') ? 'Please complete the security check and try again.' : msg);
+      setCaptchaToken('');
+      setCaptchaKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -126,7 +134,8 @@ export default function Register() {
           <label htmlFor="register-password" className="form-floating-label">Password (min 8 characters)</label>
           <p className="field-hint" id="register-password-hint">Use at least 8 characters.</p>
         </div>
-        <button type="submit" disabled={submitting} aria-busy={submitting}>
+        <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
+        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>

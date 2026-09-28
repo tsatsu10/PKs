@@ -1708,6 +1708,8 @@ git commit -m "ci: run pgTAP database tests"
 - Create: `supabase/migrations/20260927000010_contract_dead_schema.sql`, `supabase/tests/database/10_contract.test.sql`
 - Modify: `supabase/tests/database/05_dashboard.test.sql` (drop the pulse assertion). Never edit an applied migration: `get_dashboard_stats` is redefined in the new one.
 
+  Note: `20260927000010` is a placeholder. Since this task's migration collides with plan −1B2's Task 10 contract migration, give it a fresh timestamp for the date it's actually written, after the earlier migrations in both plans are already in production.
+
 **Interfaces:**
 - Removes:
   - `export_jobs`, `export_job_items`, and the `export_format` / `export_template` / `export_status` enums

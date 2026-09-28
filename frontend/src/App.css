@@ -137,6 +137,12 @@ body {
   color: var(--error-text);
 }
 
+.toast-info {
+  background: var(--hover-overlay-strong);
+  border-color: var(--glass-border);
+  color: var(--polar-white);
+}
+
 .toast-message {
   flex: 1;
   min-width: 0;

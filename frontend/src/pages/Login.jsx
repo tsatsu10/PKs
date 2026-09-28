@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
+import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
 export default function Login() {
@@ -11,6 +12,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
   const { user, login, clearSessionExpired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,6 +50,7 @@ export default function Login() {
       const { data, error: err } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
+        options: { captchaToken: captchaToken || undefined },
       });
       if (err) {
         const msg = getErrorMessage(err, 'Login failed');
@@ -83,7 +88,10 @@ export default function Login() {
       });
       if (!loggedIn) throw new Error('Sign-in did not create a session. Please try again.');
     } catch (err) {
-      setError(getErrorMessage(err, 'Login failed'));
+      const msg = getErrorMessage(err, 'Login failed');
+      setError(msg.toLowerCase().includes('captcha') ? 'Please complete the security check and try again.' : msg);
+      setCaptchaToken('');
+      setCaptchaKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +145,8 @@ export default function Login() {
           />
           <label htmlFor="login-password" className="form-floating-label">Password</label>
         </div>
-        <button type="submit" disabled={submitting} aria-busy={submitting}>
+        <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
+        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

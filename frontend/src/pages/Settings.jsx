@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
+import Turnstile from '../components/Turnstile';
 import { useAuth } from '../context/AuthContext';
 import { AI_PROVIDERS, AI_PROVIDER_IDS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
 import { validateApiKeyForProvider } from '../lib/aiProviders';
@@ -45,6 +46,9 @@ export default function Settings() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   useEffect(() => {
     const handler = (e) => {
@@ -125,13 +129,19 @@ export default function Settings() {
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email,
         password: currentPassword,
+        options: { captchaToken: captchaToken || undefined },
       });
       if (signInErr) {
-        if (signInErr.message?.toLowerCase().includes('invalid')) {
+        const msg = signInErr.message ?? 'Verification failed';
+        if (msg.toLowerCase().includes('captcha')) {
+          setPasswordError('Please complete the security check and try again.');
+        } else if (msg.toLowerCase().includes('invalid')) {
           setPasswordError('Current password is incorrect');
         } else {
-          setPasswordError(signInErr.message ?? 'Verification failed');
+          setPasswordError(msg);
         }
+        setCaptchaToken('');
+        setCaptchaKey((k) => k + 1);
         return;
       }
       const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
@@ -143,6 +153,8 @@ export default function Settings() {
       addToast('success', 'Password updated');
     } catch (err) {
       setPasswordError(getErrorMessage(err, 'Failed to update password'));
+      setCaptchaToken('');
+      setCaptchaKey((k) => k + 1);
     } finally {
       setPasswordSaving(false);
     }
@@ -177,7 +189,7 @@ export default function Settings() {
       const domain = await createDomain(name);
       setNewDomain('');
       if (domains.some((d) => d.id === domain.id)) {
-        addToast('success', `Domain "${domain.name}" already exists`);
+        addToast('info', `Domain "${domain.name}" already exists`);
       } else {
         setDomains((prev) => [...prev, domain].sort((a, b) => a.name.localeCompare(b.name)));
       }
@@ -198,7 +210,7 @@ export default function Settings() {
       const tag = await createTag(name);
       setNewTag('');
       if (tags.some((t) => t.id === tag.id)) {
-        addToast('success', `Tag "${tag.name}" already exists`);
+        addToast('info', `Tag "${tag.name}" already exists`);
       } else {
         setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
       }
@@ -569,7 +581,8 @@ export default function Settings() {
               aria-label="Confirm new password"
             />
           </label>
-          <button type="submit" className="btn btn-primary" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}>
+          <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
+          <button type="submit" className="btn btn-primary" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword || (captchaSiteKey && !captchaToken)}>
             {passwordSaving ? 'Updating…' : 'Update password'}
           </button>
         </form>

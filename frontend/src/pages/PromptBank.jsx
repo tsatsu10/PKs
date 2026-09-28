@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { OBJECT_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
 import './PromptBank.css';
-const OUTPUT_FORMATS = ['text', 'markdown', 'json'];
 
 export default function PromptBank() {
   const { user } = useAuth();
@@ -23,7 +22,6 @@ export default function PromptBank() {
     applies_to_types: [],
     tags: [],
     prompt_text: '',
-    output_format: 'text',
   });
   const [tagInput, setTagInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +66,7 @@ export default function PromptBank() {
 
   function openNew() {
     setEditingId('new');
-    setForm({ name: '', description: '', applies_to_types: [], tags: [], prompt_text: '', output_format: 'text' });
+    setForm({ name: '', description: '', applies_to_types: [], tags: [], prompt_text: '' });
     setTagInput('');
     setError('');
   }
@@ -81,7 +79,6 @@ export default function PromptBank() {
       applies_to_types: t.applies_to_types || [],
       tags: Array.isArray(t.tags) ? t.tags.filter(Boolean) : [],
       prompt_text: t.prompt_text || '',
-      output_format: t.output_format || 'text',
     });
     setTagInput('');
     setError('');
@@ -149,7 +146,6 @@ export default function PromptBank() {
         applies_to_types: form.applies_to_types.length ? form.applies_to_types : [],
         tags: (form.tags || []).map((t) => t.trim()).filter(Boolean),
         prompt_text: form.prompt_text.trim(),
-        output_format: form.output_format,
       };
       if (editingId && editingId !== 'new') {
         const { error: err } = await supabase
@@ -443,17 +439,6 @@ export default function PromptBank() {
                     ))}
                   </div>
                 </div>
-                <label className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Output format</span>
-                  <select
-                    value={form.output_format}
-                    onChange={(e) => setForm((f) => ({ ...f, output_format: e.target.value }))}
-                  >
-                    {OUTPUT_FORMATS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
                 <label className="prompt-bank-field">
                   <span className="prompt-bank-field-label">Prompt text</span>
                   <textarea

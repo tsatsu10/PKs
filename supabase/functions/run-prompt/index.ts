@@ -1,56 +1,41 @@
-// PKS Edge Function: run a prompt with DeepSeek or Claude (Anthropic).
-// Server defaults: DEEPSEEK_API_KEY / ANTHROPIC_API_KEY in Edge Function Secrets (daily-capped per user).
-// Or the client passes user_provider_id (a row in user_ai_providers; its provider_type picks the API).
-// Invoke: POST body { promptText, objectTitle?, objectContent?, model?, provider?, user_provider_id? }
-
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Anthropic from "npm:@anthropic-ai/sdk";
-import { validateDeepSeekApiKey, hintForDeepSeekAuthCode } from "./deepseekKey.ts";
-
-const appOrigin = Deno.env.get("PKS_APP_ORIGIN") ?? "*";
-const corsHeaders = {
-  "Access-Control-Allow-Origin": appOrigin,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// PKS Edge Function: run a prompt over a knowledge object with DeepSeek or Claude.
+// Order: auth → validate → per-minute limit → load object (as the user, under RLS) → key/provider
+// → server-key caps → AI call → server-owned prompt_runs row.
+import Anthropic from "@anthropic-ai/sdk";
+import { corsHeaders } from "../_shared/cors.ts";
+import { json } from "../_shared/http.ts";
+import { getAdminClient, getUserClient } from "../_shared/supabase.ts";
+import { hintForDeepSeekAuthCode, validateDeepSeekApiKey } from "./deepseekKey.ts";
+import {
+  buildUserMessage,
+  completionOutcome,
+  EMPTY_OUTPUT_BODY,
+  failedRunOutput,
+  isProvider,
+  parseRunRequest,
+  pickModel,
+  type Provider,
+  PROVIDERS,
+  redactSecrets,
+  serverKeyCaps,
+  upstreamFailure,
+} from "./lib.ts";
 
 const RATE_LIMIT_PER_MINUTE = 20;
-// Daily cap per user on the shared server keys (users with their own key are not capped).
-const SERVER_KEY_DAILY_LIMIT = Number(Deno.env.get("SERVER_KEY_DAILY_LIMIT") ?? "50") || 50;
+const env = (k: string, d: number) => Number(Deno.env.get(k) ?? "") || d;
+const SERVER_KEY_DAILY_LIMIT = env("SERVER_KEY_DAILY_LIMIT", 50); // per user, all providers
+const SERVER_KEY_DAILY_LIMIT_ANTHROPIC = env("SERVER_KEY_DAILY_LIMIT_ANTHROPIC", 10); // per user, Claude
+const SERVER_KEY_GLOBAL_DAILY_LIMIT = env("SERVER_KEY_GLOBAL_DAILY_LIMIT", 500); // all users together
+const DAY = 86_400;
 const DEEPSEEK_TIMEOUT_MS = 60_000;
-// Claude with adaptive thinking can take longer; stays under the Edge Function wall-clock limit.
-const CLAUDE_TIMEOUT_MS = 120_000;
-const MAX_PROMPT_TEXT = 16_384;
-const MAX_OBJECT_TITLE = 200;
-const MAX_OBJECT_CONTENT = 50_000;
+const CLAUDE_TIMEOUT_MS = 110_000; // with maxRetries 0, stays under the 150 s edge limit
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
-type Provider = "deepseek" | "anthropic";
-
-const PROVIDERS: Record<Provider, { label: string; models: string[]; defaultModel: string; serverKeyEnv: string }> = {
-  deepseek: {
-    label: "DeepSeek",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    defaultModel: "deepseek-chat",
-    serverKeyEnv: "DEEPSEEK_API_KEY",
-  },
-  anthropic: {
-    label: "Claude",
-    models: ["claude-opus-5"],
-    defaultModel: "claude-opus-5",
-    serverKeyEnv: "ANTHROPIC_API_KEY",
-  },
-};
-
-function isProvider(v: unknown): v is Provider {
-  return v === "deepseek" || v === "anthropic";
-}
-
-function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
-  });
-}
+type Usage = { input: number | null; output: number | null };
+/** Upstream problems are always a RunResult (never a throw), so a failed run row is always written. */
+type RunResult =
+  | { ok: true; output: string; usage: Usage; model: string; stopReason: string | null }
+  | { ok: false; status: number; body: Record<string, unknown> };
 
 function validateAnthropicApiKey(raw: string): { ok: true; key: string } | { ok: false; hint: string } {
   const key = raw.trim().replace(/^bearer\s+/i, "");
@@ -60,298 +45,315 @@ function validateAnthropicApiKey(raw: string): { ok: true; key: string } | { ok:
   return { ok: true, key };
 }
 
-type RunResult = { ok: true; output: string } | { ok: false; status: number; body: Record<string, unknown> };
+/** Format check for either provider's key; runs before any quota is consumed. */
+function checkApiKey(provider: Provider, raw: string): { ok: true; key: string } | { ok: false; body: Record<string, string> } {
+  if (provider === "deepseek") {
+    const check = validateDeepSeekApiKey(raw);
+    return check.ok ? check : { ok: false, body: { error: "Invalid DeepSeek API key", code: check.code, hint: check.hint } };
+  }
+  const check = validateAnthropicApiKey(raw);
+  return check.ok ? check : { ok: false, body: { error: "Invalid Claude API key", code: "INVALID_API_KEY", hint: check.hint } };
+}
+
+/** Logs (redacted) and maps a thrown upstream error to a failed RunResult. */
+function upstreamFailed(e: unknown, usingServerKey: boolean, label: string): RunResult {
+  console.error(`${label} request error${usingServerKey ? " (server key)" : ""}`, redactSecrets(e instanceof Error ? `${e.name}: ${e.message}` : String(e)));
+  return { ok: false, ...upstreamFailure(e, usingServerKey, label) };
+}
 
 async function runDeepSeek(apiKey: string, model: string, userMessage: string, usingServerKey: boolean): Promise<RunResult> {
-  const res = await fetch(DEEPSEEK_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: userMessage }], max_tokens: 4096 }),
-    signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS),
-  }).catch((e) => {
-    if (e instanceof DOMException && e.name === "TimeoutError") return null;
-    throw e;
-  });
-
-  if (!res) {
-    return { ok: false, status: 504, body: { error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." } };
-  }
-
-  if (!res.ok) {
-    let upstreamCode = "DEEPSEEK_ERROR";
-    let upstreamMessage = "";
-    try {
-      const errJson = await res.json();
-      const errObj = errJson?.error;
-      upstreamMessage =
-        (typeof errObj === "object" && errObj?.message) ||
-        errJson?.message ||
-        (typeof errJson?.error === "string" ? errJson.error : "") ||
-        "";
-      upstreamCode = (typeof errObj === "object" && errObj?.code) || errJson?.code || upstreamCode;
-    } catch {
-      /* ignore parse errors */
+  // One try around the request AND the body reads: a timeout or network error at any point,
+  // or an unparseable body, becomes a failed RunResult instead of escaping as a 500.
+  try {
+    const res = await fetch(DEEPSEEK_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: "user", content: userMessage }], max_tokens: 4096 }),
+      signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS), // also bounds the body reads below
+    });
+    if (!res.ok) {
+      let upstreamCode = "DEEPSEEK_ERROR";
+      let upstreamMessage = "";
+      try {
+        const errJson = await res.json();
+        const errObj = errJson?.error;
+        upstreamMessage = (typeof errObj === "object" && errObj?.message) || errJson?.message ||
+          (typeof errObj === "string" ? errObj : "") || "";
+        upstreamCode = (typeof errObj === "object" && errObj?.code) || errJson?.code || upstreamCode;
+      } catch { /* ignore parse errors */ }
+      upstreamMessage = redactSecrets(String(upstreamMessage));
+      upstreamCode = redactSecrets(String(upstreamCode));
+      if (usingServerKey) {
+        // Upstream errors for the shared key stay server-side.
+        console.error("DeepSeek error (server key)", res.status, upstreamCode, upstreamMessage);
+        return { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+      }
+      const hint = upstreamMessage ? `DeepSeek: ${upstreamMessage}` : hintForDeepSeekAuthCode(upstreamCode);
+      return { ok: false, status: 502, body: { error: upstreamMessage || "AI request failed", code: upstreamCode, hint } };
     }
-    if (usingServerKey) {
-      // Upstream errors for the shared key can echo key fragments or config details; keep them server-side.
-      console.error("DeepSeek error (server key)", res.status, upstreamCode, upstreamMessage);
-      return { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
-    }
-    // Prefer DeepSeek's own message (e.g. "Insufficient Balance") over the generic key hint.
-    const hint = upstreamMessage
-      ? `DeepSeek: ${upstreamMessage}`
-      : hintForDeepSeekAuthCode(String(upstreamCode));
-    return { ok: false, status: 502, body: { error: upstreamMessage || "AI request failed", code: upstreamCode, hint } };
+    const data = await res.json();
+    const choice = data?.choices?.[0];
+    return {
+      ok: true,
+      output: typeof choice?.message?.content === "string" ? choice.message.content : "",
+      usage: { input: data?.usage?.prompt_tokens ?? null, output: data?.usage?.completion_tokens ?? null },
+      model: typeof data?.model === "string" && data.model ? data.model : model,
+      stopReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : null,
+    };
+  } catch (e) {
+    return upstreamFailed(e, usingServerKey, "DeepSeek");
   }
-
-  const data = await res.json();
-  return { ok: true, output: data.choices?.[0]?.message?.content ?? "" };
 }
 
 async function runClaude(apiKey: string, model: string, userMessage: string, usingServerKey: boolean): Promise<RunResult> {
-  const client = new Anthropic({ apiKey, timeout: CLAUDE_TIMEOUT_MS, maxRetries: 1 });
+  const client = new Anthropic({ apiKey, timeout: CLAUDE_TIMEOUT_MS, maxRetries: 0 });
+  const messages = [{ role: "user" as const, content: userMessage }];
   try {
-    const response = await client.beta.messages.create({
-      model,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      // Server-side fallback: a safety-classifier decline is re-run on Anthropic's recommended model.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      messages: [{ role: "user", content: userMessage }],
-    });
+    const response = model === "claude-opus-5"
+      ? await client.beta.messages.create({
+        model,
+        max_tokens: 16000,
+        thinking: { type: "adaptive" },
+        // Server-side fallback: a safety-classifier decline is re-run on Anthropic's recommended model.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        messages,
+      })
+      : await client.messages.create({
+        model,
+        max_tokens: usingServerKey ? 4096 : 16000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: usingServerKey ? "medium" : "high" },
+        messages,
+      });
 
     if (response.stop_reason === "refusal") {
       return {
         ok: false,
         status: 422,
-        body: {
-          error: "Claude declined this request",
-          code: "REFUSAL",
-          hint: response.stop_details?.explanation || "Try rephrasing the prompt.",
-        },
+        body: { error: "Claude declined this request", code: "REFUSAL", hint: response.stop_details?.explanation || "Try rephrasing the prompt." },
       };
     }
-
     const output = response.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { text: string }).text)
       .join("");
-    return { ok: true, output };
+    return {
+      ok: true,
+      output,
+      usage: { input: response.usage?.input_tokens ?? null, output: response.usage?.output_tokens ?? null },
+      model: response.model || model, // the model that actually answered (may differ after a fallback)
+      stopReason: response.stop_reason ?? null,
+    };
   } catch (e) {
     const fail = (status: number, code: string, error: string, hint: string): RunResult => {
       if (usingServerKey) {
-        console.error("Claude error (server key)", status, code, e instanceof Error ? e.message : e);
-        return { ok: false, status: status === 504 ? 504 : 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+        console.error("Claude error (server key)", status, redactSecrets(code), redactSecrets(e instanceof Error ? e.message : String(e)));
+        return status === 504
+          ? { ok: false, status, body: { error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." } }
+          : { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
       }
-      return { ok: false, status, body: { error, code, hint } };
+      return { ok: false, status, body: { error: redactSecrets(error), code, hint: redactSecrets(hint) } };
     };
     if (e instanceof Anthropic.AuthenticationError) {
       return fail(502, "INVALID_API_KEY", "Invalid Claude API key", "Check the key in Settings → AI API keys (it starts with sk-ant-).");
     }
-    if (e instanceof Anthropic.PermissionDeniedError) {
-      return fail(502, "PERMISSION_DENIED", "Claude API key lacks access", e.message);
-    }
-    if (e instanceof Anthropic.RateLimitError) {
-      return fail(429, "UPSTREAM_RATE_LIMITED", "Claude rate limit reached", "Try again in a minute.");
-    }
+    if (e instanceof Anthropic.PermissionDeniedError) return fail(502, "PERMISSION_DENIED", "Claude API key lacks access", e.message);
+    if (e instanceof Anthropic.RateLimitError) return fail(429, "UPSTREAM_RATE_LIMITED", "Claude rate limit reached", "Try again in a minute.");
+    // Includes timeouts (APIConnectionTimeoutError); must precede APIError, its superclass.
     if (e instanceof Anthropic.APIConnectionError) {
-      // Includes timeouts (APIConnectionTimeoutError is a subclass).
       return fail(504, "UPSTREAM_TIMEOUT", "AI request timed out or could not connect", "Try again, or shorten the prompt.");
     }
-    if (e instanceof Anthropic.APIError) {
-      // e.g. 400 "Your credit balance is too low", 529 overloaded.
-      return fail(502, e.type ?? "CLAUDE_ERROR", e.message, `Claude: ${e.message}`);
-    }
-    throw e;
+    if (e instanceof Anthropic.APIError) return fail(502, e.type ?? "CLAUDE_ERROR", e.message, `Claude: ${e.message}`);
+    // Anything else (e.g. a raw abort or a malformed response) is still an upstream failure, not a 500.
+    return upstreamFailed(e, usingServerKey, "Claude");
   }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeaders();
+  if (!cors) {
+    console.error("PKS_APP_ORIGIN is not set; refusing to serve");
+    return new Response("Server misconfigured", { status: 500 });
+  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  const reply = (body: unknown, status = 200, extra: Record<string, string> = {}) => json(body, status, { ...cors, ...extra });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const auth = await getUserClient(req);
+    if (!auth) return reply({ error: "Unauthorized" }, 401);
+    const { supabase, user } = auth;
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: rlData, error: rlError } = await supabase.rpc("increment_run_prompt_rate_limit", {
-      p_limit_per_minute: RATE_LIMIT_PER_MINUTE,
-    });
-    if (rlError) {
-      return new Response(
-        JSON.stringify({
-          error: "Rate limit check failed",
-          code: "RATE_LIMIT_ERROR",
-          hint: "Try again in a moment.",
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const rl = rlData as { count?: number; limited?: boolean; retry_after_sec?: number; error?: string } | null;
-    if (rl?.error === "unauthorized" || rl?.limited === true) {
-      const retryAfter = typeof rl?.retry_after_sec === "number" ? rl.retry_after_sec : 60;
-      return new Response(
-        JSON.stringify({
-          error: "Too many requests",
-          code: "RATE_LIMITED",
-          hint: `Limit: ${RATE_LIMIT_PER_MINUTE} Run prompt requests per minute. Try again in ${retryAfter}s.`,
-          retryAfter,
-        }),
-        {
-          status: 429,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "Retry-After": String(retryAfter),
-          },
-        }
-      );
-    }
-
-    let body: {
-      promptText?: string;
-      objectTitle?: string;
-      objectContent?: string;
-      model?: string;
-      provider?: string;
-      user_provider_id?: string;
-    };
+    // B19: validate before spending any quota.
+    let raw: unknown;
     try {
-      body = await req.json();
+      raw = await req.json();
     } catch {
-      return json({ error: "Invalid JSON body" }, 400);
+      return reply({ error: "Invalid JSON body" }, 400);
+    }
+    const parsed = parseRunRequest(raw);
+    if (!parsed.ok) return reply({ error: parsed.error }, 400);
+    const input = parsed.value;
+
+    // Counters are server-only: users can't call consume_usage, so count with the service role
+    // against the verified caller's id.
+    const { data: rl, error: rlErr } = await getAdminClient().rpc("consume_usage", {
+      p_user_id: user.id,
+      p_scope: "run_prompt_minute",
+      p_limit: RATE_LIMIT_PER_MINUTE,
+      p_window_seconds: 60,
+    });
+    if (rlErr) return reply({ error: "Rate limit check failed", code: "RATE_LIMIT_ERROR", hint: "Try again in a moment." }, 503);
+    if (rl?.limited !== false) {
+      const retryAfter = typeof rl?.retry_after_sec === "number" ? rl.retry_after_sec : 60;
+      return reply({
+        error: "Too many requests",
+        code: "RATE_LIMITED",
+        hint: `Limit: ${RATE_LIMIT_PER_MINUTE} runs per minute. Try again in ${retryAfter}s.`,
+        retryAfter,
+      }, 429, { "Retry-After": String(retryAfter) });
     }
 
-    const userProviderId = typeof body?.user_provider_id === "string" ? body.user_provider_id.trim() || null : null;
-    const usingServerKey = !userProviderId;
+    // Load the object as the user (RLS) instead of trusting client-sent content.
+    let title = input.legacyTitle;
+    let content = input.legacyContent;
+    if (input.objectId) {
+      const { data: obj, error: objErr } = await supabase
+        .from("knowledge_objects").select("title, content").eq("id", input.objectId).single();
+      if (objErr || !obj) return reply({ error: "Object not found", code: "OBJECT_NOT_FOUND" }, 404);
+      title = obj.title ?? "";
+      content = obj.content ?? "";
+    }
 
     let provider: Provider;
     let apiKey: string;
-
-    if (userProviderId) {
-      // api_key has no SELECT grant for app users; read it with the service role, scoped to the
-      // already-verified caller.
-      const admin = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-        { auth: { persistSession: false } }
-      );
-      const { data: providerRow, error: providerErr } = await admin
-        .from("user_ai_providers")
-        .select("api_key, provider_type")
-        .eq("id", userProviderId)
-        .eq("user_id", user.id)
-        .single();
-      if (providerErr || !providerRow?.api_key) {
-        return json({
+    const usingServerKey = !input.userProviderId;
+    if (input.userProviderId) {
+      // api_key has no SELECT grant for app users; read it with the service role, scoped to the verified caller.
+      const { data: row, error } = await getAdminClient()
+        .from("user_ai_providers").select("api_key, provider_type")
+        .eq("id", input.userProviderId).eq("user_id", user.id).single();
+      if (error || !row?.api_key) {
+        return reply({
           error: "Invalid or missing AI provider",
           code: "USER_PROVIDER_INVALID",
           hint: "The selected API key may have been removed. Check Settings → AI API keys.",
         }, 400);
       }
-      if (!isProvider(providerRow.provider_type)) {
-        return json({
+      if (!isProvider(row.provider_type)) {
+        return reply({
           error: "Unsupported AI provider",
           code: "PROVIDER_NOT_SUPPORTED",
           hint: "Add a DeepSeek or Claude API key in Settings → AI API keys.",
         }, 400);
       }
-      provider = providerRow.provider_type;
-      apiKey = providerRow.api_key;
+      provider = row.provider_type;
+      const check = checkApiKey(provider, row.api_key);
+      if (!check.ok) return reply(check.body, 400);
+      apiKey = check.key;
     } else {
-      provider = isProvider(body?.provider) ? body.provider : "deepseek";
-      const serverCfg = PROVIDERS[provider];
-      const serverKey = Deno.env.get(serverCfg.serverKeyEnv);
+      provider = input.provider ?? "deepseek";
+      const cfg = PROVIDERS[provider];
+      const serverKey = Deno.env.get(cfg.serverKeyEnv);
       if (!serverKey) {
-        return json({
-          error: `${serverCfg.label} not configured`,
-          code: provider === "deepseek" ? "DEEPSEEK_API_KEY_MISSING" : "ANTHROPIC_API_KEY_MISSING",
-          hint: `No shared ${serverCfg.label} key is set on the server (${serverCfg.serverKeyEnv}). Add your own ${serverCfg.label} key in Settings → AI API keys.`,
+        return reply({
+          error: `${cfg.label} not configured`,
+          code: `${provider.toUpperCase()}_API_KEY_MISSING`,
+          hint: `No shared ${cfg.label} key is set on the server. Add your own ${cfg.label} key in Settings → AI API keys.`,
         }, 503);
       }
-      const { data: quota, error: quotaErr } = await supabase.rpc("consume_server_key_quota", {
-        p_daily_limit: SERVER_KEY_DAILY_LIMIT,
+      // Check the shared key's format before consuming any caps, so a misconfigured key burns no quota.
+      const check = checkApiKey(provider, serverKey);
+      if (!check.ok) {
+        console.error(`Server ${cfg.label} key (${cfg.serverKeyEnv}) is malformed:`, check.body.code);
+        return reply({
+          error: `${cfg.label} not configured`,
+          code: `${provider.toUpperCase()}_API_KEY_INVALID`,
+          hint: `The shared ${cfg.label} key on the server is misconfigured. Add your own ${cfg.label} key in Settings → AI API keys.`,
+        }, 503);
+      }
+      // S2: per-user caps (narrowest first), then a global cap across all users. All fail closed.
+      // Per-user before global, so one user can't burn global units past their own cap. Accepted cost:
+      // if the global cap then rejects the call, the user's per-user units for this call are already spent.
+      const caps = serverKeyCaps(provider, { total: SERVER_KEY_DAILY_LIMIT, anthropic: SERVER_KEY_DAILY_LIMIT_ANTHROPIC });
+      for (const { scope, limit } of caps) {
+        const { data: q, error: qErr } = await getAdminClient().rpc("consume_usage", {
+          p_user_id: user.id, p_scope: scope, p_limit: limit, p_window_seconds: DAY,
+        });
+        if (qErr || q?.limited !== false) {
+          return reply({
+            error: "Daily limit reached",
+            code: "SERVER_KEY_QUOTA",
+            hint: `The shared ${cfg.label} key allows ${limit} runs per day. Add your own key in Settings → AI API keys to keep going.`,
+          }, 429);
+        }
+      }
+      const { data: g, error: gErr } = await getAdminClient().rpc("consume_global_usage", {
+        p_scope: "server_key_global",
+        p_limit: SERVER_KEY_GLOBAL_DAILY_LIMIT,
+        p_window_seconds: DAY,
       });
-      const q = quota as { limited?: boolean } | null;
-      if (quotaErr || q?.limited !== false) {
-        return json({
-          error: "Daily limit reached",
-          code: "SERVER_KEY_QUOTA",
-          hint: `The shared AI key allows ${SERVER_KEY_DAILY_LIMIT} runs per day. Add your own key in Settings → AI API keys to keep going.`,
+      if (gErr || g?.limited !== false) {
+        console.error("Global server-key cap reached or check failed", gErr?.message ?? g);
+        return reply({
+          error: "Shared AI capacity reached for today",
+          code: "SERVER_KEY_GLOBAL_QUOTA",
+          hint: "Add your own API key in Settings → AI API keys, or try again tomorrow.",
         }, 429);
       }
-      apiKey = serverKey;
+      apiKey = check.key;
     }
 
-    const cfg = PROVIDERS[provider];
-    const requestedModel = typeof body?.model === "string" ? body.model.trim() : "";
-    const model = cfg.models.includes(requestedModel) ? requestedModel : cfg.defaultModel;
+    const requestedModel = pickModel(provider, input.model, usingServerKey);
 
-    if (provider === "deepseek") {
-      const keyCheck = validateDeepSeekApiKey(apiKey);
-      if (!keyCheck.ok) {
-        return json({ error: "Invalid DeepSeek API key", code: keyCheck.code, hint: keyCheck.hint }, 400);
+    const { message, truncated } = buildUserMessage(title, content, input.promptText);
+    const rawResult = provider === "anthropic"
+      ? await runClaude(apiKey, requestedModel, message, usingServerKey)
+      : await runDeepSeek(apiKey, requestedModel, message, usingServerKey);
+
+    // R14: an output cut off at max tokens is reported; an empty answer is a failed run, not a completed one.
+    let result: RunResult = rawResult;
+    let outputTruncated = false;
+    if (rawResult.ok) {
+      const outcome = completionOutcome(provider, rawResult.stopReason, rawResult.output);
+      outputTruncated = outcome.outputTruncated;
+      if (outcome.empty) result = { ok: false, status: 502, body: { ...EMPTY_OUTPUT_BODY } };
+    }
+    const model = rawResult.ok ? rawResult.model : requestedModel;
+    const usage = rawResult.ok ? rawResult.usage : { input: null, output: null };
+
+    // B8/D13: one server-written run row per call, completed or failed. Legacy bodies (no object_id) get none.
+    let run: { id: string; created_at: string } | undefined;
+    if (input.objectId) {
+      const runFields = {
+        user_id: user.id,
+        knowledge_object_id: input.objectId,
+        status: result.ok ? "completed" : "failed",
+        output: result.ok ? result.output : failedRunOutput(result.body),
+        provider,
+        model,
+        input_tokens: usage.input,
+        output_tokens: usage.output,
+        truncated: truncated || outputTruncated, // input or output was cut
+      };
+      const insertRun = (promptTemplateId: string | null | undefined) =>
+        supabase.from("prompt_runs").insert({ ...runFields, prompt_template_id: promptTemplateId })
+          .select("id, created_at").single();
+      let { data: runRow, error: runErr } = await insertRun(input.promptTemplateId);
+      // The AI call is already paid for: a bad/deleted template id must not drop the run row.
+      if (runErr && input.promptTemplateId) {
+        console.error("Failed to record prompt run with template; retrying without it", runErr.message);
+        ({ data: runRow, error: runErr } = await insertRun(null));
       }
-      apiKey = keyCheck.key;
-    } else {
-      const keyCheck = validateAnthropicApiKey(apiKey);
-      if (!keyCheck.ok) {
-        return json({ error: "Invalid Claude API key", code: "INVALID_API_KEY", hint: keyCheck.hint }, 400);
-      }
-      apiKey = keyCheck.key;
+      if (runErr) console.error("Failed to record prompt run", runErr.message);
+      else run = runRow ?? undefined;
     }
 
-    const rawPromptText = body?.promptText;
-    const rawObjectTitle = body?.objectTitle;
-    const rawObjectContent = body?.objectContent;
-    if (!rawPromptText || typeof rawPromptText !== "string") {
-      return json({ error: "promptText (string) is required" }, 400);
-    }
-    if (rawPromptText.length > MAX_PROMPT_TEXT) {
-      return json({ error: `promptText must be at most ${MAX_PROMPT_TEXT} characters` }, 400);
-    }
-    const objectTitle =
-      typeof rawObjectTitle === "string" ? rawObjectTitle.slice(0, MAX_OBJECT_TITLE) : "";
-    const objectContent =
-      typeof rawObjectContent === "string" ? rawObjectContent.slice(0, MAX_OBJECT_CONTENT) : "";
-
-    const userMessage =
-      (objectTitle || objectContent)
-        ? `Document title: ${objectTitle}\n\nContent:\n${objectContent || "(none)"}\n\nTask:\n${rawPromptText}`
-        : rawPromptText;
-
-    const result = provider === "anthropic"
-      ? await runClaude(apiKey, model, userMessage, usingServerKey)
-      : await runDeepSeek(apiKey, model, userMessage, usingServerKey);
-
-    if (!result.ok) return json(result.body, result.status);
-    return json({ output: result.output, provider, model });
-  } catch (_e) {
-    return new Response(
-      JSON.stringify({
-        error: "Server error",
-        hint: "Something went wrong on the server. Try again in a moment.",
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    if (!result.ok) return reply({ ...result.body, run }, result.status);
+    // `truncated` = input truncation (the frontend toast relies on it); `output_truncated` = answer cut off.
+    return reply({ output: result.output, provider, model, truncated, output_truncated: outputTruncated, run });
+  } catch (e) {
+    console.error("run-prompt error:", redactSecrets(e instanceof Error ? e.stack ?? e.message : String(e)));
+    return reply({ error: "Server error", hint: "Something went wrong on the server. Try again in a moment." }, 500);
   }
 });

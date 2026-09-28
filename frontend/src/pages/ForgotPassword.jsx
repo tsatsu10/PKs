@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
+import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
 export default function ForgotPassword() {
@@ -10,6 +11,9 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -19,11 +23,15 @@ export default function ForgotPassword() {
       const redirectTo = `${window.location.origin}/reset-password`;
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,
+        captchaToken: captchaToken || undefined,
       });
       if (err) throw err;
       setSent(true);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to send reset email'));
+      const msg = getErrorMessage(err, 'Failed to send reset email');
+      setError(msg.toLowerCase().includes('captcha') ? 'Please complete the security check and try again.' : msg);
+      setCaptchaToken('');
+      setCaptchaKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -71,7 +79,8 @@ export default function ForgotPassword() {
           />
           <label htmlFor="forgot-email" className="form-floating-label">Email</label>
         </div>
-        <button type="submit" disabled={submitting} aria-busy={submitting}>
+        <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
+        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
           {submitting ? 'Sending…' : 'Send reset link'}
         </button>
       </form>
