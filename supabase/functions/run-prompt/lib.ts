@@ -42,11 +42,49 @@ export function pickModel(provider: Provider, requested: string, usingServerKey:
   return allowed.includes(requested) ? requested : (usingServerKey ? cfg.serverDefault : cfg.userDefault);
 }
 
-/** Per-user daily counters a server-key run consumes, in order (the global cap is separate). */
+/**
+ * Per-user daily counters a server-key run consumes, narrowest first, so hitting the per-provider
+ * cap does not also burn a unit of the per-user total (the global cap is separate, and checked last).
+ */
 export function serverKeyCaps(provider: Provider, limits: { total: number; anthropic: number }): Array<{ scope: string; limit: number }> {
-  const caps = [{ scope: "server_key", limit: limits.total }];
+  const caps: Array<{ scope: string; limit: number }> = [];
   if (provider === "anthropic") caps.push({ scope: "server_key:anthropic", limit: limits.anthropic });
+  caps.push({ scope: "server_key", limit: limits.total });
   return caps;
+}
+
+export type FailureBody = { error: string; code: string; hint: string };
+
+export const EMPTY_OUTPUT_BODY: FailureBody = {
+  error: "The AI returned no answer",
+  code: "EMPTY_OUTPUT",
+  hint: "Try again, or shorten the prompt.",
+};
+
+/** R14: an empty answer is a failure; a max-length stop is reported, never silent. */
+export function completionOutcome(
+  provider: Provider,
+  stopReason: string | null | undefined,
+  text: string,
+): { empty: boolean; outputTruncated: boolean } {
+  const outputTruncated = provider === "anthropic" ? stopReason === "max_tokens" : stopReason === "length";
+  return { empty: !text.trim(), outputTruncated };
+}
+
+/**
+ * Maps a non-HTTP upstream failure (network/DNS/TLS error, timeout while connecting or reading the
+ * body, unparseable body) to a response. Timeouts are 504; the rest 502, generic on the server key.
+ */
+export function upstreamFailure(e: unknown, usingServerKey: boolean, label: string): { status: number; body: FailureBody } {
+  const name = e instanceof Error || e instanceof DOMException ? e.name : "";
+  if (name === "TimeoutError" || name === "AbortError") {
+    return { status: 504, body: { error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." } };
+  }
+  if (usingServerKey) {
+    return { status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+  }
+  const detail = redactSecrets(e instanceof Error ? e.message : String(e));
+  return { status: 502, body: { error: `${label} request failed: ${detail}`, code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
 }
 
 /** Masks API-key-shaped tokens (sk-…, including sk-ant-…) before text is logged or stored. */

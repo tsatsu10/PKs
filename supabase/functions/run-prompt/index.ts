@@ -8,6 +8,8 @@ import { getAdminClient, getUserClient } from "../_shared/supabase.ts";
 import { hintForDeepSeekAuthCode, validateDeepSeekApiKey } from "./deepseekKey.ts";
 import {
   buildUserMessage,
+  completionOutcome,
+  EMPTY_OUTPUT_BODY,
   failedRunOutput,
   isProvider,
   parseRunRequest,
@@ -16,6 +18,7 @@ import {
   PROVIDERS,
   redactSecrets,
   serverKeyCaps,
+  upstreamFailure,
 } from "./lib.ts";
 
 const RATE_LIMIT_PER_MINUTE = 20;
@@ -29,8 +32,9 @@ const CLAUDE_TIMEOUT_MS = 110_000; // with maxRetries 0, stays under the 150 s e
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
 type Usage = { input: number | null; output: number | null };
+/** Upstream problems are always a RunResult (never a throw), so a failed run row is always written. */
 type RunResult =
-  | { ok: true; output: string; usage: Usage }
+  | { ok: true; output: string; usage: Usage; model: string; stopReason: string | null }
   | { ok: false; status: number; body: Record<string, unknown> };
 
 function validateAnthropicApiKey(raw: string): { ok: true; key: string } | { ok: false; hint: string } {
@@ -41,44 +45,64 @@ function validateAnthropicApiKey(raw: string): { ok: true; key: string } | { ok:
   return { ok: true, key };
 }
 
+/** Format check for either provider's key; runs before any quota is consumed. */
+function checkApiKey(provider: Provider, raw: string): { ok: true; key: string } | { ok: false; body: Record<string, string> } {
+  if (provider === "deepseek") {
+    const check = validateDeepSeekApiKey(raw);
+    return check.ok ? check : { ok: false, body: { error: "Invalid DeepSeek API key", code: check.code, hint: check.hint } };
+  }
+  const check = validateAnthropicApiKey(raw);
+  return check.ok ? check : { ok: false, body: { error: "Invalid Claude API key", code: "INVALID_API_KEY", hint: check.hint } };
+}
+
+/** Logs (redacted) and maps a thrown upstream error to a failed RunResult. */
+function upstreamFailed(e: unknown, usingServerKey: boolean, label: string): RunResult {
+  console.error(`${label} request error${usingServerKey ? " (server key)" : ""}`, redactSecrets(e instanceof Error ? `${e.name}: ${e.message}` : String(e)));
+  return { ok: false, ...upstreamFailure(e, usingServerKey, label) };
+}
+
 async function runDeepSeek(apiKey: string, model: string, userMessage: string, usingServerKey: boolean): Promise<RunResult> {
-  const res = await fetch(DEEPSEEK_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: userMessage }], max_tokens: 4096 }),
-    signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS),
-  }).catch((e) => {
-    if (e instanceof DOMException && e.name === "TimeoutError") return null;
-    throw e;
-  });
-  if (!res) {
-    return { ok: false, status: 504, body: { error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." } };
-  }
-  if (!res.ok) {
-    let upstreamCode = "DEEPSEEK_ERROR";
-    let upstreamMessage = "";
-    try {
-      const errJson = await res.json();
-      const errObj = errJson?.error;
-      upstreamMessage = (typeof errObj === "object" && errObj?.message) || errJson?.message ||
-        (typeof errObj === "string" ? errObj : "") || "";
-      upstreamCode = (typeof errObj === "object" && errObj?.code) || errJson?.code || upstreamCode;
-    } catch { /* ignore parse errors */ }
-    upstreamMessage = redactSecrets(String(upstreamMessage));
-    if (usingServerKey) {
-      // Upstream errors for the shared key stay server-side.
-      console.error("DeepSeek error (server key)", res.status, upstreamCode, upstreamMessage);
-      return { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+  // One try around the request AND the body reads: a timeout or network error at any point,
+  // or an unparseable body, becomes a failed RunResult instead of escaping as a 500.
+  try {
+    const res = await fetch(DEEPSEEK_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: "user", content: userMessage }], max_tokens: 4096 }),
+      signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS), // also bounds the body reads below
+    });
+    if (!res.ok) {
+      let upstreamCode = "DEEPSEEK_ERROR";
+      let upstreamMessage = "";
+      try {
+        const errJson = await res.json();
+        const errObj = errJson?.error;
+        upstreamMessage = (typeof errObj === "object" && errObj?.message) || errJson?.message ||
+          (typeof errObj === "string" ? errObj : "") || "";
+        upstreamCode = (typeof errObj === "object" && errObj?.code) || errJson?.code || upstreamCode;
+      } catch { /* ignore parse errors */ }
+      upstreamMessage = redactSecrets(String(upstreamMessage));
+      upstreamCode = redactSecrets(String(upstreamCode));
+      if (usingServerKey) {
+        // Upstream errors for the shared key stay server-side.
+        console.error("DeepSeek error (server key)", res.status, upstreamCode, upstreamMessage);
+        return { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+      }
+      const hint = upstreamMessage ? `DeepSeek: ${upstreamMessage}` : hintForDeepSeekAuthCode(upstreamCode);
+      return { ok: false, status: 502, body: { error: upstreamMessage || "AI request failed", code: upstreamCode, hint } };
     }
-    const hint = upstreamMessage ? `DeepSeek: ${upstreamMessage}` : hintForDeepSeekAuthCode(String(upstreamCode));
-    return { ok: false, status: 502, body: { error: upstreamMessage || "AI request failed", code: upstreamCode, hint } };
+    const data = await res.json();
+    const choice = data?.choices?.[0];
+    return {
+      ok: true,
+      output: typeof choice?.message?.content === "string" ? choice.message.content : "",
+      usage: { input: data?.usage?.prompt_tokens ?? null, output: data?.usage?.completion_tokens ?? null },
+      model: typeof data?.model === "string" && data.model ? data.model : model,
+      stopReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : null,
+    };
+  } catch (e) {
+    return upstreamFailed(e, usingServerKey, "DeepSeek");
   }
-  const data = await res.json();
-  return {
-    ok: true,
-    output: data.choices?.[0]?.message?.content ?? "",
-    usage: { input: data.usage?.prompt_tokens ?? null, output: data.usage?.completion_tokens ?? null },
-  };
 }
 
 async function runClaude(apiKey: string, model: string, userMessage: string, usingServerKey: boolean): Promise<RunResult> {
@@ -114,12 +138,20 @@ async function runClaude(apiKey: string, model: string, userMessage: string, usi
       .filter((b) => b.type === "text")
       .map((b) => (b as { text: string }).text)
       .join("");
-    return { ok: true, output, usage: { input: response.usage?.input_tokens ?? null, output: response.usage?.output_tokens ?? null } };
+    return {
+      ok: true,
+      output,
+      usage: { input: response.usage?.input_tokens ?? null, output: response.usage?.output_tokens ?? null },
+      model: response.model || model, // the model that actually answered (may differ after a fallback)
+      stopReason: response.stop_reason ?? null,
+    };
   } catch (e) {
     const fail = (status: number, code: string, error: string, hint: string): RunResult => {
       if (usingServerKey) {
-        console.error("Claude error (server key)", status, code, redactSecrets(e instanceof Error ? e.message : String(e)));
-        return { ok: false, status: status === 504 ? 504 : 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
+        console.error("Claude error (server key)", status, redactSecrets(code), redactSecrets(e instanceof Error ? e.message : String(e)));
+        return status === 504
+          ? { ok: false, status, body: { error: "AI request timed out", code: "UPSTREAM_TIMEOUT", hint: "Try again, or shorten the prompt." } }
+          : { ok: false, status: 502, body: { error: "AI request failed", code: "UPSTREAM_ERROR", hint: "Try again in a moment." } };
       }
       return { ok: false, status, body: { error: redactSecrets(error), code, hint: redactSecrets(hint) } };
     };
@@ -133,7 +165,8 @@ async function runClaude(apiKey: string, model: string, userMessage: string, usi
       return fail(504, "UPSTREAM_TIMEOUT", "AI request timed out or could not connect", "Try again, or shorten the prompt.");
     }
     if (e instanceof Anthropic.APIError) return fail(502, e.type ?? "CLAUDE_ERROR", e.message, `Claude: ${e.message}`);
-    throw e;
+    // Anything else (e.g. a raw abort or a malformed response) is still an upstream failure, not a 500.
+    return upstreamFailed(e, usingServerKey, "Claude");
   }
 }
 
@@ -212,7 +245,9 @@ Deno.serve(async (req) => {
         }, 400);
       }
       provider = row.provider_type;
-      apiKey = row.api_key;
+      const check = checkApiKey(provider, row.api_key);
+      if (!check.ok) return reply(check.body, 400);
+      apiKey = check.key;
     } else {
       provider = input.provider ?? "deepseek";
       const cfg = PROVIDERS[provider];
@@ -224,7 +259,19 @@ Deno.serve(async (req) => {
           hint: `No shared ${cfg.label} key is set on the server. Add your own ${cfg.label} key in Settings → AI API keys.`,
         }, 503);
       }
-      // S2: per-user total, per-user per-provider, then a global cap across all users. All fail closed.
+      // Check the shared key's format before consuming any caps, so a misconfigured key burns no quota.
+      const check = checkApiKey(provider, serverKey);
+      if (!check.ok) {
+        console.error(`Server ${cfg.label} key (${cfg.serverKeyEnv}) is malformed:`, check.body.code);
+        return reply({
+          error: `${cfg.label} not configured`,
+          code: `${provider.toUpperCase()}_API_KEY_INVALID`,
+          hint: `The shared ${cfg.label} key on the server is misconfigured. Add your own ${cfg.label} key in Settings → AI API keys.`,
+        }, 503);
+      }
+      // S2: per-user caps (narrowest first), then a global cap across all users. All fail closed.
+      // Per-user before global, so one user can't burn global units past their own cap. Accepted cost:
+      // if the global cap then rejects the call, the user's per-user units for this call are already spent.
       const caps = serverKeyCaps(provider, { total: SERVER_KEY_DAILY_LIMIT, anthropic: SERVER_KEY_DAILY_LIMIT_ANTHROPIC });
       for (const { scope, limit } of caps) {
         const { data: q, error: qErr } = await supabase.rpc("consume_usage", { p_scope: scope, p_limit: limit, p_window_seconds: DAY });
@@ -249,24 +296,26 @@ Deno.serve(async (req) => {
           hint: "Add your own API key in Settings → AI API keys, or try again tomorrow.",
         }, 429);
       }
-      apiKey = serverKey;
+      apiKey = check.key;
     }
 
-    const model = pickModel(provider, input.model, usingServerKey);
-    if (provider === "deepseek") {
-      const check = validateDeepSeekApiKey(apiKey);
-      if (!check.ok) return reply({ error: "Invalid DeepSeek API key", code: check.code, hint: check.hint }, 400);
-      apiKey = check.key;
-    } else {
-      const check = validateAnthropicApiKey(apiKey);
-      if (!check.ok) return reply({ error: "Invalid Claude API key", code: "INVALID_API_KEY", hint: check.hint }, 400);
-      apiKey = check.key;
-    }
+    const requestedModel = pickModel(provider, input.model, usingServerKey);
 
     const { message, truncated } = buildUserMessage(title, content, input.promptText);
-    const result = provider === "anthropic"
-      ? await runClaude(apiKey, model, message, usingServerKey)
-      : await runDeepSeek(apiKey, model, message, usingServerKey);
+    const rawResult = provider === "anthropic"
+      ? await runClaude(apiKey, requestedModel, message, usingServerKey)
+      : await runDeepSeek(apiKey, requestedModel, message, usingServerKey);
+
+    // R14: an output cut off at max tokens is reported; an empty answer is a failed run, not a completed one.
+    let result: RunResult = rawResult;
+    let outputTruncated = false;
+    if (rawResult.ok) {
+      const outcome = completionOutcome(provider, rawResult.stopReason, rawResult.output);
+      outputTruncated = outcome.outputTruncated;
+      if (outcome.empty) result = { ok: false, status: 502, body: { ...EMPTY_OUTPUT_BODY } };
+    }
+    const model = rawResult.ok ? rawResult.model : requestedModel;
+    const usage = rawResult.ok ? rawResult.usage : { input: null, output: null };
 
     // B8/D13: one server-written run row per call, completed or failed. Legacy bodies (no object_id) get none.
     let run: { id: string; created_at: string } | undefined;
@@ -279,16 +328,17 @@ Deno.serve(async (req) => {
         output: result.ok ? result.output : failedRunOutput(result.body),
         provider,
         model,
-        input_tokens: result.ok ? result.usage.input : null,
-        output_tokens: result.ok ? result.usage.output : null,
-        truncated,
+        input_tokens: usage.input,
+        output_tokens: usage.output,
+        truncated: truncated || outputTruncated, // input or output was cut
       }).select("id, created_at").single();
       if (runErr) console.error("Failed to record prompt run", runErr.message);
       else run = runRow;
     }
 
     if (!result.ok) return reply({ ...result.body, run }, result.status);
-    return reply({ output: result.output, provider, model, truncated, run });
+    // `truncated` = input truncation (the frontend toast relies on it); `output_truncated` = answer cut off.
+    return reply({ output: result.output, provider, model, truncated, output_truncated: outputTruncated, run });
   } catch (e) {
     console.error("run-prompt error:", redactSecrets(e instanceof Error ? e.stack ?? e.message : String(e)));
     return reply({ error: "Server error", hint: "Something went wrong on the server. Try again in a moment." }, 500);
