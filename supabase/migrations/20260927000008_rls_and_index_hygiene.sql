@@ -53,10 +53,16 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created
   ON public.audit_logs(user_id, created_at DESC);
 
--- 5. Case-insensitive tag/domain names. Merge existing case-duplicates into the oldest row:
---    attach every object to the kept row (DISTINCT + ON CONFLICT, so an object carrying several
---    variants gets exactly one link), then delete the duplicates; their join rows cascade away.
-DO $$
+-- 5. Case-insensitive tag/domain names.
+-- Internal maintenance function (not an API): merges case-duplicate tags/domains into the oldest
+-- row per (user_id, lower(name)). It attaches every object to the kept row (DISTINCT + ON CONFLICT,
+-- so an object carrying several variants gets exactly one link), then deletes the duplicates;
+-- their join rows cascade away. Run only by the migration or a superuser; no role may execute it.
+CREATE OR REPLACE FUNCTION public.merge_case_duplicate_taxonomy()
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
 DECLARE
   t text;
 BEGIN
@@ -83,12 +89,21 @@ BEGIN
         AND (k.created_at, k.id) < (x.created_at, x.id)
     $f$, t);
   END LOOP;
-END $$;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.merge_case_duplicate_taxonomy() FROM PUBLIC, anon, authenticated, service_role;
 
-ALTER TABLE public.domains DROP CONSTRAINT IF EXISTS domains_user_id_name_key;
-ALTER TABLE public.tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key;
-CREATE UNIQUE INDEX IF NOT EXISTS domains_user_lower_name_key ON public.domains(user_id, lower(name));
-CREATE UNIQUE INDEX IF NOT EXISTS tags_user_lower_name_key ON public.tags(user_id, lower(name));
+-- Lock, merge and build the unique indexes in one statement, so no case-variant can be inserted
+-- between the merge and the index even when the migration runner autocommits each statement.
+DO $$
+BEGIN
+  LOCK TABLE public.tags, public.domains IN SHARE ROW EXCLUSIVE MODE;
+  PERFORM public.merge_case_duplicate_taxonomy();
+  ALTER TABLE public.domains DROP CONSTRAINT IF EXISTS domains_user_id_name_key;
+  ALTER TABLE public.tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS domains_user_lower_name_key ON public.domains(user_id, lower(name));
+  CREATE UNIQUE INDEX IF NOT EXISTS tags_user_lower_name_key ON public.tags(user_id, lower(name));
+END $$;
 
 CREATE OR REPLACE FUNCTION public.create_domain(p_name text)
 RETURNS jsonb

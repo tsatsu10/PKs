@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { createDomain, createTag } from '../lib/entities';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
 import './Settings.css';
@@ -173,12 +174,13 @@ export default function Settings() {
     setError('');
     setAddingDomain(true);
     try {
-      const { error: err } = await supabase.from('domains').insert({ user_id: user.id, name });
-      if (err) throw err;
+      const domain = await createDomain(name);
       setNewDomain('');
-      const { data, error: refetchErr } = await supabase.from('domains').select('id, name').eq('user_id', user.id).order('name');
-      if (refetchErr && import.meta.env.DEV) console.warn('Domains refetch failed:', refetchErr);
-      setDomains(data || []);
+      if (domains.some((d) => d.id === domain.id)) {
+        addToast('success', `Domain "${domain.name}" already exists`);
+      } else {
+        setDomains((prev) => [...prev, domain].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add domain'));
     } finally {
@@ -193,12 +195,13 @@ export default function Settings() {
     setError('');
     setAddingTag(true);
     try {
-      const { error: err } = await supabase.from('tags').insert({ user_id: user.id, name });
-      if (err) throw err;
-      const { data, error: refetchErr } = await supabase.from('tags').select('id, name').eq('user_id', user.id).eq('name', name).single();
-      if (refetchErr && import.meta.env.DEV) console.warn('Tags refetch failed:', refetchErr);
-      if (data) setTags((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      const tag = await createTag(name);
       setNewTag('');
+      if (tags.some((t) => t.id === tag.id)) {
+        addToast('success', `Tag "${tag.name}" already exists`);
+      } else {
+        setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add tag'));
     } finally {
