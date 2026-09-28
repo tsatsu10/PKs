@@ -5,7 +5,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { json } from "../_shared/http.ts";
 import { getAdminClient, getUserClient } from "../_shared/supabase.ts";
 import {
-  assertResolvesToPublicIp, countDelivered, isAllowedEvent, isWebhookUrlAllowed,
+  assertResolvesToPublicIp, countDelivered, dedupeByUrl, isAllowedEvent, isWebhookUrlAllowed,
   legacySignature, MAX_PAYLOAD_BYTES, signPayload,
 } from "./lib.ts";
 
@@ -23,6 +23,15 @@ Deno.serve(async (req) => {
     if (!auth) return reply({ error: "Unauthorized" }, 401);
     const { supabase, user } = auth;
 
+    // Cheap early reject on the declared size before buffering the body (a spoofed/missing
+    // Content-Length still gets the byte-accurate check right after req.text()).
+    const declaredLength = req.headers.get("Content-Length");
+    if (declaredLength) {
+      const n = parseInt(declaredLength, 10);
+      if (!Number.isNaN(n) && n > MAX_PAYLOAD_BYTES) {
+        return reply({ error: "Request body too large", code: "PAYLOAD_TOO_LARGE" }, 413);
+      }
+    }
     const rawBody = await req.text();
     if (new TextEncoder().encode(rawBody).length > MAX_PAYLOAD_BYTES) {
       return reply({ error: "Request body too large", code: "PAYLOAD_TOO_LARGE" }, 413);
@@ -52,10 +61,13 @@ Deno.serve(async (req) => {
       return reply({ error: "Server error" }, 500);
     }
 
-    const toCall = (integrations ?? []).filter((i) => {
+    const matching = (integrations ?? []).filter((i) => {
       const events = i.config?.events;
       return !Array.isArray(events) || events.length === 0 || events.includes(event);
     });
+    // Ten webhooks pointing at the same URL should send one POST, not ten. `total` below counts
+    // distinct URLs actually called, not the number of integration rows that matched.
+    const toCall = dedupeByUrl(matching, (i) => i.config?.url);
 
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({ event, payload: parsed.payload ?? {}, timestamp: new Date(timestamp * 1000).toISOString() });
@@ -75,7 +87,10 @@ Deno.serve(async (req) => {
         headers["X-PKS-Signature-256"] = `v1=${await signPayload(i.webhook_secret, timestamp, body)}`;
         headers["X-PKS-Signature"] = await legacySignature(i.webhook_secret, body);
       }
-      return await fetch(url, { method: "POST", headers, body, redirect: "manual", signal: AbortSignal.timeout(10_000) });
+      const res = await fetch(url, { method: "POST", headers, body, redirect: "manual", signal: AbortSignal.timeout(10_000) });
+      // We only care about the status; don't leave the response body unread/unclosed.
+      try { await res.body?.cancel(); } catch { /* best-effort */ }
+      return res;
     }));
 
     return reply({ delivered: countDelivered(results), total: toCall.length });

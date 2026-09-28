@@ -156,3 +156,33 @@ export async function legacySignature(secret: string, body: string): Promise<str
 export function countDelivered(results: PromiseSettledResult<Response | undefined>[]): number {
   return results.filter((r) => r.status === "fulfilled" && r.value?.ok === true).length;
 }
+
+/**
+ * Dedupe items by normalized URL (protocol + host + pathname + sorted query; no fragment, no
+ * trailing slash), keeping the first item seen for each URL. Ten webhooks pointing at the same
+ * URL should trigger one POST, not ten. Items whose URL is missing/invalid sort into their own
+ * "undefined" bucket and are kept as-is (the caller's per-item URL validation still runs on them).
+ */
+export function normalizeWebhookUrl(urlString: unknown): string {
+  if (typeof urlString !== "string") return "";
+  try {
+    const u = new URL(urlString);
+    u.searchParams.sort();
+    const path = u.pathname.length > 1 ? u.pathname.replace(/\/+$/, "") : u.pathname;
+    return `${u.protocol}//${u.host}${path}${u.search}`;
+  } catch {
+    return urlString;
+  }
+}
+
+export function dedupeByUrl<T>(items: T[], getUrl: (item: T) => unknown): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const key = normalizeWebhookUrl(getUrl(item));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}

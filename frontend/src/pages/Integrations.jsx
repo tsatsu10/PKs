@@ -89,10 +89,16 @@ export default function Integrations() {
     }
     setError('');
     try {
+      const item = list.find((i) => i.id === editingConfigId);
+      const secretTouched = editConfig.secret !== '********';
+      const trimmedSecret = editConfig.secret.trim();
       const config = {
         url: editConfig.url.trim(),
         events: editConfig.events,
-        ...(editConfig.secret && editConfig.secret !== '********' ? { secret: editConfig.secret.trim() } : {}),
+        // '********' (untouched) keeps the existing secret (omit the key). A non-empty new value
+        // sets it. An emptied field clears it only when there was a secret to clear.
+        ...(secretTouched && trimmedSecret ? { secret: trimmedSecret } : {}),
+        ...(secretTouched && !trimmedSecret && item?.has_secret ? { secret: '' } : {}),
       };
       const { error: err } = await supabase
         .from('integrations')
@@ -100,7 +106,9 @@ export default function Integrations() {
         .eq('id', editingConfigId)
         .eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.map((i) => (i.id === editingConfigId ? { ...i, config, has_secret: config.secret ? true : i.has_secret } : i)));
+      setList((prev) => prev.map((i) => (
+        i.id === editingConfigId ? { ...i, config, has_secret: 'secret' in config ? config.secret !== '' : i.has_secret } : i
+      )));
       setEditingConfigId(null);
       setEditConfig({ url: '', events: [], secret: '' });
     } catch (err) {
