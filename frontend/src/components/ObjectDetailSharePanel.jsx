@@ -45,6 +45,7 @@ export default function ObjectDetailSharePanel({
           {shares.map((s) => (
             <li key={s.id}>
               <span className="share-email">{s.shared_with_email || '—'}</span>
+                {s.pending && <span className="muted"> · pending</span>}
               <span className="share-role">{s.role}</span>
               <button type="button" className="btn btn-danger btn-small" onClick={() => onRevokeShare(s.id)}>
                 Revoke

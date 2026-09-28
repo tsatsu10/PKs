@@ -955,13 +955,22 @@ export default function ObjectDetail() {
 
   async function loadShares() {
     if (!object?.id || !user?.id) return;
-    const { data, error: err } = await supabase.from('share_permissions').select('id, shared_with_email, role, created_at').eq('knowledge_object_id', object.id).order('created_at', { ascending: false });
-    if (err) {
-      if (import.meta.env.DEV) console.warn('Failed to load shares:', err);
+    const [sharesRes, invitesRes] = await Promise.all([
+      supabase.from('share_permissions').select('id, shared_with_email, role, created_at')
+        .eq('knowledge_object_id', object.id).order('created_at', { ascending: false }),
+      supabase.from('share_invites').select('id, email, role, created_at')
+        .eq('knowledge_object_id', object.id).is('accepted_at', null)
+        .order('created_at', { ascending: false }),
+    ]);
+    if (sharesRes.error || invitesRes.error) {
+      if (import.meta.env.DEV) console.warn('Failed to load shares:', sharesRes.error || invitesRes.error);
       setShares([]);
       return;
     }
-    setShares(data || []);
+    const pending = (invitesRes.data || []).map((i) => ({
+      id: `invite:${i.id}`, shared_with_email: i.email, role: i.role, created_at: i.created_at, pending: true,
+    }));
+    setShares([...pending, ...(sharesRes.data || [])]);
   }
 
   function isValidEmail(str) {
@@ -980,23 +989,16 @@ export default function ObjectDetail() {
     setSharing(true);
     setError('');
     try {
-      const { data: userId, error: rpcErr } = await supabase.rpc('resolve_user_id_by_email', {
-        target_email: shareEmail.trim(),
-        p_knowledge_object_id: object.id,
+      const email = shareEmail.trim();
+      const { error: rpcErr } = await supabase.rpc('share_object_by_email', {
+        p_object_id: object.id,
+        p_email: email,
+        p_role: shareRole,
       });
       if (rpcErr) throw rpcErr;
-      if (!userId) throw new Error('No user found with that email');
-      if (userId === user.id) throw new Error('You cannot share with yourself');
-      const { data: newShare, error: insErr } = await supabase.from('share_permissions').insert({
-        knowledge_object_id: object.id,
-        shared_with_user_id: userId,
-        shared_with_email: shareEmail.trim(),
-        role: shareRole,
-      }).select('id, shared_with_email, role, created_at').single();
-      if (insErr) throw insErr;
-      setShares((prev) => [newShare, ...prev]);
+      await loadShares();
       setShareEmail('');
-      addToast('success', `Shared with ${shareEmail.trim()}`);
+      addToast('success', `Shared with ${email}. If they don't have a verified PKS account yet, they'll get access when they sign up.`);
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to share');
       addToast('error', msg);
@@ -1010,7 +1012,9 @@ export default function ObjectDetail() {
     if (!object) return;
     setError('');
     try {
-      const { error: err } = await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
+      const { error: err } = shareId.startsWith('invite:')
+        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length))
+        : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
       if (err) throw err;
       setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch (err) {
