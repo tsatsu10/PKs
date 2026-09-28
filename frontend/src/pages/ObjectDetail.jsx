@@ -1140,10 +1140,11 @@ export default function ObjectDetail() {
             {editing ? (
         <div className="detail-edit" key={`edit-${object?.id}`}>
           <label>Title <input type="text" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} required /></label>
-          <label>Status <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} aria-label="Status">{OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
-          <label>Due date <input type="datetime-local" value={editForm.due_at} onChange={(e) => setEditForm((f) => ({ ...f, due_at: e.target.value }))} aria-label="Due date" /></label>
-          <label>Remind at <input type="datetime-local" value={editForm.remind_at} onChange={(e) => setEditForm((f) => ({ ...f, remind_at: e.target.value }))} aria-label="Remind at" /></label>
-          <label>Cover URL <input type="url" value={editForm.cover_url} onChange={(e) => setEditForm((f) => ({ ...f, cover_url: e.target.value }))} placeholder="https://…" /></label>
+          <label>Status <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} aria-label="Status" disabled={!isOwner}>{OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+          <label>Due date <input type="datetime-local" value={editForm.due_at} onChange={(e) => setEditForm((f) => ({ ...f, due_at: e.target.value }))} aria-label="Due date" disabled={!isOwner} /></label>
+          <label>Remind at <input type="datetime-local" value={editForm.remind_at} onChange={(e) => setEditForm((f) => ({ ...f, remind_at: e.target.value }))} aria-label="Remind at" disabled={!isOwner} /></label>
+          <label>Cover URL <input type="url" value={editForm.cover_url} onChange={(e) => setEditForm((f) => ({ ...f, cover_url: e.target.value }))} placeholder="https://…" disabled={!isOwner} /></label>
+          {!isOwner && <p className="form-hint">Only the owner can change status, dates and cover.</p>}
           <label>{object.type === 'bookmark' ? 'URL' : 'Reference / URL'} <input type={object.type === 'bookmark' ? 'url' : 'text'} value={editForm.source} onChange={(e) => setEditForm((f) => ({ ...f, source: e.target.value }))} placeholder={object.type === 'bookmark' ? 'https://…' : 'e.g. https://… or book, article'} /></label>
           <label>Summary <textarea value={editForm.summary} onChange={(e) => setEditForm((f) => ({ ...f, summary: e.target.value }))} rows={2} /></label>
           <div className="detail-edit-field">
