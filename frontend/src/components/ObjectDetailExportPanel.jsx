@@ -1,5 +1,3 @@
-import { EXPORT_FORMAT_LABELS } from '../lib/export';
-
 /**
  * Export panel for ObjectDetail: format, template, include toggles, recent jobs, actions.
  */
@@ -11,9 +9,7 @@ export default function ObjectDetailExportPanel({
   exportInclude,
   setExportInclude,
   applyExportTemplate,
-  recentExportJobs,
   onExport,
-  onRetryExport,
   onClose,
 }) {
   return (
@@ -61,41 +57,6 @@ export default function ObjectDetailExportPanel({
           </label>
         ))}
       </div>
-      {recentExportJobs.length > 0 && (
-        <div className="export-recent">
-          <h3 className="export-recent-title">Recent exports</h3>
-          <ul className="export-jobs-list">
-            {recentExportJobs.map((j) => (
-              <li key={j.id} className="export-job-item">
-                <span className={`export-job-status ${j.status}`}>
-                  {j.status === 'processing' || j.status === 'queued' ? (
-                    <span className="export-job-spinner" aria-hidden="true" />
-                  ) : j.status === 'completed' ? (
-                    '✓ Ready'
-                  ) : j.status === 'failed' ? (
-                    'Failed'
-                  ) : (
-                    j.status
-                  )}
-                </span>
-                <span className="export-job-meta">
-                  {(EXPORT_FORMAT_LABELS[j.format] || j.format).toUpperCase()}
-                  {' · '}
-                  {new Date(j.created_at).toLocaleString()}
-                  {j.error_message && ` — ${j.error_message}`}
-                </span>
-                {j.status === 'failed' && (
-                  <span className="export-job-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => onRetryExport(j)}>
-                      Retry
-                    </button>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
       <div className="export-actions">
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Cancel

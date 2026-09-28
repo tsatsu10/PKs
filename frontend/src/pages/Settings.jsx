@@ -8,13 +8,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
-import { useDeckEnabled } from '../components/MainMenuDeckContext';
+import { createDomain, createTag } from '../lib/entities';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
-import PulseTargetsForm from '../features/dashboard/components/Settings/PulseTargetsForm';
+import { downloadBlob } from '../lib/download';
 import './Settings.css';
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, profileLoaded } = useAuth();
   const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
   const [domains, setDomains] = useState([]);
@@ -26,7 +26,6 @@ export default function Settings() {
   const [addingTag, setAddingTag] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
-  const { deckEnabled: mainMenuDeckEnabled, setDeckEnabled } = useDeckEnabled();
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupError, setBackupError] = useState('');
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -68,14 +67,22 @@ export default function Settings() {
     setInstallPrompt(null);
   }
 
-  useEffect(() => {
-    if (!user?.id) return;
+  // Fill the profile form once per user, and again when the stored profile
+  // arrives, never on other user-object changes (a refocus re-verify would
+  // otherwise wipe in-progress edits). Adjusting state during render, per React docs.
+  const profileFormKey = user?.id ? `${user.id}:${profileLoaded ? 'loaded' : 'pending'}` : null;
+  const [profileFormFor, setProfileFormFor] = useState(null);
+  if (profileFormKey && profileFormKey !== profileFormFor) {
+    setProfileFormFor(profileFormKey);
     setProfileDisplayName(user.displayName ?? '');
     setProfileTimezone(user.timezone ?? 'Africa/Accra');
-  }, [user?.id, user?.displayName, user?.timezone]);
+  }
 
   async function saveProfile(e) {
     e.preventDefault();
+    // Until the profile loads the form holds defaults ('Africa/Accra'); saving
+    // them would overwrite the stored timezone and display name.
+    if (!profileLoaded) return;
     setProfileError('');
     setProfileSaving(true);
     try {
@@ -167,12 +174,13 @@ export default function Settings() {
     setError('');
     setAddingDomain(true);
     try {
-      const { error: err } = await supabase.from('domains').insert({ user_id: user.id, name });
-      if (err) throw err;
+      const domain = await createDomain(name);
       setNewDomain('');
-      const { data, error: refetchErr } = await supabase.from('domains').select('id, name').eq('user_id', user.id).order('name');
-      if (refetchErr && import.meta.env.DEV) console.warn('Domains refetch failed:', refetchErr);
-      setDomains(data || []);
+      if (domains.some((d) => d.id === domain.id)) {
+        addToast('success', `Domain "${domain.name}" already exists`);
+      } else {
+        setDomains((prev) => [...prev, domain].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add domain'));
     } finally {
@@ -187,12 +195,13 @@ export default function Settings() {
     setError('');
     setAddingTag(true);
     try {
-      const { error: err } = await supabase.from('tags').insert({ user_id: user.id, name });
-      if (err) throw err;
-      const { data, error: refetchErr } = await supabase.from('tags').select('id, name').eq('user_id', user.id).eq('name', name).single();
-      if (refetchErr && import.meta.env.DEV) console.warn('Tags refetch failed:', refetchErr);
-      if (data) setTags((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      const tag = await createTag(name);
       setNewTag('');
+      if (tags.some((t) => t.id === tag.id)) {
+        addToast('success', `Tag "${tag.name}" already exists`);
+      } else {
+        setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add tag'));
     } finally {
@@ -361,11 +370,7 @@ export default function Settings() {
         '}',
       );
       const blob = new Blob([parts.join('')], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
@@ -406,11 +411,7 @@ export default function Settings() {
       }
       parts.push(']}');
       const blob = new Blob([parts.join('')], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
@@ -448,11 +449,7 @@ export default function Settings() {
         zip.file(`${String(i + 1).padStart(3, '0')}-${safeTitle}.md`, md);
       });
       const blob = await zip.generateAsync({ type: 'blob' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-backup-${new Date().toISOString().slice(0, 10)}.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.zip`);
     } catch (err) {
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
@@ -512,7 +509,17 @@ export default function Settings() {
               <option value="UTC" />
             </datalist>
           </label>
-          <button type="submit" className="btn btn-primary" disabled={profileSaving}>
+          {!profileLoaded && (
+            <p id="profile-loading-hint" className="settings-desc" role="status">
+              Loading your saved profile… You can save once it has loaded.
+            </p>
+          )}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={profileSaving || !profileLoaded}
+            aria-describedby={profileLoaded ? undefined : 'profile-loading-hint'}
+          >
             {profileSaving ? 'Saving…' : 'Save profile'}
           </button>
         </form>
@@ -566,21 +573,6 @@ export default function Settings() {
             {passwordSaving ? 'Updating…' : 'Update password'}
           </button>
         </form>
-      </section>
-
-      <section className="settings-section page-section">
-        <h2 className="page-section-title">Bottom menu</h2>
-        <p className="settings-desc page-section-desc">Show the menu wheel at the bottom of the screen. When off, the standard bottom bar (Home, New, Alerts, Settings) is used on mobile.</p>
-        <label className="settings-toggle-label">
-          <input
-            type="checkbox"
-            checked={mainMenuDeckEnabled}
-            onChange={(e) => setDeckEnabled(e.target.checked)}
-            aria-describedby="deck-desc"
-          />
-          <span>Enable bottom menu wheel</span>
-        </label>
-        <p id="deck-desc" className="settings-desc">Tap the Menu button at the bottom to open the wheel and jump to any section.</p>
       </section>
 
       <section className="settings-section page-section">
@@ -644,12 +636,6 @@ export default function Settings() {
           ))}
           {aiProviders.length === 0 && <li className="muted">No custom AI providers yet.</li>}
         </ul>
-      </section>
-
-      <section className="settings-section page-section" aria-labelledby="pulse-targets-heading">
-        <h2 id="pulse-targets-heading" className="page-section-title">Daily pulse targets</h2>
-        <p className="settings-desc page-section-desc">Goals for Capture, Tend, and Close rings on your dashboard.</p>
-        <PulseTargetsForm />
       </section>
 
       <section className="settings-section page-section">

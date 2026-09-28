@@ -4,6 +4,8 @@ import {
   buildObjectMarkdown,
   EXPORT_TEMPLATE_IDS,
   EXPORT_FORMAT_LABELS,
+  zipEntryName,
+  safeFileBase,
 } from './export.js';
 
 describe('getExportIncludeFromTemplate', () => {
@@ -85,5 +87,73 @@ describe('export constants', () => {
   it('EXPORT_FORMAT_LABELS has md and txt', () => {
     expect(EXPORT_FORMAT_LABELS.md).toBe('Markdown');
     expect(EXPORT_FORMAT_LABELS.txt).toBe('TXT');
+  });
+});
+
+describe('zipEntryName', () => {
+  it('keeps same-titled objects as separate files', () => {
+    const used = new Set();
+    const a = zipEntryName('Meeting', 'aaaaaaaa-1', 'md', used);
+    const b = zipEntryName('Meeting', 'bbbbbbbb-2', 'md', used);
+    expect(a).toBe('Meeting.md');
+    expect(b).toBe('Meeting-bbbbbbbb.md');
+  });
+
+  it('treats names that differ only in case as duplicates (Windows/macOS unzip)', () => {
+    const used = new Set();
+    zipEntryName('Meeting', 'aaaaaaaa', 'md', used);
+    expect(zipEntryName('meeting', 'cccccccc', 'md', used)).toBe('meeting-cccccccc.md');
+  });
+
+  it('never ends a long name with a dash', () => {
+    const name = zipEntryName(`${'a'.repeat(79)} b`, 'dddddddd', 'md', new Set());
+    expect(name.endsWith('-.md')).toBe(false);
+  });
+
+  it('keeps non-Latin titles readable instead of collapsing to "-"', () => {
+    const used = new Set();
+    expect(zipEntryName('会議メモ', 'cccccccc', 'md', used)).toBe('会議メモ.md');
+    expect(zipEntryName('日記', 'dddddddd', 'md', used)).toBe('日記.md');
+  });
+
+  it('strips characters that are illegal in file names and handles empty titles', () => {
+    const used = new Set();
+    expect(zipEntryName('a/b:c*?', 'eeeeeeee', 'txt', used)).toBe('abc.txt');
+    expect(zipEntryName('   ', 'ffffffff', 'md', used)).toBe('untitled.md');
+  });
+});
+
+describe('safeFileBase', () => {
+  it('keeps a non-Latin title readable instead of collapsing to "-"', () => {
+    expect(safeFileBase('会議メモ')).toBe('会議メモ');
+  });
+
+  it('falls back to "untitled" for a title made only of illegal characters', () => {
+    expect(safeFileBase('///:::***')).toBe('untitled');
+  });
+
+  it('strips illegal characters and collapses whitespace', () => {
+    expect(safeFileBase('a/b:c*?')).toBe('abc');
+    expect(safeFileBase('  My Notes  ')).toBe('My-Notes');
+  });
+
+  it('returns "untitled" for empty or whitespace-only titles', () => {
+    expect(safeFileBase('')).toBe('untitled');
+    expect(safeFileBase('   ')).toBe('untitled');
+  });
+
+  it('cuts to maxLength by code point, never splitting an emoji at the cut', () => {
+    // 49 letters then an emoji (2 UTF-16 units): .slice(0, 50) would keep half of it
+    const title = `${'a'.repeat(49)}😀tail`;
+    expect(safeFileBase(title, 50)).toBe(`${'a'.repeat(49)}😀`);
+  });
+
+  it('trims a dash left at the cut point by maxLength', () => {
+    // character 50 is the dash that replaced the space between words
+    expect(safeFileBase(`${'a'.repeat(49)} bcd`, 50)).toBe('a'.repeat(49));
+  });
+
+  it('defaults maxLength to 80', () => {
+    expect(safeFileBase('x'.repeat(100))).toHaveLength(80);
   });
 });

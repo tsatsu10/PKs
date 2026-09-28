@@ -3,7 +3,8 @@ import { supabase } from '../../../lib/supabase';
 import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
-import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../../../lib/export';
+import { getExportIncludeFromTemplate, buildObjectMarkdown, zipEntryName } from '../../../lib/export';
+import { downloadBlob } from '../../../lib/download';
 import { getErrorMessage } from '../../../lib/errors';
 import { resolveOwnedObjectIds } from '../lib/dashboardUtils';
 
@@ -100,7 +101,6 @@ export function useDashboardBulkActions({
   const handleExportSelected = useCallback(async () => {
     setExporting(true);
     setError('');
-    let jobId = null;
     try {
       const ids = exportScope === 'filtered'
         ? await fetchFilteredIds()
@@ -111,27 +111,6 @@ export function useDashboardBulkActions({
         return;
       }
       const include = getExportIncludeFromTemplate(exportTemplate, { includeLinks: false });
-      const { data: job, error: jobErr } = await supabase.from('export_jobs').insert({
-        user_id: user.id,
-        knowledge_object_id: null,
-        format: exportFormat,
-        template: exportTemplate,
-        include_content: include.content,
-        include_summary: include.summary,
-        include_key_points: include.key_points,
-        include_tags: include.tags,
-        include_domains: include.domains,
-        include_links: false,
-        filename: `export-${ids.length}-objects.zip`,
-        status: 'processing',
-      }).select('id').single();
-      if (jobErr) throw jobErr;
-      jobId = job?.id;
-      const { error: itemsErr } = await supabase.from('export_job_items').insert(
-        ids.map((knowledge_object_id, i) => ({ export_job_id: jobId, knowledge_object_id, sort_order: i }))
-      );
-      if (itemsErr) throw itemsErr;
-
       const objs = await selectInChunks('knowledge_objects', '*', 'id', ids);
       if (!objs.length) throw new Error('No objects found');
       const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));
@@ -159,34 +138,28 @@ export function useDashboardBulkActions({
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       const ZIP_CHUNK = 20;
+      const usedNames = new Set();
       for (let i = 0; i < ids.length; i += ZIP_CHUNK) {
         const chunk = ids.slice(i, i + ZIP_CHUNK);
         for (const id of chunk) {
           const obj = objMap[id];
           if (!obj) continue;
-          const slug = obj.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
           const ext = exportFormat === 'txt' ? 'txt' : 'md';
           const text = buildObjectMarkdown(obj, include, { asPlainText: exportFormat === 'txt' });
-          zip.file(`${slug}.${ext}`, text);
+          zip.file(zipEntryName(obj.title, obj.id, ext, usedNames), text);
         }
         if (i + ZIP_CHUNK < ids.length) await new Promise((r) => setTimeout(r, 0));
       }
       const blob = await zip.generateAsync({ type: 'blob' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pks-export-${ids.length}-objects.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(blob, `pks-export-${ids.length}-objects.zip`);
 
-      await supabase.from('export_jobs').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', jobId);
       createNotification(user.id, 'export_completed', 'Bundle export completed', `${ids.length} objects exported as ZIP`, {});
-      logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, jobId, { objectCount: ids.length, format: exportFormat });
+      logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.EXPORT_JOB, null, { objectCount: ids.length, format: exportFormat });
       addToast('success', `Exported ${ids.length} objects`);
       setShowExportModal(false);
       if (exportScope === 'selected') clearSelection();
     } catch (err) {
       const msg = getErrorMessage(err, 'Export failed');
-      if (jobId) await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
       setError(msg);
       addToast('error', msg);
     } finally {
@@ -384,8 +357,8 @@ export function useDashboardBulkActions({
       const { error: err } = await supabase.from('knowledge_objects').update({ is_deleted: true }).in('id', ownedIds);
       if (err) throw err;
       const msg = skipped > 0
-        ? `${ownedIds.length} object(s) deleted (${skipped} shared object(s) skipped)`
-        : `${ownedIds.length} object(s) deleted`;
+        ? `Moved ${ownedIds.length} to Trash (${skipped} shared object${skipped === 1 ? '' : 's'} skipped)`
+        : `Moved ${ownedIds.length} to Trash`;
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();

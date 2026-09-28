@@ -77,11 +77,3 @@ export function buildStreamVirtualItems(objects, density = 'comfortable') {
 
   return items;
 }
-
-export function getStreamRowHeight(density) {
-  return density === 'compact' ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE;
-}
-
-export function getStreamHeaderHeight() {
-  return HEADER_HEIGHT;
-}

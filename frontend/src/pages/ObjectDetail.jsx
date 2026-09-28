@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isTypingTarget } from '../lib/keyboard';
 import { createNotification } from '../lib/notifications';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
-import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS } from '../lib/export';
-import { slugify } from '../lib/slugify';
+import { getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS, safeFileBase } from '../lib/export';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
+import { objectToEditForm, buildObjectPatch, draftFromForm, formFromDraft } from '../lib/objectForm';
 import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { useToast } from '../context/ToastContext';
-import NotificationCenter from '../components/NotificationCenter';
 import { SkeletonDetail } from '../components/Skeleton';
 import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
@@ -21,6 +21,7 @@ import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { resolveRunSelection, modelForProvider, isServerSelection } from '../lib/aiProviders';
 import { getErrorMessage } from '../lib/errors';
+import { downloadBlob, printHtml } from '../lib/download';
 import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
@@ -95,11 +96,12 @@ export default function ObjectDetail() {
   const [shareEmail, setShareEmail] = useState('');
   const [shareRole, setShareRole] = useState('viewer');
   const [sharing, setSharing] = useState(false);
-  const [recentExportJobs, setRecentExportJobs] = useState([]);
   const [linkSearchQuery, setLinkSearchQuery] = useState('');
   const [linkSearchResults, setLinkSearchResults] = useState([]);
   const [linkSearchOpen, setLinkSearchOpen] = useState(false);
   const editInitialContentRef = useRef('');
+  // Revision the current edit is based on; used for the optimistic-concurrency check on save.
+  const editBaseRevisionRef = useRef(null);
   const linkSearchRef = useRef(null);
 
   useEffect(() => {
@@ -109,16 +111,7 @@ export default function ObjectDetail() {
 
   useEffect(() => {
     if (!object || editing) return;
-    setEditForm({
-      title: object.title,
-      content: object.content || '',
-      summary: object.summary || '',
-      source: object.source || '',
-      status: object.status || 'active',
-      due_at: object.due_at ? object.due_at.slice(0, 16) : '',
-      remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '',
-      cover_url: object.cover_url || '',
-    });
+    setEditForm(objectToEditForm(object));
   }, [object, editing]);
 
   const draftAppliedRef = useRef(false);
@@ -127,8 +120,10 @@ export default function ObjectDetail() {
     const d = draft && (draft.title !== undefined || draft.content !== undefined || draft.summary !== undefined) ? draft : null;
     if (!d) return;
     draftAppliedRef.current = true;
-    editInitialContentRef.current = d.content ?? object.content ?? '';
-    setEditForm((prev) => ({ ...prev, ...d }));
+    const restored = formFromDraft(d, object);
+    editInitialContentRef.current = restored.form.content;
+    editBaseRevisionRef.current = restored.baseRevision;
+    setEditForm(restored.form);
     setEditing(true);
     addToast('success', 'Draft restored');
   }, [object, id, draft, addToast]);
@@ -149,46 +144,15 @@ export default function ObjectDetail() {
     if (!id || !editing) return;
     if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current);
     editDraftTimerRef.current = setTimeout(() => {
-      setDraft(DRAFT_KEYS.object(id), editForm);
+      setDraft(DRAFT_KEYS.object(id), draftFromForm(editForm, editBaseRevisionRef.current));
     }, 500);
     return () => { if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current); };
   }, [id, editing, editForm]);
 
-  const loadRecentExportJobs = useCallback(async () => {
-    if (!id || !user?.id) return;
-    const { data, error: err } = await supabase
-      .from('export_jobs')
-      .select('id, format, template, status, error_message, completed_at, created_at, include_content, include_summary, include_key_points, include_tags, include_domains, include_links')
-      .eq('knowledge_object_id', id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    if (err) {
-      if (import.meta.env.DEV) console.warn('Failed to load export jobs:', err);
-      setRecentExportJobs([]);
-      return;
-    }
-    setRecentExportJobs(data || []);
-  }, [id, user?.id]);
-
-  useEffect(() => {
-    loadRecentExportJobs();
-  }, [loadRecentExportJobs]);
-
-  useEffect(() => {
-    if (showExportPanel) loadRecentExportJobs();
-  }, [showExportPanel, loadRecentExportJobs]);
-
-  useEffect(() => {
-    const inProgress = recentExportJobs.some((j) => j.status === 'queued' || j.status === 'processing');
-    if (!inProgress) return;
-    const t = setInterval(loadRecentExportJobs, 3000);
-    return () => clearInterval(t);
-  }, [loadRecentExportJobs, recentExportJobs]);
-
   useEffect(() => {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'R') {
-        if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+        if (isTypingTarget(document.activeElement)) return;
         e.preventDefault();
         if (!object || !promptTemplates?.length) return;
         const applicable = promptTemplates.filter(
@@ -299,47 +263,41 @@ export default function ObjectDetail() {
     setSaving(true);
     setError('');
     try {
-      const newSlug = slugify(editForm.title.trim()) || null;
-      // Optimistic concurrency: only update if the row is still at the version
-      // we loaded; a version trigger bumps current_version on every update.
-      const { data: updatedRows, error: err } = await supabase
+      const patch = buildObjectPatch(object, editForm, { isOwner });
+      if (Object.keys(patch).length === 0) {
+        setEditing(false);
+        clearDraft(DRAFT_KEYS.object(object.id));
+        return;
+      }
+      // Optimistic concurrency: revision bumps on every edit (views and pins
+      // excluded), so any change made elsewhere since this edit began is caught.
+      const query = supabase
         .from('knowledge_objects')
-        .update({
-          title: editForm.title.trim(),
-          content: editForm.content.trim() || null,
-          summary: editForm.summary.trim() || null,
-          source: editForm.source.trim() || null,
-          status: editForm.status || 'active',
-          due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
-          remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
-          cover_url: editForm.cover_url?.trim() || null,
-          slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : null,
-        })
+        .update(patch)
         .eq('id', object.id)
-        .eq('current_version', object.current_version)
-        .select('current_version, updated_at');
+        .eq('revision', editBaseRevisionRef.current ?? object.revision);
+      const OBJECT_ROW_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, revision';
+      const { data: updatedRows, error: err } = await query.select(OBJECT_ROW_COLS);
       if (err) throw err;
       if (!updatedRows || updatedRows.length === 0) {
-        const msg = 'This object was changed elsewhere (another tab or device). Copy your edits, then reload to get the latest version.';
+        // Refresh this tab's copy so Cancel then Edit starts from the latest
+        // version. Stay in edit mode: the effect that resets editForm skips
+        // while editing, and the draft stays until the user cancels.
+        try {
+          const { data: fresh } = await supabase
+            .from('knowledge_objects')
+            .select(OBJECT_ROW_COLS)
+            .eq('id', object.id)
+            .maybeSingle();
+          if (fresh) setObject((o) => ({ ...o, ...fresh }));
+        } catch (_e) { void _e; }
+        const msg = 'This object was changed elsewhere (another tab or device). Your text is still in the editor — copy it, click Cancel, then Edit again and paste it back.';
         setError(msg);
         addToast('error', msg);
         return;
       }
-      const savedRow = updatedRows[0];
-      setObject((o) => ({
-        ...o,
-        title: editForm.title.trim(),
-        content: editForm.content.trim() || null,
-        summary: editForm.summary.trim() || null,
-        source: editForm.source.trim() || null,
-        status: editForm.status || 'active',
-        due_at: editForm.due_at ? new Date(editForm.due_at).toISOString() : null,
-        remind_at: editForm.remind_at ? new Date(editForm.remind_at).toISOString() : null,
-        cover_url: editForm.cover_url?.trim() || null,
-        slug: newSlug ? `${newSlug}-${object.id.slice(0, 8)}` : o.slug,
-        updated_at: savedRow.updated_at ?? new Date().toISOString(),
-        current_version: savedRow.current_version ?? o.current_version + 1,
-      }));
+      // Merge the full saved row so a stale tab also picks up other tabs' changes.
+      setObject((o) => ({ ...o, ...updatedRows[0] }));
       setEditing(false);
       clearDraft(DRAFT_KEYS.object(object.id));
       addToast('success', 'Changes saved');
@@ -448,7 +406,7 @@ export default function ObjectDetail() {
   }
 
   async function handleDelete() {
-    if (!object || !window.confirm('Soft-delete this object? It will disappear from the list but can be restored from the database.')) return;
+    if (!object || !window.confirm('Move this object to Trash? You can restore it from Trash later.')) return;
     setDeleting(true);
     setError('');
     try {
@@ -459,7 +417,7 @@ export default function ObjectDetail() {
         .eq('user_id', user.id);
       if (err) throw err;
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_DELETE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { title: object.title });
-      addToast('success', 'Object deleted');
+      addToast('success', 'Moved to Trash');
       navigate('/', { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Delete failed');
@@ -901,31 +859,11 @@ export default function ObjectDetail() {
 
   async function handleExport(jobOverrides) {
     const fmt = jobOverrides?.format ?? exportFormat;
-    const tpl = jobOverrides?.template ?? exportTemplate;
     const inc = jobOverrides?.include ?? exportInclude;
-    const slug = object.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 50);
+    const slug = safeFileBase(object.title, 50);
     const ext = fmt === 'pdf' ? 'pdf' : fmt === 'docx' ? 'docx' : fmt;
     const suggestedFilename = `${slug}.${ext}`;
-    let jobId = null;
     try {
-      const { data: job, error: insertErr } = await supabase.from('export_jobs').insert({
-        user_id: user.id,
-        knowledge_object_id: object.id,
-        format: fmt,
-        template: tpl,
-        include_content: inc.content,
-        include_summary: inc.summary,
-        include_key_points: inc.key_points,
-        include_tags: inc.tags,
-        include_domains: inc.domains,
-        include_links: inc.links,
-        filename: suggestedFilename,
-        status: 'queued',
-      }).select('id').single();
-      if (insertErr) throw insertErr;
-      jobId = job?.id;
-      await supabase.from('export_jobs').update({ status: 'processing' }).eq('id', jobId);
-
       if (fmt === 'txt') {
         const blob = new Blob([buildExportText(false, inc)], { type: 'text/plain;charset=utf-8' });
         downloadBlob(blob, suggestedFilename);
@@ -942,57 +880,24 @@ export default function ObjectDetail() {
         const blob = await buildExportDocxBlob(inc);
         if (blob) downloadBlob(blob, suggestedFilename);
       } else {
-        const html = buildExportHtml(inc);
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const w = window.open(url, '_blank', 'noopener,noreferrer');
-        if (w) {
-          w.onload = () => {
-            URL.revokeObjectURL(url);
-            w.focus();
-            w.print();
-          };
-        } else {
-          URL.revokeObjectURL(url);
+        if (!printHtml(buildExportHtml(inc))) {
+          throw new Error('Your browser blocked the print window. Allow pop-ups for this site, then try again.');
         }
       }
 
-      await supabase.from('export_jobs').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', jobId);
       const formatLabel = EXPORT_FORMAT_LABELS[fmt] || fmt;
-      createNotification(user.id, 'export_completed', 'Export completed', `"${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}" as ${formatLabel}`, { type: 'knowledge_object', id: object.id });
+      if (fmt !== 'pdf') {
+        createNotification(user.id, 'export_completed', 'Export completed', `"${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}" as ${formatLabel}`, { type: 'knowledge_object', id: object.id });
+        deliverWebhookEvent('export.completed', { objectId: object.id, title: object.title, format: fmt });
+      }
       logAudit(user.id, AUDIT_ACTIONS.EXPORT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { format: fmt, title: object.title });
-      deliverWebhookEvent('export.completed', { objectId: object.id, title: object.title, format: fmt });
-      addToast('success', `Export downloaded as ${formatLabel}`);
-      loadRecentExportJobs();
+      addToast('success', fmt === 'pdf' ? 'Print dialog opened: choose "Save as PDF"' : `Export downloaded as ${formatLabel}`);
       setShowExportPanel(false);
     } catch (err) {
       const msg = getErrorMessage(err, 'Export failed');
-      if (jobId) {
-        await supabase.from('export_jobs').update({ status: 'failed', error_message: msg }).eq('id', jobId);
-      }
       setError(msg);
       addToast('error', msg);
     }
-  }
-
-  function downloadBlob(blob, filename) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function retryExport(job) {
-    const inc = {
-      content: job.include_content ?? true,
-      summary: job.include_summary ?? true,
-      key_points: job.include_key_points ?? true,
-      tags: job.include_tags ?? true,
-      domains: job.include_domains ?? true,
-      links: job.include_links ?? true,
-    };
-    handleExport({ format: job.format, template: job.template, include: inc });
   }
 
   async function buildExportDocxBlob(include = exportInclude) {
@@ -1050,13 +955,22 @@ export default function ObjectDetail() {
 
   async function loadShares() {
     if (!object?.id || !user?.id) return;
-    const { data, error: err } = await supabase.from('share_permissions').select('id, shared_with_email, role, created_at').eq('knowledge_object_id', object.id).order('created_at', { ascending: false });
-    if (err) {
-      if (import.meta.env.DEV) console.warn('Failed to load shares:', err);
+    const [sharesRes, invitesRes] = await Promise.all([
+      supabase.from('share_permissions').select('id, shared_with_email, role, created_at')
+        .eq('knowledge_object_id', object.id).order('created_at', { ascending: false }),
+      supabase.from('share_invites').select('id, email, role, created_at')
+        .eq('knowledge_object_id', object.id).is('accepted_at', null)
+        .order('created_at', { ascending: false }),
+    ]);
+    if (sharesRes.error || invitesRes.error) {
+      if (import.meta.env.DEV) console.warn('Failed to load shares:', sharesRes.error || invitesRes.error);
       setShares([]);
       return;
     }
-    setShares(data || []);
+    const pending = (invitesRes.data || []).map((i) => ({
+      id: `invite:${i.id}`, shared_with_email: i.email, role: i.role, created_at: i.created_at, pending: true,
+    }));
+    setShares([...pending, ...(sharesRes.data || [])]);
   }
 
   function isValidEmail(str) {
@@ -1075,23 +989,16 @@ export default function ObjectDetail() {
     setSharing(true);
     setError('');
     try {
-      const { data: userId, error: rpcErr } = await supabase.rpc('resolve_user_id_by_email', {
-        target_email: shareEmail.trim(),
-        p_knowledge_object_id: object.id,
+      const email = shareEmail.trim();
+      const { error: rpcErr } = await supabase.rpc('share_object_by_email', {
+        p_object_id: object.id,
+        p_email: email,
+        p_role: shareRole,
       });
       if (rpcErr) throw rpcErr;
-      if (!userId) throw new Error('No user found with that email');
-      if (userId === user.id) throw new Error('You cannot share with yourself');
-      const { data: newShare, error: insErr } = await supabase.from('share_permissions').insert({
-        knowledge_object_id: object.id,
-        shared_with_user_id: userId,
-        shared_with_email: shareEmail.trim(),
-        role: shareRole,
-      }).select('id, shared_with_email, role, created_at').single();
-      if (insErr) throw insErr;
-      setShares((prev) => [newShare, ...prev]);
+      await loadShares();
       setShareEmail('');
-      addToast('success', `Shared with ${shareEmail.trim()}`);
+      addToast('success', `Shared with ${email}. If they don't have a verified PKS account yet, they'll get access when they sign up.`);
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to share');
       addToast('error', msg);
@@ -1105,7 +1012,9 @@ export default function ObjectDetail() {
     if (!object) return;
     setError('');
     try {
-      const { error: err } = await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
+      const { error: err } = shareId.startsWith('invite:')
+        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length)).eq('knowledge_object_id', object.id)
+        : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
       if (err) throw err;
       setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch (err) {
@@ -1122,7 +1031,6 @@ export default function ObjectDetail() {
       <header className="object-detail-header">
         <div className="object-detail-header-left">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: object.title || 'Object' }]} />
-          <NotificationCenter />
         </div>
         {canEdit && (
           <div className="detail-header-link-search" ref={linkSearchRef}>
@@ -1172,12 +1080,12 @@ export default function ObjectDetail() {
           )}
           {!editing ? (
             <>
-              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; setEditing(true); }}>Edit</button>}
+              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; editBaseRevisionRef.current = object.revision; setEditing(true); }}>Edit</button>}
               {isOwner && <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>}
             </>
           ) : (
             <>
-              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm({ title: object.title, content: object.content || '', summary: object.summary || '', source: object.source || '', status: object.status || 'active', due_at: object.due_at ? object.due_at.slice(0, 16) : '', remind_at: object.remind_at ? object.remind_at.slice(0, 16) : '', cover_url: object.cover_url || '' }); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
+              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(false); setEditForm(objectToEditForm(object)); if (object?.id) clearDraft(DRAFT_KEYS.object(object.id)); }}>Cancel</button>
               <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </>
           )}
@@ -1208,9 +1116,7 @@ export default function ObjectDetail() {
           exportInclude={exportInclude}
           setExportInclude={setExportInclude}
           applyExportTemplate={applyExportTemplate}
-          recentExportJobs={recentExportJobs}
           onExport={() => handleExport()}
-          onRetryExport={retryExport}
           onClose={() => setShowExportPanel(false)}
         />
       )}
@@ -1238,10 +1144,11 @@ export default function ObjectDetail() {
             {editing ? (
         <div className="detail-edit" key={`edit-${object?.id}`}>
           <label>Title <input type="text" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} required /></label>
-          <label>Status <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} aria-label="Status">{OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
-          <label>Due date <input type="datetime-local" value={editForm.due_at} onChange={(e) => setEditForm((f) => ({ ...f, due_at: e.target.value }))} aria-label="Due date" /></label>
-          <label>Remind at <input type="datetime-local" value={editForm.remind_at} onChange={(e) => setEditForm((f) => ({ ...f, remind_at: e.target.value }))} aria-label="Remind at" /></label>
-          <label>Cover URL <input type="url" value={editForm.cover_url} onChange={(e) => setEditForm((f) => ({ ...f, cover_url: e.target.value }))} placeholder="https://…" /></label>
+          <label>Status <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} aria-label="Status" disabled={!isOwner}>{OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+          <label>Due date <input type="datetime-local" value={editForm.due_at} onChange={(e) => setEditForm((f) => ({ ...f, due_at: e.target.value }))} aria-label="Due date" disabled={!isOwner} /></label>
+          <label>Remind at <input type="datetime-local" value={editForm.remind_at} onChange={(e) => setEditForm((f) => ({ ...f, remind_at: e.target.value }))} aria-label="Remind at" disabled={!isOwner} /></label>
+          <label>Cover URL <input type="url" value={editForm.cover_url} onChange={(e) => setEditForm((f) => ({ ...f, cover_url: e.target.value }))} placeholder="https://…" disabled={!isOwner} /></label>
+          {!isOwner && <p className="form-hint">Only the owner can change status, dates and cover.</p>}
           <label>{object.type === 'bookmark' ? 'URL' : 'Reference / URL'} <input type={object.type === 'bookmark' ? 'url' : 'text'} value={editForm.source} onChange={(e) => setEditForm((f) => ({ ...f, source: e.target.value }))} placeholder={object.type === 'bookmark' ? 'https://…' : 'e.g. https://… or book, article'} /></label>
           <label>Summary <textarea value={editForm.summary} onChange={(e) => setEditForm((f) => ({ ...f, summary: e.target.value }))} rows={2} /></label>
           <div className="detail-edit-field">
@@ -1407,8 +1314,7 @@ export default function ObjectDetail() {
           )}
           {isOwner && (
             <div className="detail-section-card">
-              <h3 className="detail-section-card-title">Run prompt</h3>
-              <button type="button" className="btn btn-primary run-prompt-open-btn" onClick={handleRunPrompt}>Run prompt</button>
+              <h3 className="detail-section-card-title">Prompt runs</h3>
               <h4 className="detail-section-card-sub">History</h4>
               <ul className="prompt-runs-list">
                 {promptRuns.slice(0, 5).map((r) => (
@@ -1493,6 +1399,7 @@ export default function ObjectDetail() {
               </>
             )}
           </div>
+          {!(isOwner && versions.length > 0) && (
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Version history</h3>
             {versions.length === 0 ? (
@@ -1509,6 +1416,7 @@ export default function ObjectDetail() {
               </ul>
             )}
           </div>
+          )}
         </aside>
       </div>
 

@@ -25,10 +25,8 @@ const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const PasteBin = lazy(() => import('./pages/PasteBin'));
 const Journal = lazy(() => import('./pages/Journal'));
-const About = lazy(() => import('./pages/About'));
 const Search = lazy(() => import('./pages/Search'));
 const Trash = lazy(() => import('./pages/Trash'));
-const ObjectBySlug = lazy(() => import('./pages/ObjectBySlug'));
 const Import = lazy(() => import('./pages/Import'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -65,7 +63,6 @@ function ObjectDetailRoute() {
 export const protectedChildRoutes = [
   { path: '/', element: withErrorBoundary(<Dashboard />) },
   { path: '/objects/new', element: withErrorBoundary(<ObjectNew />) },
-  { path: '/objects/by-slug/:slug', element: withErrorBoundary(<ObjectBySlug />) },
   { path: '/quick', element: withErrorBoundary(<QuickCapture />) },
   { path: '/objects/:id', element: withErrorBoundary(<ObjectDetailRoute />) },
   { path: '/settings', element: withErrorBoundary(<Settings />) },
@@ -76,7 +73,6 @@ export const protectedChildRoutes = [
   { path: '/integrations', element: withErrorBoundary(<Integrations />) },
   { path: '/paste', element: withErrorBoundary(<PasteBin />) },
   { path: '/journal', element: withErrorBoundary(<Journal />) },
-  { path: '/about', element: withErrorBoundary(<About />) },
   { path: '/search', element: withErrorBoundary(<Search />) },
   { path: '/trash', element: withErrorBoundary(<Trash />) },
   { path: '/import', element: withErrorBoundary(<Import />) },
@@ -85,10 +81,3 @@ export const protectedChildRoutes = [
 /** Layout route element wrapping all protectedChildRoutes. */
 /* eslint-disable-next-line react-refresh/only-export-components */
 export const protectedLayoutRoute = { element: protectedLayout, children: protectedChildRoutes };
-
-/** @deprecated Use publicRoutes + protectedLayoutRoute — kept for tests importing routeConfig */
-/* eslint-disable-next-line react-refresh/only-export-components */
-export const routeConfig = [
-  ...publicRoutes,
-  ...protectedChildRoutes.map(({ path }) => ({ path, element: protectedLayout })),
-];

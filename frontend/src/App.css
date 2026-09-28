@@ -76,8 +76,8 @@ body {
 
 .error-boundary-fallback button {
   padding: 0.5rem 1rem;
-  background: var(--accent-gradient);
-  color: var(--polar-white);
+  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
+  color: var(--on-accent);
   border: none;
   border-radius: 10px;
   cursor: pointer;
@@ -186,4 +186,24 @@ body {
 
 .skeleton-detail {
   padding: 0.5rem 0;
+}
+
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + var(--mobile-nav-offset, 0px));
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-6) var(--space-8);
+  background: var(--surface-elevated);
+  color: var(--polar-white);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--modal-shadow);
 }

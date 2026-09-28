@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { FILES_BUCKET, getStoragePath } from '../lib/storage';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import TypeMark from '../components/TypeMark';
@@ -67,12 +68,13 @@ export default function Trash() {
     setDeletingId(id);
     setError('');
     try {
-      const { error: err } = await supabase
-        .from('knowledge_objects')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+      const { data: orphans, error: err } = await supabase.rpc('delete_object_permanently', { p_object_id: id });
       if (err) throw err;
+      const paths = (orphans || []).map((f) => f.storage_key || getStoragePath(user.id, f.id, f.filename));
+      if (paths.length) {
+        const { error: storageErr } = await supabase.storage.from(FILES_BUCKET).remove(paths);
+        if (storageErr && import.meta.env.DEV) console.warn('Storage cleanup failed:', storageErr);
+      }
       addToast('success', 'Permanently deleted');
       setObjects((prev) => prev.filter((o) => o.id !== id));
     } catch (e) {

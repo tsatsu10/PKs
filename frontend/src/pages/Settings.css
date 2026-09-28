@@ -123,8 +123,6 @@
 }
 
 .settings-form .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 
@@ -171,7 +169,7 @@
   gap: var(--space-4);
 }
 
-@media (max-width: var(--bp-md, 768px)) {
+@media (max-width: 768px) {
   .settings-page {
     padding: var(--space-12) var(--space-8);
   }

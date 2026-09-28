@@ -37,7 +37,7 @@ export default function DashboardView(props) {
     setBulkTagId, bulkType, setBulkType, bulkStatus, setBulkStatus, bulkActionLoading,
     searchInputRef, quickAddInputRef, listScrollRef, cardColumns, runPromptTemplate,
     heroStats, showActivityPanel, setShowActivityPanel, pendingObject, sparkObject,
-    resumeObject, pulseValues, pulseTargets, pulseLoading, celebrateRing,
+    resumeObject,
     selectionMode, runPromptSuffix, streamItems, listVirtualizer, filterChips, handlePageChange,
     dismissRunPromptBanner, closeQuickAdd, handleTagFilterFromActivity, handleSearchSubmit,
     toggleSelect, selectAllOnPage, clearSelection, handleQuickAddCreate, handleExportSelected,
@@ -62,10 +62,6 @@ export default function DashboardView(props) {
           <div className="dashboard-main-col">
         <DashboardHero
           displayName={user?.displayName}
-          celebrateRing={celebrateRing}
-          pulseValues={pulseValues}
-          pulseTargets={pulseTargets}
-          pulseLoading={pulseLoading}
           resumeObject={resumeObject}
           pendingObject={pendingObject}
           sparkObject={sparkObject}

@@ -280,8 +280,8 @@
   padding: 0.875rem 1.5rem;
   min-height: 48px;
   margin-top: 0.5rem;
-  background: var(--accent-gradient);
-  color: var(--polar-white);
+  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
+  color: var(--on-accent);
   border: none;
   border-radius: 12px;
   font-weight: 600;

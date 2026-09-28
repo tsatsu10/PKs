@@ -173,7 +173,7 @@
 }
 
 .detail-link-search-input:focus {
-  border-color: var(--accent);
+  border-color: var(--cosmic-pink);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
@@ -223,7 +223,7 @@
 }
 
 .detail-link-search-title:hover {
-  color: var(--accent);
+  color: var(--cosmic-pink);
 }
 
 .detail-link-search-type {
@@ -249,8 +249,6 @@
 }
 
 .object-detail .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 
@@ -416,26 +414,6 @@
   line-height: 1.6;
   margin-bottom: 2rem;
 }
-
-/* Rendered Markdown in detail view */
-.markdown-content {
-  line-height: 1.65;
-  margin-bottom: 2rem;
-}
-.markdown-content h1 { font-size: 1.5rem; margin: 1.25rem 0 0.5rem; font-weight: 700; }
-.markdown-content h2 { font-size: 1.25rem; margin: 1rem 0 0.5rem; font-weight: 600; }
-.markdown-content h3 { font-size: 1.125rem; margin: 0.75rem 0 0.35rem; font-weight: 600; }
-.markdown-content p { margin: 0.5rem 0; }
-.markdown-content ul, .markdown-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
-.markdown-content li { margin: 0.25rem 0; }
-.markdown-content code { background: var(--glass-bg, #1e293b); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
-.markdown-content pre { background: var(--glass-bg, #1e293b); padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; }
-.markdown-content pre code { padding: 0; background: none; }
-.markdown-content a { color: var(--link-color, #60a5fa); text-decoration: none; }
-.markdown-content a:hover { text-decoration: underline; }
-.markdown-content blockquote { border-left: 3px solid var(--glass-border, #334155); margin: 0.5rem 0; padding-left: 1rem; color: var(--polar-muted); }
-.markdown-content table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
-.markdown-content th, .markdown-content td { border: 1px solid var(--glass-border, #334155); padding: 0.35rem 0.6rem; text-align: left; }
 
 .detail-edit label,
 .detail-edit .detail-edit-field {
@@ -871,11 +849,6 @@
   font-size: 0.8125rem;
 }
 
-.run-prompt-open-btn {
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
 /* —— Run prompt overlay (LLM-style panel) —— */
 .run-prompt-overlay {
   position: fixed;
@@ -1072,7 +1045,7 @@
 }
 
 .run-prompt-edit-check input {
-  accent-color: var(--accent-primary);
+  accent-color: var(--cosmic-pink);
 }
 
 .run-prompt-prompt-block {
@@ -1287,75 +1260,6 @@
   gap: 0.5rem;
 }
 
-/* Recent exports – status, download, retry */
-.export-recent {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--glass-border);
-}
-
-.export-recent-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--polar-dim);
-  margin: 0 0 0.5rem 0;
-}
-
-.export-jobs-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.export-job-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  font-size: 0.875rem;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.export-job-item:last-child {
-  border-bottom: none;
-}
-
-.export-job-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 6rem;
-}
-
-.export-job-status.queued { color: var(--polar-faint); }
-.export-job-status.processing { color: var(--cosmic-pink); }
-.export-job-status.completed { color: #22c55e; }
-.export-job-status.failed { color: var(--error-text); }
-
-.export-job-spinner {
-  width: 0.875rem;
-  height: 0.875rem;
-  border: 2px solid var(--glass-border);
-  border-top-color: var(--cosmic-pink);
-  border-radius: 50%;
-  animation: export-spin 0.8s linear infinite;
-}
-
-@keyframes export-spin {
-  to { transform: rotate(360deg); }
-}
-
-.export-job-meta {
-  flex: 1;
-  color: var(--polar-dim);
-  font-size: 0.8125rem;
-}
-
-.export-job-actions {
-  display: flex;
-  gap: 0.35rem;
-}
-
 .share-panel {
   margin-bottom: 1rem;
   padding: 1.25rem;
@@ -1519,10 +1423,10 @@
   .share-panel,
   .export-panel {
     position: fixed;
-    bottom: 0;
+    bottom: var(--mobile-nav-offset);
     left: 0;
     right: 0;
-    max-height: 85vh;
+    max-height: calc(85dvh - var(--mobile-nav-offset));
     overflow-y: auto;
     margin: 0;
     border-radius: 16px 16px 0 0;
@@ -1540,7 +1444,7 @@
   }
   .run-prompt-overlay-panel {
     max-width: 100%;
-    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem - var(--mobile-nav-offset));
     border-radius: 12px;
   }
   .run-prompt-overlay-body {

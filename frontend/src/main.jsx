@@ -1,32 +1,18 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { registerCustomProtocol, init } from 'linkifyjs'
-import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
+import { registerServiceWorker } from './lib/registerServiceWorker'
+import { markUpdateAvailable } from './lib/pwaUpdate'
 
-if (typeof registerSW === 'function') {
-  const registerPwa = () => registerSW({ immediate: true })
-  if (document.readyState === 'complete') {
-    registerPwa()
-  } else {
-    window.addEventListener('load', registerPwa, { once: true })
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  const start = () => {
+    registerServiceWorker({ onUpdateReady: markUpdateAvailable }).catch((err) => {
+      console.error('Service worker registration failed', err)
+    })
   }
-}
-
-// Initialize linkify once with default schemes so BlockNote/Tiptap Link extension
-// does not trigger "already initialized" warnings when multiple editors mount.
-const LINK_PROTOCOLS = ['http', 'https', 'ftp', 'ftps', 'mailto', 'tel', 'callto', 'sms', 'cid', 'xmpp']
-LINK_PROTOCOLS.forEach((scheme) => registerCustomProtocol(scheme))
-init()
-
-// Tiptap's Link extension re-registers linkify protocols on every editor
-// mount, which linkifyjs reports via console.warn. Filter exactly that one
-// message on console.warn only; everything else passes through untouched.
-const origWarn = console.warn
-console.warn = (...args) => {
-  if (typeof args[0] === 'string' && args[0].startsWith('linkifyjs: already initialized')) return
-  origWarn.apply(console, args)
+  if (document.readyState === 'complete') start()
+  else window.addEventListener('load', start, { once: true })
 }
 
 createRoot(document.getElementById('root')).render(

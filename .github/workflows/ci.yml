@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npm audit --omit=dev --audit-level=high
+
+  database:
+    runs-on: ubuntu-latest
+    # Placeholders only, no real secrets: config.toml's env(...) references must resolve to
+    # *something* for the local stack to boot, even though these services stay disabled/unused
+    # in CI (auth.sms.twilio, auth.external.apple, studio's optional AI key, experimental S3 storage).
+    env:
+      OPENAI_API_KEY: ci-placeholder
+      SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: ci-placeholder
+      SUPABASE_AUTH_EXTERNAL_APPLE_SECRET: ci-placeholder
+      S3_HOST: ci-placeholder
+      S3_REGION: ci-placeholder
+      S3_ACCESS_KEY: ci-placeholder
+      S3_SECRET_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          # Pin to a known-good release instead of `latest` so CI doesn't silently pick up a
+          # future breaking CLI version; bump deliberately when needed.
+          version: 2.118.0
+      # Exclude services pgTAP doesn't need. Migrations/tests/seed reference auth.* and
+      # storage.* (auth.users, auth.uid/jwt/role, storage.buckets/objects/foldername), so
+      # gotrue and storage-api must stay (they own those schemas' migrations). No migration,
+      # seed or test file references a realtime.* or vault.* object, so realtime is safe to
+      # drop; studio/imgproxy/edge-runtime/logflare/vector are dev-UI/observability/edge-function
+      # extras pg_prove never touches. kong/postgrest/postgres-meta/supavisor/mailpit are left
+      # running (not verified safe to exclude).
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime
+      - run: supabase test db

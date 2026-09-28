@@ -238,12 +238,14 @@
   justify-content: center;
 }
 
-.app-layout-sidebar-collapsed .app-layout-nav-link,
-.app-layout-sidebar-collapsed .app-layout-logout {
-  justify-content: center;
-  padding: 0.5rem;
-  margin: 0 0.35rem;
-  width: calc(100% - 0.7rem);
+@media (min-width: 769px) {
+  .app-layout-sidebar-collapsed .app-layout-nav-link,
+  .app-layout-sidebar-collapsed .app-layout-logout {
+    justify-content: center;
+    padding: 0.5rem;
+    margin: 0 0.35rem;
+    width: calc(100% - 0.7rem);
+  }
 }
 
 .app-layout-sidebar-collapsed .app-layout-nav-icon {
@@ -379,24 +381,31 @@
   transition: margin-left 0.2s ease;
 }
 
+/* Focused programmatically (skip link, navigating from the mobile drawer): no ring around the whole page. */
+.app-layout-main:focus {
+  outline: none;
+}
+
 .app-layout-sidebar-collapsed .app-layout-main {
   margin-left: 56px;
 }
 
-/* Collapsed: hide group labels and tighten spacing */
-.app-layout-sidebar-collapsed .app-layout-nav-group-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-.app-layout-sidebar-collapsed .app-layout-nav-group {
-  margin-bottom: 0.25rem;
+/* Collapsed: hide group labels and tighten spacing (desktop sidebar only; mobile drawer always shows headings) */
+@media (min-width: 769px) {
+  .app-layout-sidebar-collapsed .app-layout-nav-group-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .app-layout-sidebar-collapsed .app-layout-nav-group {
+    margin-bottom: 0.25rem;
+  }
 }
 
 /* Subtle scrollbar for long nav lists */
@@ -441,12 +450,11 @@
   display: none;
 }
 
-/* When menu deck (wheel) is enabled, reserve space above the trigger */
-.app-layout-deck-enabled .app-layout-main {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
-}
-
 @media (max-width: 768px) {
+  :root {
+    /* Everything fixed to the bottom must sit above the 56px bottom nav */
+    --mobile-nav-offset: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
   .app-layout-sidebar {
     transform: translateX(-100%);
     width: 220px;
@@ -534,7 +542,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0);
     background: var(--glass-bg);
     backdrop-filter: blur(16px);

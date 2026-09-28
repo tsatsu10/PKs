@@ -3,14 +3,12 @@ import { supabase } from '../../../lib/supabase';
 import { deferAfterPaint } from '../../../lib/defer';
 
 const EMPTY_ACTIVITY = {
-  capture7d: [],
-  tend7d: [],
   trendingTags: [],
   recentLinks: [],
 };
 
 /**
- * Right-rail activity data: 7-day sparklines, trending tags, recent links.
+ * Right-rail activity data: trending tags, recent links.
  * @param {string | null} userId
  */
 export function useActivityPulse(userId) {
@@ -32,8 +30,6 @@ export function useActivityPulse(userId) {
         }
 
         setResult({ userId, activity: {
-          capture7d: Array.isArray(data.capture_7d) ? data.capture_7d : [],
-          tend7d: Array.isArray(data.tend_7d) ? data.tend_7d : [],
           trendingTags: Array.isArray(data.trending_tags) ? data.trending_tags : [],
           recentLinks: Array.isArray(data.recent_links) ? data.recent_links : [],
         } });

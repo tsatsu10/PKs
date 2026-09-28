@@ -49,11 +49,17 @@
 }
 
 .bulk-action-ribbon-danger {
-  color: #f87171;
+  color: var(--error-text);
 }
 
 .bulk-action-ribbon-dismiss {
   flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .bulk-action-ribbon {
+    bottom: calc(16px + var(--mobile-nav-offset));
+  }
 }
 
 @media (max-width: 600px) {

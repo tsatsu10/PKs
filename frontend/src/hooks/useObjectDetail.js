@@ -36,7 +36,7 @@ export function useObjectDetail({ id, userId }) {
     setLoading(true);
     setError('');
     try {
-      const OBJECT_COLS = 'id, user_id, type, title, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at';
+      const OBJECT_COLS = 'id, user_id, type, title, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, revision';
       const [objRes, contentRes] = await Promise.all([
         supabase.from('knowledge_objects').select(OBJECT_COLS).eq('id', id).single(),
         supabase.from('knowledge_objects').select('content').eq('id', id).single(),

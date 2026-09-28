@@ -1,43 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../breakpoints';
+import { isTypingTarget } from '../lib/keyboard';
 import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
-import MainMenuDeck from './MainMenuDeck';
-import { useDeckEnabled } from './MainMenuDeckContext';
+import { NAV_GROUPS } from '../constants/navigation';
 import './AppLayout.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'pks-sidebar-collapsed';
-
-const navGroups = [
-  {
-    label: 'Main',
-    items: [
-      { to: '/', label: 'Dashboard', icon: '⌂' },
-      { to: '/search', label: 'Search', icon: '🔍' },
-      { to: '/quick', label: 'Quick capture', icon: '⚡' },
-      { to: '/objects/new', label: 'New object', icon: '+' },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [
-      { to: '/paste', label: 'Paste bin', icon: '📋' },
-      { to: '/journal', label: 'Journal', icon: '📅' },
-      { to: '/prompts', label: 'Prompts', icon: '◆' },
-      { to: '/templates', label: 'Templates', icon: '◇' },
-      { to: '/notifications', label: 'Notifications', icon: '◉' },
-      { to: '/audit-logs', label: 'Audit logs', icon: '▤' },
-      { to: '/integrations', label: 'Integrations', icon: '◈' },
-      { to: '/import', label: 'Import', icon: '↓' },
-      { to: '/about', label: 'About PKS', icon: 'ℹ' },
-      { to: '/settings', label: 'Settings', icon: '⚙' },
-    ],
-  },
-];
 
 export default function AppLayout({ children }) {
   const { user, logout } = useAuth();
@@ -47,6 +20,28 @@ export default function AppLayout({ children }) {
   const { pathname } = location;
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const isMobile = useIsMobile(768);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarRef = useRef(null);
+  const menuBtnRef = useRef(null);
+  const mobileMenuOpenedRef = useRef(false);
+  const focusWasInDrawerRef = useRef(false);
+  // The drawer is closing because the user navigated from it: focus the page,
+  // not the menu button (and never leave focus on a now-inert drawer link).
+  const focusMainOnCloseRef = useRef(false);
+  const mainRef = useRef(null);
+
+  const closeMobileMenu = () => {
+    const active = document.activeElement;
+    focusWasInDrawerRef.current = !!(active && sidebarRef.current?.contains(active));
+    setMobileMenuOpen(false);
+  };
+
+  const closeMobileMenuForNavigation = () => {
+    if (mobileMenuOpenedRef.current) focusMainOnCloseRef.current = true;
+    closeMobileMenu();
+  };
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -72,14 +67,19 @@ export default function AppLayout({ children }) {
         navigate('/search');
         return;
       }
-      if (e.key === '?' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+      if (e.key === '?' && !isTypingTarget(document.activeElement)) {
         e.preventDefault();
         setShortcutsOpen(true);
+      }
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        // The palette or shortcuts modal sits on top of the drawer: Escape is theirs.
+        if (commandOpen || shortcutsOpen) return;
+        closeMobileMenu();
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate, pathname]);
+  }, [navigate, pathname, mobileMenuOpen, commandOpen, shortcutsOpen]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -89,9 +89,29 @@ export default function AppLayout({ children }) {
     }
   });
 
-  const isMobile = useIsMobile(768);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { deckEnabled } = useDeckEnabled();
+  // The mobile drawer always shows labels, even if the desktop sidebar is collapsed.
+  const showLabels = !collapsed || isMobile;
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (mobileMenuOpen) {
+      mobileMenuOpenedRef.current = true;
+      focusMainOnCloseRef.current = false;
+      const focusable = sidebarRef.current?.querySelector(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      focusable?.focus();
+    } else if (mobileMenuOpenedRef.current) {
+      mobileMenuOpenedRef.current = false;
+      if (focusMainOnCloseRef.current) {
+        mainRef.current?.focus();
+      } else if (focusWasInDrawerRef.current) {
+        menuBtnRef.current?.focus();
+      }
+      focusWasInDrawerRef.current = false;
+      focusMainOnCloseRef.current = false;
+    }
+  }, [mobileMenuOpen, isMobile]);
 
   useEffect(() => {
     try {
@@ -100,14 +120,14 @@ export default function AppLayout({ children }) {
   }, [collapsed]);
 
   useEffect(() => {
+    // Route changed with the drawer still open (e.g. Back): focus the new page once it closes.
+    if (mobileMenuOpenedRef.current) focusMainOnCloseRef.current = true;
     queueMicrotask(() => setMobileMenuOpen(false));
   }, [location.pathname]);
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
-
   return (
-    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''} ${deckEnabled ? 'app-layout-deck-enabled' : ''}`}>
-      <aside className="app-layout-sidebar" aria-label="Main navigation" aria-hidden={isMobile && !mobileMenuOpen}>
+    <div className={`app-layout ${collapsed ? 'app-layout-sidebar-collapsed' : ''} ${mobileMenuOpen ? 'app-layout-sidebar-open' : ''}`}>
+      <aside ref={sidebarRef} className="app-layout-sidebar" aria-label="Main navigation" inert={isMobile && !mobileMenuOpen}>
         <div className="app-layout-sidebar-top">
           <button
             type="button"
@@ -117,9 +137,9 @@ export default function AppLayout({ children }) {
           >
             ✕
           </button>
-          <Link to="/" className="app-layout-brand" title="Personal Knowledge System">
+          <Link to="/" className="app-layout-brand" title="Personal Knowledge System" onClick={closeMobileMenuForNavigation}>
             <img src="/pks-logo.svg" alt="" className="app-layout-logo" width="32" height="32" />
-            {!collapsed && (
+            {showLabels && (
               <span className="app-layout-brand-words">
                 <span className="app-layout-brand-mark" aria-hidden>PKS</span>
                 <span className="app-layout-brand-text">
@@ -129,7 +149,7 @@ export default function AppLayout({ children }) {
               </span>
             )}
           </Link>
-          {!collapsed && (
+          {showLabels && (
             <button
               type="button"
               className="app-layout-command-hint"
@@ -142,9 +162,9 @@ export default function AppLayout({ children }) {
           )}
         </div>
         <nav className="app-layout-nav" aria-label="Primary">
-          {navGroups.map(({ label: groupLabel, items }) => (
+          {NAV_GROUPS.map(({ label: groupLabel, items }) => (
             <div key={groupLabel} className="app-layout-nav-group">
-              {!collapsed && (
+              {showLabels && (
                 <span className="app-layout-nav-group-label" aria-hidden>
                   {groupLabel}
                 </span>
@@ -158,11 +178,11 @@ export default function AppLayout({ children }) {
                         to={to}
                         className={`app-layout-nav-link ${isActive ? 'active' : ''}`}
                         aria-current={isActive ? 'page' : undefined}
-                        title={collapsed ? label : undefined}
-                        onClick={closeMobileMenu}
+                        title={showLabels ? undefined : label}
+                        onClick={closeMobileMenuForNavigation}
                       >
                         <span className="app-layout-nav-icon" aria-hidden>{icon}</span>
-                        {!collapsed && <span className="app-layout-nav-label">{label}</span>}
+                        {showLabels && <span className="app-layout-nav-label">{label}</span>}
                       </Link>
                     </li>
                   );
@@ -185,10 +205,10 @@ export default function AppLayout({ children }) {
             </button>
           </div>
           <div className="app-layout-sidebar-user">
-            {!collapsed && <span className="app-layout-user-email" aria-hidden>{user?.email}</span>}
-            <button type="button" onClick={() => { closeMobileMenu(); logout(); }} className="app-layout-logout" aria-label="Sign out" title={collapsed ? 'Sign out' : undefined}>
+            {showLabels && <span className="app-layout-user-email" aria-hidden>{user?.email}</span>}
+            <button type="button" onClick={() => { closeMobileMenu(); logout(); }} className="app-layout-logout" aria-label="Sign out" title={showLabels ? undefined : 'Sign out'}>
               <span className="app-layout-nav-icon" aria-hidden>⎋</span>
-              {!collapsed && <span className="app-layout-nav-label">Sign out</span>}
+              {showLabels && <span className="app-layout-nav-label">Sign out</span>}
             </button>
           </div>
         </div>
@@ -207,9 +227,10 @@ export default function AppLayout({ children }) {
         aria-hidden="true"
         onClick={closeMobileMenu}
       />
-      <main className="app-layout-main" id="main-content" role="main">
+      <main ref={mainRef} className="app-layout-main" id="main-content" role="main" tabIndex={-1}>
         <div className="app-layout-mobile-header">
           <button
+            ref={menuBtnRef}
             type="button"
             className="app-layout-mobile-menu-btn"
             aria-label="Open menu"
@@ -221,28 +242,24 @@ export default function AppLayout({ children }) {
         </div>
         {children}
       </main>
-      {deckEnabled ? (
-        <MainMenuDeck />
-      ) : (
-        <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">
-          <Link to="/" className={`app-layout-bottom-link ${location.pathname === '/' ? 'active' : ''}`} aria-current={location.pathname === '/' ? 'page' : undefined}>
-            <span className="app-layout-bottom-icon" aria-hidden>⌂</span>
-            <span className="app-layout-bottom-label">Home</span>
-          </Link>
-          <Link to="/objects/new" className={`app-layout-bottom-link ${location.pathname === '/objects/new' ? 'active' : ''}`} aria-current={location.pathname === '/objects/new' ? 'page' : undefined}>
-            <span className="app-layout-bottom-icon" aria-hidden>+</span>
-            <span className="app-layout-bottom-label">New</span>
-          </Link>
-          <Link to="/notifications" className={`app-layout-bottom-link ${location.pathname === '/notifications' ? 'active' : ''}`} aria-current={location.pathname === '/notifications' ? 'page' : undefined}>
-            <span className="app-layout-bottom-icon" aria-hidden>◉</span>
-            <span className="app-layout-bottom-label">Alerts</span>
-          </Link>
-          <Link to="/settings" className={`app-layout-bottom-link ${location.pathname === '/settings' ? 'active' : ''}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
-            <span className="app-layout-bottom-icon" aria-hidden>⚙</span>
-            <span className="app-layout-bottom-label">Settings</span>
-          </Link>
-        </nav>
-      )}
+      <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">
+        <Link to="/" className={`app-layout-bottom-link ${location.pathname === '/' ? 'active' : ''}`} aria-current={location.pathname === '/' ? 'page' : undefined}>
+          <span className="app-layout-bottom-icon" aria-hidden>⌂</span>
+          <span className="app-layout-bottom-label">Home</span>
+        </Link>
+        <Link to="/objects/new" className={`app-layout-bottom-link ${location.pathname === '/objects/new' ? 'active' : ''}`} aria-current={location.pathname === '/objects/new' ? 'page' : undefined}>
+          <span className="app-layout-bottom-icon" aria-hidden>+</span>
+          <span className="app-layout-bottom-label">New</span>
+        </Link>
+        <Link to="/notifications" className={`app-layout-bottom-link ${location.pathname === '/notifications' ? 'active' : ''}`} aria-current={location.pathname === '/notifications' ? 'page' : undefined}>
+          <span className="app-layout-bottom-icon" aria-hidden>◉</span>
+          <span className="app-layout-bottom-label">Alerts</span>
+        </Link>
+        <Link to="/settings" className={`app-layout-bottom-link ${location.pathname === '/settings' ? 'active' : ''}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+          <span className="app-layout-bottom-icon" aria-hidden>⚙</span>
+          <span className="app-layout-bottom-label">Settings</span>
+        </Link>
+      </nav>
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>

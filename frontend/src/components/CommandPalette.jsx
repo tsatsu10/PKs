@@ -1,25 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFocusTrap } from '@mantine/hooks';
+import { NAV_ITEMS } from '../constants/navigation';
 import './CommandPalette.css';
 
-const QUICK_ACTIONS = [
-  { label: 'Go to Dashboard', path: '/', keywords: ['home', 'dashboard'] },
-  { label: 'Search objects', path: '/search', keywords: ['search', 'find', 'query'] },
-  { label: 'Quick capture', path: '/quick', keywords: ['quick', 'capture', 'add'] },
-  { label: 'New object', path: '/objects/new', keywords: ['new', 'create', 'object'] },
-  { label: 'Paste bin', path: '/paste', keywords: ['paste', 'pastebin', 'snippet', 'code'] },
-  { label: 'Journal', path: '/journal', keywords: ['journal', 'calendar', 'diary', 'entry'] },
-  { label: 'Prompts', path: '/prompts', keywords: ['prompts', 'prompt'] },
-  { label: 'Templates', path: '/templates', keywords: ['templates', 'template'] },
-  { label: 'Notifications', path: '/notifications', keywords: ['notifications', 'notify'] },
-  { label: 'Audit logs', path: '/audit-logs', keywords: ['audit', 'logs', 'history'] },
-  { label: 'Integrations', path: '/integrations', keywords: ['integrations', 'integrate'] },
-  { label: 'Import', path: '/import', keywords: ['import', 'upload', 'csv', 'markdown'] },
-  { label: 'About PKS', path: '/about', keywords: ['about', 'help', 'pks', 'project'] },
-  { label: 'Trash', path: '/trash', keywords: ['trash', 'deleted', 'restore'] },
-  { label: 'Settings', path: '/settings', keywords: ['settings', 'preferences'] },
-];
+const QUICK_ACTIONS = NAV_ITEMS.map(({ to, label, keywords }) => ({ label, path: to, keywords }));
 
 export default function CommandPalette({ open, onClose }) {
   const [query, setQuery] = useState('');

@@ -87,7 +87,26 @@ export default function ObjectNew() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchDomainsTagsTemplates]);
 
+  // Template values restored from a draft; the reset effect below must not wipe them.
+  // Holds { templateId, values } so the reset effect only consumes it once
+  // selectedTemplateId has actually caught up to the restored id — under
+  // StrictMode's double-invoked effects, the reset effect can otherwise run
+  // before the id state update commits and wipe the just-restored values.
+  const restoredTemplateValuesRef = useRef(null);
   useEffect(() => {
+    const restored = restoredTemplateValuesRef.current;
+    if (restored) {
+      if (restored.templateId === selectedTemplateId) {
+        setTemplateValues(restored.values);
+        restoredTemplateValuesRef.current = null;
+        return;
+      }
+      if (selectedTemplateId) {
+        // User (or a later render) moved on to a different template; the
+        // stale restore no longer applies.
+        restoredTemplateValuesRef.current = null;
+      }
+    }
     if (!schema?.fields?.length) {
       setTemplateValues({});
       return;
@@ -103,11 +122,17 @@ export default function ObjectNew() {
     if (hasRestoredDraft.current) return;
     const draft = getDraft(DRAFT_KEYS.new);
     if (!draft?.form) return;
-    if (!draft.form.title?.trim() && !draft.form.content?.trim()) return;
+    const hasTemplateInput = Object.values(draft.templateValues || {}).some((v) => String(v ?? '').trim());
+    if (!draft.form.title?.trim() && !draft.form.content?.trim() && !hasTemplateInput) return;
     hasRestoredDraft.current = true;
     setForm((f) => ({ ...f, ...draft.form }));
+    if (draft.templateValues && Object.keys(draft.templateValues).length) {
+      if (draft.selectedTemplateId) {
+        restoredTemplateValuesRef.current = { templateId: draft.selectedTemplateId, values: draft.templateValues };
+      }
+      setTemplateValues(draft.templateValues);
+    }
     if (draft.selectedTemplateId) setSelectedTemplateId(draft.selectedTemplateId);
-    if (draft.templateValues && Object.keys(draft.templateValues).length) setTemplateValues(draft.templateValues);
     addToast('success', 'Draft restored');
   }, [addToast]);
 

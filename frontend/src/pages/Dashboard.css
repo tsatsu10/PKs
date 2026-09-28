@@ -1,7 +1,6 @@
 @import '../features/dashboard/components/Hero/DashboardHero.css';
 @import '../features/dashboard/components/Hero/Trailhead.css';
 @import '../features/dashboard/components/Hero/TrailheadRow.css';
-@import '../features/dashboard/components/Hero/PulseRings.css';
 @import '../features/dashboard/components/Toolbar/CommandBar.css';
 @import '../features/dashboard/components/Toolbar/ActiveFiltersStrip.css';
 @import '../features/dashboard/components/Views/StreamView.css';
@@ -144,7 +143,7 @@
   position: fixed;
   right: 0;
   top: 0;
-  bottom: 0;
+  bottom: var(--mobile-nav-offset, 0px);
   z-index: 40;
   width: min(20rem, 92vw);
   padding: 1rem;
@@ -645,8 +644,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent-gradient);
-  color: var(--polar-white);
+  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
+  color: var(--on-accent);
   border: none;
   font-size: 1.5rem;
   font-weight: 300;
@@ -722,8 +721,6 @@
 }
 
 .dashboard-actions .btn-primary {
-  background: var(--accent-gradient);
-  color: var(--polar-white);
   box-shadow: 0 2px 12px var(--cosmic-pink-glow);
 }
 
@@ -1209,11 +1206,6 @@
   border-color: var(--midnight-purple-accent);
   box-shadow: 0 0 0 3px var(--midnight-purple-glow);
 }
-.dashboard-main .btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--cosmic-pink-glow);
-}
-
 .search-bar .btn {
   flex-shrink: 0;
 }
@@ -1454,9 +1446,9 @@
 }
 
 .dashboard-pagination-page.is-active {
-  background: var(--accent-gradient);
+  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
   border-color: transparent;
-  color: var(--polar-white);
+  color: var(--on-accent);
   cursor: default;
 }
 
@@ -1700,6 +1692,7 @@
   }
   .dashboard-fab {
     display: flex;
+    bottom: calc(1rem + var(--mobile-nav-offset));
   }
   .dashboard-actions {
     gap: 0.75rem;

@@ -13,13 +13,6 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    if (typeof window !== 'undefined' && typeof window.__reportError === 'function') {
-      try {
-        window.__reportError({ error, errorInfo });
-      } catch (e) {
-        console.warn('Error in __reportError:', e);
-      }
-    }
   }
 
   render() {

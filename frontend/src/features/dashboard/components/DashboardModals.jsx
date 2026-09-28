@@ -178,12 +178,12 @@ export default function DashboardModals({
       {bulkModal === 'delete' && (
         <div className="dashboard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title">
           <div className="dashboard-modal">
-            <h2 id="bulk-delete-title">Delete {selectedIds.size} object(s)?</h2>
-            <p className="muted">Objects will be moved to trash (soft delete). This action cannot be undone from this screen.</p>
+            <h2 id="bulk-delete-title">Move {selectedIds.size} object{selectedIds.size === 1 ? '' : 's'} to Trash?</h2>
+            <p className="muted">You can restore {selectedIds.size === 1 ? 'it' : 'them'} from Trash later.</p>
             <div className="dashboard-modal-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setBulkModal(null)} disabled={bulkActionLoading}>Cancel</button>
               <button type="button" className="btn btn-danger" onClick={bulkDelete} disabled={bulkActionLoading}>
-                {bulkActionLoading ? 'Deleting…' : 'Delete selected'}
+                {bulkActionLoading ? 'Moving…' : 'Move to Trash'}
               </button>
             </div>
           </div>

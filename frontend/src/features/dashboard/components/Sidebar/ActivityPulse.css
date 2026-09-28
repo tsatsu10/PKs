@@ -46,24 +46,6 @@
   text-decoration: underline;
 }
 
-.activity-pulse-sparkline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.activity-pulse-sparkline:last-child {
-  margin-bottom: 0;
-}
-
-.activity-pulse-sparkline-label {
-  font-size: 0.6875rem;
-  color: var(--polar-dim);
-  min-width: 3.5rem;
-}
-
 .activity-pulse-tag-list,
 .activity-pulse-link-list {
   list-style: none;
