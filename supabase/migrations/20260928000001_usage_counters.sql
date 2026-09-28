@@ -40,21 +40,27 @@ $$;
 -- (Postgres/Supabase default privileges would otherwise grant it EXECUTE like any other function).
 REVOKE EXECUTE ON FUNCTION public._consume_counter(text, uuid, int, int) FROM PUBLIC, anon, authenticated, service_role;
 
-CREATE OR REPLACE FUNCTION public.consume_usage(p_scope text, p_limit int, p_window_seconds int)
+-- Per-user counter. Server-only: users never touch counters (a caller-chosen window would let a
+-- user wipe their own daily bucket, and a caller-chosen scope would let them create arbitrary rows).
+-- Edge functions call it with the service role and the verified user's id.
+CREATE OR REPLACE FUNCTION public.consume_usage(p_user_id uuid, p_scope text, p_limit int, p_window_seconds int)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF auth.uid() IS NULL THEN
-    RETURN jsonb_build_object('error', 'unauthorized', 'count', 0, 'limited', true, 'retry_after_sec', 60);
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'consume_usage: p_user_id is required' USING ERRCODE = '22023';
   END IF;
-  RETURN public._consume_counter(p_scope, auth.uid(), p_limit, p_window_seconds);
+  IF p_window_seconds IS NULL OR p_window_seconds < 1 THEN
+    RAISE EXCEPTION 'consume_usage: p_window_seconds must be at least 1' USING ERRCODE = '22023';
+  END IF;
+  RETURN public._consume_counter(p_scope, p_user_id, p_limit, p_window_seconds);
 END;
 $$;
-REVOKE EXECUTE ON FUNCTION public.consume_usage(text, int, int) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.consume_usage(text, int, int) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.consume_usage(uuid, text, int, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_usage(uuid, text, int, int) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.consume_global_usage(p_scope text, p_limit int, p_window_seconds int)
 RETURNS jsonb

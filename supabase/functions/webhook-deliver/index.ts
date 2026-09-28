@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   try {
     const auth = await getUserClient(req);
     if (!auth) return reply({ error: "Unauthorized" }, 401);
-    const { supabase, user } = auth;
+    const { user } = auth;
 
     // Cheap early reject on the declared size before buffering the body (a spoofed/missing
     // Content-Length still gets the byte-accurate check right after req.text()).
@@ -41,14 +41,16 @@ Deno.serve(async (req) => {
     if (!isAllowedEvent(parsed.event)) return reply({ error: "Unknown event" }, 400);
     const event = parsed.event;
 
-    // B18: rate limit shared across all function instances.
-    const { data: rl, error: rlErr } = await supabase.rpc("consume_usage", {
-      p_scope: "webhook_deliver", p_limit: 60, p_window_seconds: 60,
+    // B18: rate limit shared across all function instances. Counters are server-only, so count with
+    // the service role against the verified caller's id. Fail closed: missing data counts as limited.
+    const { data: rl, error: rlErr } = await getAdminClient().rpc("consume_usage", {
+      p_user_id: user.id, p_scope: "webhook_deliver", p_limit: 60, p_window_seconds: 60,
     });
     if (rlErr) return reply({ error: "Rate limit check failed" }, 503);
-    if (rl?.limited) {
-      return reply({ error: "Too many requests", code: "RATE_LIMITED", retryAfter: rl.retry_after_sec }, 429,
-        { "Retry-After": String(rl.retry_after_sec ?? 60) });
+    if (rl?.limited !== false) {
+      const retryAfter = typeof rl?.retry_after_sec === "number" ? rl.retry_after_sec : 60;
+      return reply({ error: "Too many requests", code: "RATE_LIMITED", retryAfter }, 429,
+        { "Retry-After": String(retryAfter) });
     }
 
     // Secrets are write-only for users; read them with the service role, scoped to this user.

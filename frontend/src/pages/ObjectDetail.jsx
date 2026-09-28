@@ -676,6 +676,12 @@ export default function ObjectDetail() {
 
   async function handleSaveRun() {
     if (!object) return;
+    // The server records the run; with no run row back there is nothing saved, so don't claim otherwise.
+    // Keep the panel open so the output can still be copied.
+    if (!lastRun?.id) {
+      setError("This run couldn't be recorded. Copy the output if you need it, then try again.");
+      return;
+    }
     setError('');
     setSavingRun(true);
     try {

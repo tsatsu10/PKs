@@ -63,4 +63,5 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno check --config supabase/functions/deno.json supabase/functions/run-prompt/index.ts supabase/functions/webhook-deliver/index.ts
-      - run: deno test --config supabase/functions/deno.json --allow-env --allow-net=none supabase/functions
+      # No --allow-net: network access is denied by default (`--allow-net=none` would allow a host named "none").
+      - run: deno test --config supabase/functions/deno.json --allow-env supabase/functions

@@ -34,7 +34,7 @@
 ## Global Constraints
 
 - **Working directory:** commands run from the repo root unless a step says otherwise.
-  - Edge function tests: `deno test --allow-env --allow-net=none supabase/functions`.
+  - Edge function tests: `deno test --config supabase/functions/deno.json --allow-env supabase/functions`. Network access is denied by default; don't pass `--allow-net=none` (Deno reads it as "allow the host named none").
   - DB tests: `npx supabase test db`.
 - **Deno imports go through `supabase/functions/deno.json` only.** No `https://esm.sh/...` URLs and no unpinned `npm:` specifiers.
 - **Claude models:** these are the owner's choice (decision 2). The first two use adaptive thinking.
@@ -57,7 +57,7 @@
   - The legacy `X-PKS-Signature` header is still sent.
 - **Secrets never reach the browser:** API keys, webhook secrets, the Turnstile secret key.
 - **Checks after every task:**
-  - `deno test --allow-env --allow-net=none supabase/functions` (from Task 1 on)
+  - `deno test --config supabase/functions/deno.json --allow-env supabase/functions` (from Task 1 on)
   - `npx supabase db reset && npx supabase test db`
   - in `frontend/`: `npm run lint && npm test && npm run build`
 - **Commits:** one per task, ending with `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
@@ -253,7 +253,7 @@ git commit -m "chore(functions): pinned import map, fail-closed CORS and shared 
 
 **Interfaces:**
 - Produces:
-  - `public.consume_usage(p_scope text, p_limit int, p_window_seconds int) RETURNS jsonb`. Returns `{count, limited, retry_after_sec}` for the caller.
+  - `public.consume_usage(p_user_id uuid, p_scope text, p_limit int, p_window_seconds int) RETURNS jsonb`. Returns `{count, limited, retry_after_sec}` for that user. **service_role only** (users never touch counters: a caller-chosen window would let them wipe their own daily bucket). Raises 22023 when `p_user_id` is null or `p_window_seconds < 1`. Edge functions call it via `getAdminClient()` with the verified `user.id`. *(Final-review fix: this replaces the original caller-scoped 3-argument version; the code blocks below show the pre-fix version, and the migration and `10_usage` test in the repo are authoritative.)*
   - `public.consume_global_usage(p_scope text, p_limit int, p_window_seconds int) RETURNS jsonb`. Same shape; **service_role only**.
 
 - [ ] **Step 1: Write the failing test.** Create `supabase/tests/database/10_usage.test.sql`:
@@ -1629,6 +1629,7 @@ git commit -m "ci: type-check and test edge functions"
   - `prompt_templates.output_format`
   - The `X-PKS-Signature` header
   - The `objectTitle` / `objectContent` request fields
+- Also contract (final-review finding): **make run rows server-owned for UPDATE too.** Today users can UPDATE their own `prompt_runs` rows, so they can set `saved_object_id` or forge `provider`, `model` and the token columns. Once old clients no longer insert or update runs, drop the user UPDATE (and INSERT) policy on `prompt_runs`, leaving writes to `run-prompt` and `save_prompt_output_as_object`, and add a pgTAP assertion that an authenticated user can't change those columns.
 
 - [ ] **Step 1: Write the failing test.** Create `supabase/tests/database/13_contract_quota.test.sql`:
 
@@ -1678,7 +1679,7 @@ ALTER TABLE public.prompt_templates DROP COLUMN IF EXISTS output_format;
 
 - [ ] **Step 5: Run it and confirm it passes.**
 
-Run: `npx supabase db reset && npx supabase test db && deno test --allow-env --allow-net=none supabase/functions`
+Run: `npx supabase db reset && npx supabase test db && deno test --config supabase/functions/deno.json --allow-env supabase/functions`
 
 Expected: all pass.
 
@@ -1693,6 +1694,13 @@ git commit -m "chore: drop legacy quota tables, output_format, legacy webhook si
 
 ### Task 11: Production hand-off (owner checklist)
 
+- [ ] **Step 0: Check for users over the new webhook cap** (before the migrations). Migration `20260928000003` limits each user to 10 webhooks. Run in the SQL editor:
+
+  ```sql
+  SELECT user_id, count(*) FROM integrations WHERE type='webhook' GROUP BY 1 HAVING count(*) > 10;
+  ```
+
+  Expect no rows. If any come back, contact those users (or disable their extra webhooks) before pushing, and decide how to handle them.
 - [ ] **Step 1: Apply the database migrations.** Follow plan −1B1 Task 12 (backup → `db diff` → `db push`). This plan's migrations are included.
 - [ ] **Step 2: Set the function secrets.** Run `npx supabase secrets set PKS_APP_ORIGIN=https://<your-app-domain> SERVER_KEY_DAILY_LIMIT=50 SERVER_KEY_DAILY_LIMIT_ANTHROPIC=10 SERVER_KEY_GLOBAL_DAILY_LIMIT=<budget-based number>`.
   - Add `DEEPSEEK_API_KEY` and `ANTHROPIC_API_KEY` if they aren't set yet.
@@ -1706,5 +1714,5 @@ git commit -m "chore: drop legacy quota tables, output_format, legacy webhook si
 - [ ] **Step 6: Smoke test in production:**
   - Sign up with a new email: confirmation required, then login works.
   - Run a prompt on the server key: the response model is `claude-sonnet-5`.
-  - Add a webhook: the secret isn't visible.
+  - Webhooks: add one (the secret isn't visible afterwards), list them, edit one (change the URL, then clear its secret and confirm it now shows no secret), and delete it.
 - [ ] **Step 7: Schedule Task 10** two weeks later.

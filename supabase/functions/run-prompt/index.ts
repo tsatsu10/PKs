@@ -195,7 +195,10 @@ Deno.serve(async (req) => {
     if (!parsed.ok) return reply({ error: parsed.error }, 400);
     const input = parsed.value;
 
-    const { data: rl, error: rlErr } = await supabase.rpc("consume_usage", {
+    // Counters are server-only: users can't call consume_usage, so count with the service role
+    // against the verified caller's id.
+    const { data: rl, error: rlErr } = await getAdminClient().rpc("consume_usage", {
+      p_user_id: user.id,
       p_scope: "run_prompt_minute",
       p_limit: RATE_LIMIT_PER_MINUTE,
       p_window_seconds: 60,
@@ -274,7 +277,9 @@ Deno.serve(async (req) => {
       // if the global cap then rejects the call, the user's per-user units for this call are already spent.
       const caps = serverKeyCaps(provider, { total: SERVER_KEY_DAILY_LIMIT, anthropic: SERVER_KEY_DAILY_LIMIT_ANTHROPIC });
       for (const { scope, limit } of caps) {
-        const { data: q, error: qErr } = await supabase.rpc("consume_usage", { p_scope: scope, p_limit: limit, p_window_seconds: DAY });
+        const { data: q, error: qErr } = await getAdminClient().rpc("consume_usage", {
+          p_user_id: user.id, p_scope: scope, p_limit: limit, p_window_seconds: DAY,
+        });
         if (qErr || q?.limited !== false) {
           return reply({
             error: "Daily limit reached",
@@ -320,10 +325,9 @@ Deno.serve(async (req) => {
     // B8/D13: one server-written run row per call, completed or failed. Legacy bodies (no object_id) get none.
     let run: { id: string; created_at: string } | undefined;
     if (input.objectId) {
-      const { data: runRow, error: runErr } = await supabase.from("prompt_runs").insert({
+      const runFields = {
         user_id: user.id,
         knowledge_object_id: input.objectId,
-        prompt_template_id: input.promptTemplateId,
         status: result.ok ? "completed" : "failed",
         output: result.ok ? result.output : failedRunOutput(result.body),
         provider,
@@ -331,9 +335,18 @@ Deno.serve(async (req) => {
         input_tokens: usage.input,
         output_tokens: usage.output,
         truncated: truncated || outputTruncated, // input or output was cut
-      }).select("id, created_at").single();
+      };
+      const insertRun = (promptTemplateId: string | null | undefined) =>
+        supabase.from("prompt_runs").insert({ ...runFields, prompt_template_id: promptTemplateId })
+          .select("id, created_at").single();
+      let { data: runRow, error: runErr } = await insertRun(input.promptTemplateId);
+      // The AI call is already paid for: a bad/deleted template id must not drop the run row.
+      if (runErr && input.promptTemplateId) {
+        console.error("Failed to record prompt run with template; retrying without it", runErr.message);
+        ({ data: runRow, error: runErr } = await insertRun(null));
+      }
       if (runErr) console.error("Failed to record prompt run", runErr.message);
-      else run = runRow;
+      else run = runRow ?? undefined;
     }
 
     if (!result.ok) return reply({ ...result.body, run }, result.status);
