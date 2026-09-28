@@ -40,20 +40,20 @@ describe('buildObjectPatch', () => {
   });
 });
 
-describe('drafts keep the version they were based on', () => {
-  it('round-trips form and base version', () => {
-    const form = { ...objectToEditForm(object), title: 'Draft title' };
-    const draft = draftFromForm(form, 4);
-    const restored = formFromDraft(draft, { ...object, current_version: 6 });
-    expect(restored.baseVersion).toBe(4);
+describe('drafts keep the revision they were based on', () => {
+  const row = { ...object, revision: 7 };
+
+  it('round-trips form and base revision', () => {
+    const form = { ...objectToEditForm(row), title: 'Draft title' };
+    const restored = formFromDraft(draftFromForm(form, 7), { ...row, revision: 9 });
+    expect(restored.baseRevision).toBe(7);
     expect(restored.form.title).toBe('Draft title');
-    expect(restored.form).not.toHaveProperty('_baseVersion');
+    expect(restored.form).not.toHaveProperty('_baseRevision');
   });
 
-  it('falls back to the current version for drafts saved before this change', () => {
-    const legacy = { title: 'Old draft' };
-    const restored = formFromDraft(legacy, object);
-    expect(restored.baseVersion).toBe(4);
-    expect(restored.form.content).toBe('Body');
+  it('ignores legacy _baseVersion drafts and uses the row revision', () => {
+    const restored = formFromDraft({ title: 'Old draft', _baseVersion: 4 }, row);
+    expect(restored.baseRevision).toBe(7);
+    expect(restored.form).not.toHaveProperty('_baseVersion');
   });
 });

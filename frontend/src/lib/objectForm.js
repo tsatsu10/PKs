@@ -53,18 +53,21 @@ export function buildObjectPatch(object, form) {
   return patch;
 }
 
-/** Draft payload that remembers which version the edit started from. */
-export function draftFromForm(form, baseVersion) {
-  return { ...form, _baseVersion: baseVersion };
+/** Draft payload that remembers which revision the edit started from. */
+export function draftFromForm(form, baseRevision) {
+  return { ...form, _baseRevision: baseRevision };
 }
 
 /**
- * @returns {{ form: ReturnType<typeof objectToEditForm>, baseVersion: number }}
+ * Drafts saved before revisions existed carry `_baseVersion` (a different
+ * counter); ignore it and fall back to the row's current revision.
+ * @returns {{ form: ReturnType<typeof objectToEditForm>, baseRevision: number }}
  */
 export function formFromDraft(draft, object) {
-  const { _baseVersion, ...fields } = draft;
+  const { _baseRevision, _baseVersion, ...fields } = draft;
+  void _baseVersion;
   return {
     form: { ...objectToEditForm(object), ...fields },
-    baseVersion: _baseVersion ?? object.current_version,
+    baseRevision: _baseRevision ?? object.revision,
   };
 }

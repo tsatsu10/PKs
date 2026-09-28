@@ -100,8 +100,8 @@ export default function ObjectDetail() {
   const [linkSearchResults, setLinkSearchResults] = useState([]);
   const [linkSearchOpen, setLinkSearchOpen] = useState(false);
   const editInitialContentRef = useRef('');
-  // Version the current edit is based on; used for the optimistic-concurrency check on save.
-  const editBaseVersionRef = useRef(null);
+  // Revision the current edit is based on; used for the optimistic-concurrency check on save.
+  const editBaseRevisionRef = useRef(null);
   const linkSearchRef = useRef(null);
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function ObjectDetail() {
     draftAppliedRef.current = true;
     const restored = formFromDraft(d, object);
     editInitialContentRef.current = restored.form.content;
-    editBaseVersionRef.current = restored.baseVersion;
+    editBaseRevisionRef.current = restored.baseRevision;
     setEditForm(restored.form);
     setEditing(true);
     addToast('success', 'Draft restored');
@@ -144,7 +144,7 @@ export default function ObjectDetail() {
     if (!id || !editing) return;
     if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current);
     editDraftTimerRef.current = setTimeout(() => {
-      setDraft(DRAFT_KEYS.object(id), draftFromForm(editForm, editBaseVersionRef.current));
+      setDraft(DRAFT_KEYS.object(id), draftFromForm(editForm, editBaseRevisionRef.current));
     }, 500);
     return () => { if (editDraftTimerRef.current) clearTimeout(editDraftTimerRef.current); };
   }, [id, editing, editForm]);
@@ -269,17 +269,14 @@ export default function ObjectDetail() {
         clearDraft(DRAFT_KEYS.object(object.id));
         return;
       }
-      // Optimistic concurrency, only for versioned fields: the DB trigger bumps
-      // current_version when title/content/summary change, so a metadata-only
-      // patch (status, dates…) must not be rejected just because another tab
-      // edited the text. Plan −1B replaces this with a `revision` column that
-      // bumps on every update.
-      const touchesVersioned = ['title', 'content', 'summary'].some((k) => k in patch);
-      let query = supabase.from('knowledge_objects').update(patch).eq('id', object.id);
-      if (touchesVersioned) {
-        query = query.eq('current_version', editBaseVersionRef.current ?? object.current_version);
-      }
-      const OBJECT_ROW_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at';
+      // Optimistic concurrency: revision bumps on every edit (views and pins
+      // excluded), so any change made elsewhere since this edit began is caught.
+      const query = supabase
+        .from('knowledge_objects')
+        .update(patch)
+        .eq('id', object.id)
+        .eq('revision', editBaseRevisionRef.current ?? object.revision);
+      const OBJECT_ROW_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, revision';
       const { data: updatedRows, error: err } = await query.select(OBJECT_ROW_COLS);
       if (err) throw err;
       if (!updatedRows || updatedRows.length === 0) {
@@ -1079,7 +1076,7 @@ export default function ObjectDetail() {
           )}
           {!editing ? (
             <>
-              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; editBaseVersionRef.current = object.current_version; setEditing(true); }}>Edit</button>}
+              {canEdit && <button type="button" className="btn btn-secondary" onClick={() => { editInitialContentRef.current = editForm.content ?? ''; editBaseRevisionRef.current = object.revision; setEditing(true); }}>Edit</button>}
               {isOwner && <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>}
             </>
           ) : (
