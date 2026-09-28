@@ -283,10 +283,18 @@ policy = "oneshot"
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
 # The Deno major version to use.
-deno_version = 1
+deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+[functions.run-prompt]
+verify_jwt = true
+import_map = "./functions/deno.json"
+
+[functions.webhook-deliver]
+verify_jwt = true
+import_map = "./functions/deno.json"
 
 [analytics]
 enabled = true
