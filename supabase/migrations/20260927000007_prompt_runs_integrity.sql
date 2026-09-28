@@ -2,7 +2,9 @@
 ALTER TABLE public.prompt_runs DROP CONSTRAINT IF EXISTS prompt_runs_prompt_template_id_fkey;
 ALTER TABLE public.prompt_runs
   ADD CONSTRAINT prompt_runs_prompt_template_id_fkey
-  FOREIGN KEY (prompt_template_id) REFERENCES public.prompt_templates(id) ON DELETE SET NULL;
+  FOREIGN KEY (prompt_template_id) REFERENCES public.prompt_templates(id) ON DELETE SET NULL NOT VALID;
+ALTER TABLE public.prompt_runs
+  VALIDATE CONSTRAINT prompt_runs_prompt_template_id_fkey;
 
 -- S13: runs may only reference readable objects and the caller's own templates.
 DROP POLICY IF EXISTS "Users can manage own prompt_runs" ON public.prompt_runs;

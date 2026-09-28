@@ -86,7 +86,8 @@
 | `…000006_permanent_delete_and_files.sql` | create | D4/B14, files UPDATE policy, bucket size limit |
 | `…000007_prompt_runs_integrity.sql` | create | D3, S13 |
 | `…000008_rls_and_index_hygiene.sql` | create | `(SELECT auth.uid())`, indexes, case-insensitive taxonomy, `search_path` |
-| `…000009_contract_dead_schema.sql` | create (Task 11, gated) | Drops dead tables and functions |
+| `…000009_shared_related_trash.sql` | create | S9, trash-aware shared child policies (tags/domains/link_edges) |
+| `…000010_contract_dead_schema.sql` | create (Task 11, gated) | Drops dead tables and functions |
 | `frontend/src/lib/objectForm.js` (+test) | modify | Base *revision* in drafts |
 | `frontend/src/hooks/useObjectDetail.js` | modify | Select `revision` |
 | `frontend/src/pages/ObjectDetail.jsx` | modify | Revision guard, share RPC, owner-only fields |
@@ -1704,7 +1705,7 @@ git commit -m "ci: run pgTAP database tests"
 - The owner has confirmed that no one runs an app version older than that. The update prompt from −1A Task 12 has been shown.
 
 **Files:**
-- Create: `supabase/migrations/20260927000009_contract_dead_schema.sql`, `supabase/tests/database/09_contract.test.sql`
+- Create: `supabase/migrations/20260927000010_contract_dead_schema.sql`, `supabase/tests/database/10_contract.test.sql`
 - Modify: `supabase/tests/database/05_dashboard.test.sql` (drop the pulse assertion). Never edit an applied migration: `get_dashboard_stats` is redefined in the new one.
 
 **Interfaces:**
@@ -1721,7 +1722,7 @@ Run: `CG_OK=1 grep -rnE "export_jobs|export_job_items|import_items|import_regist
 
 Expected: no output. If anything matches, stop and remove that usage first.
 
-- [ ] **Step 2: Write the failing test.** Create `supabase/tests/database/09_contract.test.sql`:
+- [ ] **Step 2: Write the failing test.** Create `supabase/tests/database/10_contract.test.sql`:
 
 ```sql
 BEGIN;
@@ -1741,9 +1742,9 @@ ROLLBACK;
 
 Run: `npx supabase test db`
 
-Expected: `09_contract` fails on "export_jobs dropped". Also delete the assertion `stats keeps the pulse key for old clients` from `05_dashboard.test.sql` and change its `plan(5)` to `plan(4)`.
+Expected: `10_contract` fails on "export_jobs dropped". Also delete the assertion `stats keeps the pulse key for old clients` from `05_dashboard.test.sql` and change its `plan(5)` to `plan(4)`.
 
-- [ ] **Step 4: Write the migration** `supabase/migrations/20260927000009_contract_dead_schema.sql`:
+- [ ] **Step 4: Write the migration** `supabase/migrations/20260927000010_contract_dead_schema.sql`:
   1. Start with:
 
   ```sql
@@ -1777,7 +1778,7 @@ Expected: all ok.
 - [ ] **Step 6: Commit.**
 
 ```bash
-git add supabase/migrations/20260927000009_contract_dead_schema.sql supabase/tests/database
+git add supabase/migrations/20260927000010_contract_dead_schema.sql supabase/tests/database
 git commit -m "chore(db): drop export/import bookkeeping, legacy resolver and pulse stats"
 ```
 
@@ -1791,6 +1792,6 @@ Nothing is applied to production inside a task. This is the checklist the owner 
 - [ ] **Step 2: Check for drift.** Run `npx supabase db diff --linked`.
   - Expected: only the new −1B1 migrations differ.
   - If other differences show up, stop and do −1C (squash) first.
-- [ ] **Step 3: Apply.** Run `npx supabase db push` (link first with `npx supabase link --project-ref <ref>`). Then deploy the frontend.
+- [ ] **Step 3: Apply.** Run `npx supabase db push` (link first with `npx supabase link --project-ref <ref>`). Then deploy the frontend. Never pass `--include-seed`: `supabase/seed.sql` holds test-only helpers (e.g. `tests.create_user`) that must not reach production.
 - [ ] **Step 4: Check the advisors.** Supabase dashboard → Advisors → Security and Performance: no new errors. Fix any "auth_rls_initplan" or "function_search_path_mutable" warnings the rewrite missed.
 - [ ] **Step 5: Schedule Task 11** two weeks after the frontend deploy.

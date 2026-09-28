@@ -4,7 +4,9 @@ ALTER TABLE public.knowledge_object_versions
   DROP CONSTRAINT IF EXISTS knowledge_object_versions_edited_by_fkey;
 ALTER TABLE public.knowledge_object_versions
   ADD CONSTRAINT knowledge_object_versions_edited_by_fkey
-  FOREIGN KEY (edited_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  FOREIGN KEY (edited_by) REFERENCES auth.users(id) ON DELETE SET NULL NOT VALID;
+ALTER TABLE public.knowledge_object_versions
+  VALIDATE CONSTRAINT knowledge_object_versions_edited_by_fkey;
 CREATE INDEX IF NOT EXISTS idx_kov_edited_by ON public.knowledge_object_versions(edited_by);
 
 -- Versions are written only by the SECURITY DEFINER snapshot trigger; clients never insert.

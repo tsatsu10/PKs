@@ -97,7 +97,9 @@ REVOKE EXECUTE ON FUNCTION public.merge_case_duplicate_taxonomy() FROM PUBLIC, a
 -- between the merge and the index even when the migration runner autocommits each statement.
 DO $$
 BEGIN
-  LOCK TABLE public.tags, public.domains IN SHARE ROW EXCLUSIVE MODE;
+  LOCK TABLE public.tags, public.domains,
+    public.knowledge_object_tags, public.knowledge_object_domains
+    IN SHARE ROW EXCLUSIVE MODE;
   PERFORM public.merge_case_duplicate_taxonomy();
   ALTER TABLE public.domains DROP CONSTRAINT IF EXISTS domains_user_id_name_key;
   ALTER TABLE public.tags DROP CONSTRAINT IF EXISTS tags_user_id_name_key;

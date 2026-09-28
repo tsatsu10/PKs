@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(11);
+SELECT plan(13);
 
 SELECT tests.create_user('owner');
 SELECT tests.create_user('editor');
@@ -25,9 +25,13 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$UPDATE public.knowledge_objects SET created_at = now() - interval '9 years' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
   '42501', NULL, 'editor cannot rewrite created_at');
-SELECT throws_ok(
+SELECT lives_ok(
   $$UPDATE public.knowledge_objects SET title = 'Live 2', slug = 'live-2-00000000' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
-  '42501', NULL, 'editor cannot change slug');
+  'editor update with slug (old client) is kept but slug is not changed');
+SELECT isnt((SELECT slug FROM public.knowledge_objects WHERE id = '00000000-0000-0000-0000-000000000001'),
+  'live-2-00000000', 'slug kept unchanged despite editor sending a new slug');
+SELECT isnt((SELECT title FROM public.knowledge_objects WHERE id = '00000000-0000-0000-0000-000000000001'),
+  'Live', 'title did change from editor update');
 SELECT lives_ok(
   $$UPDATE public.knowledge_objects SET title = 'Live 2', content = 'Body 2' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
   'editor can change title+content without slug');

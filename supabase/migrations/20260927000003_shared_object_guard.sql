@@ -101,6 +101,12 @@ BEGIN
   IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
     RAISE EXCEPTION 'Changing the owner of an object is not allowed' USING ERRCODE = '42501';
   END IF;
+  IF OLD.user_id <> auth.uid() THEN
+    -- Pre-update clients (buildObjectPatch) always send slug alongside title. Keep the
+    -- existing slug silently for non-owners instead of raising, so old app versions can
+    -- still rename shared objects.
+    NEW.slug := OLD.slug;
+  END IF;
   IF OLD.user_id <> auth.uid()
      AND (to_jsonb(NEW) - editor_writable) IS DISTINCT FROM (to_jsonb(OLD) - editor_writable) THEN
     RAISE EXCEPTION 'Only the owner can change this field'
