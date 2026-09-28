@@ -1013,7 +1013,7 @@ export default function ObjectDetail() {
     setError('');
     try {
       const { error: err } = shareId.startsWith('invite:')
-        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length))
+        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length)).eq('knowledge_object_id', object.id)
         : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
       if (err) throw err;
       setShares((prev) => prev.filter((s) => s.id !== shareId));

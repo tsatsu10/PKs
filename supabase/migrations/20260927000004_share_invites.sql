@@ -14,8 +14,18 @@ CREATE TABLE IF NOT EXISTS public.share_invites (
 );
 CREATE INDEX IF NOT EXISTS idx_share_invites_email_pending
   ON public.share_invites(email) WHERE accepted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_share_invites_invited_by
-  ON public.share_invites(invited_by, created_at DESC);
+
+-- Append-only rate-limit log: rows here are never deleted, so an owner can't reset
+-- their hourly quota by deleting share_invites (directly or via the revoke trigger).
+CREATE TABLE IF NOT EXISTS public.share_invite_log (
+  id          bigserial PRIMARY KEY,
+  invited_by  uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_share_invite_log_invited_by
+  ON public.share_invite_log(invited_by, created_at DESC);
+ALTER TABLE public.share_invite_log ENABLE ROW LEVEL SECURITY;
+-- No policies: clients can neither read nor write this log directly.
 
 ALTER TABLE public.share_invites ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Owners can read invites for own objects"
@@ -40,16 +50,21 @@ BEGIN
   IF v_uid IS NULL OR NOT public.owns_knowledge_object(p_object_id) THEN
     RAISE EXCEPTION 'Only the owner can share this object' USING ERRCODE = '42501';
   END IF;
+  IF p_role IS NULL THEN
+    RAISE EXCEPTION 'Choose a role' USING ERRCODE = '22023';
+  END IF;
   IF v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN
     RAISE EXCEPTION 'Enter a valid email address' USING ERRCODE = '22023';
   END IF;
   IF v_email = (SELECT lower(email) FROM auth.users WHERE id = v_uid) THEN
     RAISE EXCEPTION 'You cannot share with yourself' USING ERRCODE = '22023';
   END IF;
-  IF (SELECT count(*) FROM public.share_invites
+  IF (SELECT count(*) FROM public.share_invite_log
       WHERE invited_by = v_uid AND created_at > now() - interval '1 hour') >= 30 THEN
     RAISE EXCEPTION 'Too many shares in the last hour. Try again later.' USING ERRCODE = 'P0001';
   END IF;
+
+  INSERT INTO public.share_invite_log (invited_by) VALUES (v_uid);
 
   INSERT INTO public.share_invites (knowledge_object_id, email, role, invited_by)
   VALUES (p_object_id, v_email, p_role, v_uid)
@@ -57,12 +72,14 @@ BEGIN
 
   SELECT id INTO v_recipient FROM auth.users
   WHERE lower(email) = v_email AND email_confirmed_at IS NOT NULL
+  ORDER BY email_confirmed_at, created_at
   LIMIT 1;
 
   IF v_recipient IS NOT NULL THEN
     INSERT INTO public.share_permissions (knowledge_object_id, shared_with_user_id, shared_with_email, role)
     VALUES (p_object_id, v_recipient, v_email, p_role)
-    ON CONFLICT (knowledge_object_id, shared_with_user_id) DO UPDATE SET role = EXCLUDED.role;
+    ON CONFLICT (knowledge_object_id, shared_with_user_id)
+    DO UPDATE SET role = EXCLUDED.role, shared_with_email = EXCLUDED.shared_with_email;
     UPDATE public.share_invites SET accepted_at = coalesce(accepted_at, now())
     WHERE knowledge_object_id = p_object_id AND email = v_email;
   END IF;
@@ -99,9 +116,16 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.accept_pending_share_invites() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_confirmed ON auth.users;
-CREATE TRIGGER on_auth_user_confirmed
-  AFTER INSERT OR UPDATE OF email_confirmed_at, email ON auth.users
+DROP TRIGGER IF EXISTS on_auth_user_confirmed_insert ON auth.users;
+DROP TRIGGER IF EXISTS on_auth_user_confirmed_update ON auth.users;
+CREATE TRIGGER on_auth_user_confirmed_insert
+  AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.accept_pending_share_invites();
+CREATE TRIGGER on_auth_user_confirmed_update
+  AFTER UPDATE OF email_confirmed_at, email ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email_confirmed_at IS DISTINCT FROM NEW.email_confirmed_at OR OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION public.accept_pending_share_invites();
 
 -- Revoking a share also removes its invite, so a later confirmation can't re-grant it.
 CREATE OR REPLACE FUNCTION public.delete_invite_for_revoked_share()
