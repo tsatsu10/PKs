@@ -2,7 +2,7 @@
 # Local stand-in for `supabase db reset && supabase test db` on a plain Postgres server
 # (no Docker). CI uses the real Supabase CLI.
 #
-# Usage: bash supabase/tests/local/run.sh [test files...]
+# Usage: bash supabase/local-test/run.sh [test files...]
 # Env:   PGHOST/PGPORT/PGUSER (default localhost/54329/postgres), PKS_TEST_DB (default pks_test),
 #        PGTAP_SRC (extracted pgTAP 1.3.3 source; otherwise downloaded once into a cache dir).
 set -euo pipefail
@@ -10,7 +10,7 @@ set -euo pipefail
 export PGHOST="${PGHOST:-localhost}" PGPORT="${PGPORT:-54329}" PGUSER="${PGUSER:-postgres}"
 export PGOPTIONS="${PGOPTIONS:-} -c client_min_messages=warning"
 DB="${PKS_TEST_DB:-pks_test}"
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PGTAP_VERSION=1.3.3
 PSQL=(psql -X -q -v ON_ERROR_STOP=1)
 
@@ -32,7 +32,7 @@ pgtap_sql() {
 
 # Reset: fresh database, platform shim, pgTAP, migrations, seed.
 "${PSQL[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB WITH (FORCE)" -c "CREATE DATABASE $DB"
-"${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/tests/local/supabase_shim.sql"
+"${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/local-test/supabase_shim.sql"
 pgtap_sql | "${PSQL[@]}" -d "$DB"
 for f in "$ROOT"/supabase/migrations/*.sql; do
   "${PSQL[@]}" -d "$DB" -f "$f" || { echo "Migration failed: $(basename "$f")"; exit 1; }
