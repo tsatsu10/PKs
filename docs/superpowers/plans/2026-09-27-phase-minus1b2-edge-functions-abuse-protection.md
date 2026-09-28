@@ -86,8 +86,8 @@
 | `supabase/functions/webhook-deliver/lib.ts` (+test) | create | SSRF guards (moved), event allowlist, signing, delivery counting |
 | `supabase/functions/webhook-deliver/index.ts` | modify | Uses lib, DB rate limit, service-role secret read |
 | `supabase/migrations/20260928000001_usage_counters.sql` | create | `usage_counters`, `consume_usage`, `consume_global_usage` |
-| `…000011_prompt_runs_server_owned.sql` | create | Run metadata columns, `save_prompt_output_as_object` |
-| `…000012_webhook_secrets_and_caps.sql` | create | Write-only secret, `has_secret`, 10-webhook cap |
+| `20260928000002_prompt_runs_server_owned.sql` | create | Run metadata columns, `save_prompt_output_as_object` |
+| `20260928000003_webhook_secrets_and_caps.sql` | create | Write-only secret, `has_secret`, 10-webhook cap |
 | `…000013_contract_quota_and_output_format.sql` | create (gated) | Drops legacy quota tables/functions, `output_format` |
 | `frontend/src/lib/turnstile.js`, `frontend/src/components/Turnstile.jsx` (+test) | create | CAPTCHA loader and widget |
 | `frontend/src/pages/ObjectDetail.jsx` | modify | New run flow |
