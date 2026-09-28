@@ -34,19 +34,31 @@ function normalizeForm(form) {
   };
 }
 
+/** Fields a shared editor is allowed to save (DB-enforced; see guard_knowledge_object_update). */
+const EDITOR_WRITABLE_FORM_FIELDS = ['title', 'content', 'summary', 'source'];
+
 /**
  * Columns that differ between the row and the form. Sending only these keeps a
  * save from reverting fields another tab or collaborator changed.
+ *
+ * When `isOwner` is false (a shared editor), the patch is restricted to the
+ * content fields the DB guard allows them to write, and `slug` is never
+ * derived, so an editor's title change can't be rejected for touching an
+ * owner-only column and a restored draft can't leak stale owner-only values.
+ * @param {object} object - knowledge_objects row
+ * @param {ReturnType<typeof objectToEditForm>} form
+ * @param {{ isOwner?: boolean }} [options]
  * @returns {Record<string, unknown>}
  */
-export function buildObjectPatch(object, form) {
+export function buildObjectPatch(object, form, { isOwner = true } = {}) {
   const before = normalizeForm(objectToEditForm(object));
   const after = normalizeForm(form);
   const patch = {};
   for (const key of Object.keys(after)) {
+    if (!isOwner && !EDITOR_WRITABLE_FORM_FIELDS.includes(key)) continue;
     if (before[key] !== after[key]) patch[key] = after[key];
   }
-  if ('title' in patch) {
+  if (isOwner && 'title' in patch) {
     const base = slugify(after.title);
     patch.slug = base ? `${base}-${object.id.slice(0, 8)}` : null;
   }

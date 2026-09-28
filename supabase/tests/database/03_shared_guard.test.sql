@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(11);
 
 SELECT tests.create_user('owner');
 SELECT tests.create_user('editor');
@@ -25,8 +25,16 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$UPDATE public.knowledge_objects SET created_at = now() - interval '9 years' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
   '42501', NULL, 'editor cannot rewrite created_at');
+SELECT throws_ok(
+  $$UPDATE public.knowledge_objects SET title = 'Live 2', slug = 'live-2-00000000' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
+  '42501', NULL, 'editor cannot change slug');
+SELECT lives_ok(
+  $$UPDATE public.knowledge_objects SET title = 'Live 2', content = 'Body 2' WHERE id = '00000000-0000-0000-0000-000000000001'$$,
+  'editor can change title+content without slug');
 SELECT is((SELECT count(*)::int FROM public.knowledge_objects WHERE id = '00000000-0000-0000-0000-000000000002'),
   0, 'shared user cannot read a trashed object (S9)');
+SELECT is((SELECT count(*)::int FROM public.knowledge_object_versions WHERE knowledge_object_id = '00000000-0000-0000-0000-000000000002'),
+  0, 'editor sees 0 versions of a trashed shared object (S9)');
 UPDATE public.knowledge_objects SET title = 'x' WHERE id = '00000000-0000-0000-0000-000000000002';
 RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
 SELECT is((SELECT title FROM public.knowledge_objects WHERE id = '00000000-0000-0000-0000-000000000002'),

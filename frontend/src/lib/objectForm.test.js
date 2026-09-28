@@ -38,6 +38,31 @@ describe('buildObjectPatch', () => {
     const row = { ...object, status: null };
     expect(buildObjectPatch(row, objectToEditForm(row))).toEqual({});
   });
+
+  it('a non-owner patch omits slug and owner-only fields even when they differ', () => {
+    const form = {
+      ...objectToEditForm(object),
+      title: '  Q4 Plan  ',
+      content: 'New body',
+      status: 'archived',
+      due_at: '2030-01-01T00:00',
+      remind_at: '2030-01-01T00:00',
+      cover_url: 'https://evil.example/px',
+    };
+    expect(buildObjectPatch(object, form, { isOwner: false })).toEqual({
+      title: 'Q4 Plan',
+      content: 'New body',
+    });
+  });
+
+  it('an owner patch is unchanged by passing isOwner: true', () => {
+    const form = { ...objectToEditForm(object), title: '  Q4 Plan  ' };
+    expect(buildObjectPatch(object, form, { isOwner: true })).toEqual({
+      title: 'Q4 Plan',
+      slug: 'q4-plan-abcdef12',
+    });
+    expect(buildObjectPatch(object, form)).toEqual({ title: 'Q4 Plan', slug: 'q4-plan-abcdef12' });
+  });
 });
 
 describe('drafts keep the revision they were based on', () => {
@@ -55,5 +80,13 @@ describe('drafts keep the revision they were based on', () => {
     const restored = formFromDraft({ title: 'Old draft', _baseVersion: 4 }, row);
     expect(restored.baseRevision).toBe(7);
     expect(restored.form).not.toHaveProperty('_baseVersion');
+  });
+
+  it('a restored draft with stale owner-only fields produces no patch for a non-owner', () => {
+    // The draft was saved while status/cover_url differed from the current row
+    // (e.g. captured before a share was downgraded, or from another session).
+    const draft = draftFromForm({ ...objectToEditForm(row), status: 'archived', cover_url: 'https://evil.example/px' }, 7);
+    const restored = formFromDraft(draft, row);
+    expect(buildObjectPatch(row, restored.form, { isOwner: false })).toEqual({});
   });
 });

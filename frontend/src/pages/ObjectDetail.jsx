@@ -263,7 +263,7 @@ export default function ObjectDetail() {
     setSaving(true);
     setError('');
     try {
-      const patch = buildObjectPatch(object, editForm);
+      const patch = buildObjectPatch(object, editForm, { isOwner });
       if (Object.keys(patch).length === 0) {
         setEditing(false);
         clearDraft(DRAFT_KEYS.object(object.id));

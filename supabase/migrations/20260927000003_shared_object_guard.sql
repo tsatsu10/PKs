@@ -103,9 +103,28 @@ BEGIN
   END IF;
   IF OLD.user_id <> auth.uid()
      AND (to_jsonb(NEW) - editor_writable) IS DISTINCT FROM (to_jsonb(OLD) - editor_writable) THEN
-    RAISE EXCEPTION 'Only the owner can change status, dates, cover, pin or trash state'
+    RAISE EXCEPTION 'Only the owner can change this field'
       USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
 $$;
+
+-- S9 (fix round 1): editors must lose access to a trashed object's version history too.
+-- The prior "Owners and editors can read versions" policy (20260927000002) let an editor
+-- keep reading history after the object was trashed.
+DROP POLICY IF EXISTS "Owners and editors can read versions" ON public.knowledge_object_versions;
+CREATE POLICY "Owners and editors can read versions"
+  ON public.knowledge_object_versions FOR SELECT
+  TO authenticated
+  USING (
+    public.owns_knowledge_object(knowledge_object_id)
+    OR EXISTS (
+      SELECT 1 FROM public.knowledge_objects ko
+      JOIN public.share_permissions sp ON sp.knowledge_object_id = ko.id
+      WHERE ko.id = knowledge_object_versions.knowledge_object_id
+        AND NOT ko.is_deleted
+        AND sp.shared_with_user_id = (SELECT auth.uid())
+        AND sp.role = 'editor'
+    )
+  );
