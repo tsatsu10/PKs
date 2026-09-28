@@ -2,7 +2,8 @@
 # Local stand-in for `supabase db reset && supabase test db` on a plain Postgres server
 # (no Docker). CI uses the real Supabase CLI.
 #
-# Usage: bash supabase/local-test/run.sh [test files...]
+# Usage: bash supabase/local-test/run.sh [--build-only | test files...]
+#        --build-only: rebuild the database, run no tests (used by the −1C squash runbook).
 # Env:   PGHOST/PGPORT/PGUSER (default localhost/54329/postgres), PKS_TEST_DB (default pks_test),
 #        PGTAP_SRC (extracted pgTAP 1.3.3 source; otherwise downloaded once into a cache dir).
 set -euo pipefail
@@ -38,6 +39,8 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   "${PSQL[@]}" -d "$DB" -f "$f" || { echo "Migration failed: $(basename "$f")"; exit 1; }
 done
 sed '/CREATE EXTENSION.*pgtap/d' "$ROOT/supabase/seed.sql" | "${PSQL[@]}" -d "$DB"
+
+if [ "${1:-}" = "--build-only" ]; then echo "Built $DB."; exit 0; fi
 
 # Test: each file passes only with a clean psql exit, no `not ok` and no finish() complaint.
 if [ $# -gt 0 ]; then tests=("$@"); else tests=("$ROOT"/supabase/tests/database/*.test.sql); fi

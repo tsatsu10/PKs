@@ -1,12 +1,23 @@
-# Phase −1C: Migration Squash Runbook (owner-run)
+# Phase −1C: Migration Squash Runbook (owner-run, no Docker)
 
-> **This is a runbook for the project owner, not an agent plan.** It needs production database credentials and changes production migration *history*. Run it by hand, step by step. An agent may help read output, but must not run the commands against production.
+> **This is a runbook for the project owner, not an agent plan.** It needs production database credentials and changes production migration *history*. Run it by hand, step by step. An agent may help read output, but must not run commands against production.
 
-**Goal:** Replace the 46 historical migrations (unreliable, partly built in the SQL editor, with a non-idempotent enum migration and redefined search RPCs) with **one baseline migration that matches production exactly**. Then mark the history so `supabase db push` and `supabase db reset` work cleanly from then on.
+**Goal:** replace the 46 historical migrations with **one baseline migration that matches production exactly**. The old migrations are unreliable: some were built in the SQL editor, one enum migration isn't idempotent, and the search RPCs were redefined. After the squash, mark the history so `supabase db push` works cleanly from then on.
 
 **What changes:** only migration *files* in the repo and the *migration history table* in production. **No production schema or data changes.** The baseline describes what production already is.
 
-**Why:** −1B1 and every later phase ship forward migrations. Their tests replay migrations on a fresh local database, and that replay must reproduce production. See audit §4, "Squash recommendation".
+**Why:** −1B1 and every later phase ship forward migrations. Their tests replay the migrations on a fresh database, and that replay must reproduce production. See audit §4, "Squash recommendation".
+
+**No Docker.** The owner's machine has no Docker, so this runbook uses Docker-free tools only:
+
+| Job | Tool |
+|---|---|
+| Dumps (replacing `supabase db dump`) | The local PostgreSQL 18 `pg_dump` |
+| Local replays (replacing `supabase start` / `db reset`) | The private test server and `supabase/local-test/run.sh` |
+| Schema comparison (replacing `supabase db diff`) | `supabase/local-test/compare-schema.sh` |
+| Link, history and repair | The Supabase CLI commands `link`, `migration list` and `migration repair`. They talk to production directly and don't need Docker. |
+
+CI's `database` job still replays everything on the real Supabase stack. That is the final check.
 
 **Spec:**
 - [`docs/plans/2026-09-26-codebase-audit.md`](../../plans/2026-09-26-codebase-audit.md): §4 Migrations, §H/§I of the database audit.
@@ -20,25 +31,47 @@
 3. Apply −1B1 migrations to production
 4. Apply −1B2 migrations to production
 
-- **If −1B1's local work is already merged but not yet in production:** fine. Run this runbook; the −1B1 migration files (`20260927000001…`) stay where they are and are applied afterwards.
+- **If −1B1's code is already merged but not yet in production:** fine. Run this runbook. The −1B1 migration files (`20260927…`) stay where they are and are applied afterwards.
 - **If −1B1 or −1B2 migrations are already applied in production:** use the "Already applied" variant in Step 6.
 
 Allow about 1–2 hours. Pick a time when nobody is changing the schema from the dashboard.
 
 ## Prerequisites
 
-- Docker Desktop running (`docker info` works). The CLI runs `pg_dump` inside Docker.
-- Supabase CLI: `npx supabase --version` (2.x).
-- The production **project ref** (Supabase dashboard URL: `supabase.com/dashboard/project/<ref>`).
-- The **database password** (dashboard → Project Settings → Database). Keep it out of shell history; the CLI prompts for it.
-- A clean git working tree on a new branch: `git switch -c chore/migration-squash`.
+- **PostgreSQL 18 client tools** on PATH: `pg_dump --version` and `psql --version` both print 18.x. They are already installed with PostgreSQL 18. pg_dump 18 can dump the older production server.
+- **The private test server** is running on port 54329. If `psql -h localhost -p 54329 -U postgres -c "select 1"` fails, start it:
+
+  ```bash
+  "/c/Program Files/PostgreSQL/18/bin/pg_ctl.exe" -D C:/Users/elike/AppData/Local/pks-pgtest/data \
+    -l C:/Users/elike/AppData/Local/pks-pgtest/server.log -o "-p 54329 -c listen_addresses=localhost" start
+  ```
+
+- **Supabase CLI:** `npx supabase --version` (2.x). Only the commands that don't need Docker are used.
+- **The production project ref**, from the dashboard URL `supabase.com/dashboard/project/<ref>`.
+- **The Session pooler connection details:** dashboard → **Connect** → **Session pooler**. They look like `postgresql://postgres.<ref>:[PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+  - Use the Session pooler, not "Direct connection": direct connections are IPv6-only on many networks.
+  - The database password is under Project Settings → Database, and can be reset there.
+- **The password in pgpass, not in shell history.** Add one line to `C:\Users\elike\AppData\Roaming\postgresql\pgpass.conf`. Create the folder or file if missing, and watch that Notepad doesn't save it as `.txt`:
+
+  ```
+  aws-0-<region>.pooler.supabase.com:5432:postgres:postgres.<ref>:<password>
+  ```
+
+- **A clean git working tree** on a new branch: `git switch -c chore/migration-squash`.
+
+In every shell you use for this runbook, set the production connection once. It holds no password:
+
+```bash
+PROD="host=aws-0-<region>.pooler.supabase.com port=5432 dbname=postgres user=postgres.<ref> sslmode=require"
+psql "$PROD" -c "select version()"   # expected: PostgreSQL 15.x or 17.x, and no password prompt
+```
 
 ---
 
 ### Step 1: Freeze and link
 
 - [ ] Tell anyone with dashboard access not to change tables, policies or functions until this runbook is finished.
-- [ ] Link the repo to production (you'll be prompted for the DB password):
+- [ ] Link the repo to production. The CLI prompts for the database password:
 
 ```bash
 npx supabase link --project-ref <ref>
@@ -50,7 +83,7 @@ npx supabase link --project-ref <ref>
 npx supabase migration list --linked > squash-history-before.txt
 ```
 
-Expected: a table of local vs remote versions. Note any version that exists **remotely but not locally**, or the reverse. Those rows are the drift this runbook resolves.
+Expected: a table of local versus remote versions. Note any version that exists **remotely but not locally**, or the reverse. Those rows are the drift this runbook resolves.
 
 ### Step 2: Back up production (never skip)
 
@@ -58,55 +91,74 @@ Expected: a table of local vs remote versions. Note any version that exists **re
 
 ```bash
 mkdir -p supabase/backups
-echo "supabase/backups/" >> .gitignore
+grep -qx "supabase/backups/" .gitignore || echo "supabase/backups/" >> .gitignore
 ```
 
-- [ ] Dump schema, data and roles:
+- [ ] Dump the whole schema, and the data of the schemas that hold user data:
 
 ```bash
-npx supabase db dump --linked -f supabase/backups/2026-09-27-schema.sql
-npx supabase db dump --linked --data-only --use-copy -f supabase/backups/2026-09-27-data.sql
-npx supabase db dump --linked --role-only -f supabase/backups/2026-09-27-roles.sql
+pg_dump "$PROD" --schema-only -f supabase/backups/squash-schema.sql
+pg_dump "$PROD" --data-only --schema=public --schema=auth --schema=storage -f supabase/backups/squash-data.sql
 ```
 
-Expected: three non-empty files. Check with `wc -l supabase/backups/*.sql`.
+Expected: two non-empty files. Check with `wc -l supabase/backups/*.sql`.
+- If the data dump stops with "permission denied" on a table in `auth` or `storage`, drop that `--schema=` flag, re-run, and note it.
+- The `public` data is what matters most.
+- Roles are managed by Supabase, so they aren't dumped. `pg_dumpall --roles-only` needs superuser, which Supabase doesn't give you.
 
 - [ ] Also download the latest daily backup from dashboard → Database → Backups, if your plan has them.
 - [ ] Storage files (attachments in the `pks-files` bucket) are **not** in these dumps. The squash doesn't touch storage, so a separate storage backup is optional here.
 
 ### Step 3: Measure the drift between the repo and production
 
-- [ ] Replay the current repo migrations on a local database:
+- [ ] Dump production's `public` schema. This is the reference for every comparison below:
 
 ```bash
-npx supabase start
-npx supabase db reset
+pg_dump "$PROD" --schema-only --schema=public --no-owner -f supabase/backups/prod-public.sql
 ```
 
-- **If this fails:** note the failing migration file and error in `squash-notes.md`. That is exactly the drift the squash removes. Continue; the baseline comes from production, not from these files.
-- [ ] If it succeeded, diff the local database (repo history) against production:
+- [ ] Replay the current repo history locally, without the new `20260927…` files, and compare it with production:
 
 ```bash
-npx supabase db diff --linked --schema public,storage -f squash-drift
+mkdir -p ../pks-pending && mv supabase/migrations/20260927*.sql ../pks-pending/ 2>/dev/null || true
+bash supabase/local-test/run.sh --build-only
+bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 ```
 
-- The file lands in `supabase/migrations/…_squash-drift.sql`. **Read it, then delete it**; it is information, not a migration.
-- Every statement in it is a place where production differs from the repo, for example a policy or function edited in the SQL editor.
-- Production is the source of truth, and the baseline captures it. Write anything surprising in `squash-notes.md`.
+- **If `run.sh` fails:** note the failing migration file and error in `squash-notes.md`. That is exactly the drift the squash removes. Continue; the baseline comes from production, not from these files.
+- **If the compare reports differences:** read `schema-diff.txt`. Lines starting with `-` exist only in production; `+` exist only in the repo history. Each one is a place where production differs from the repo, for example a policy edited in the SQL editor. Production is the source of truth, and the baseline captures it. Copy anything surprising into `squash-notes.md`, then delete `schema-diff.txt`.
+
+Leave the `20260927…` files in `../pks-pending` until Step 5 says to restore them.
 
 ### Step 4: Create the baseline from production
 
-- [ ] Dump the `public` schema from production as the baseline. The timestamp sorts after every old migration and before −1B1's `20260927000001`:
+- [ ] Copy production's `public` dump into place as the baseline, then clean it:
 
 ```bash
-npx supabase db dump --linked --schema public -f supabase/migrations/20260926235959_baseline.sql
+cp supabase/backups/prod-public.sql supabase/migrations/20260926235959_baseline.sql
+bash supabase/local-test/clean-baseline.sh supabase/migrations/20260926235959_baseline.sql
 ```
 
-- [ ] **Append what `--schema public` leaves out.** These objects live in the managed `auth` and `storage` schemas and would otherwise be lost on a fresh `db reset`. Append the block below to the end of `supabase/migrations/20260926235959_baseline.sql`. Each part is copied from the named historical migration, so check it against the Step 2 schema dump before saving.
+The timestamp sorts after every old migration and before −1B1's `20260927000001`.
+
+`clean-baseline.sh` does two things.
+
+**It removes lines that break a Supabase migration:**
+- `\restrict` / `\unrestrict` (psql-only; `supabase db push` rejects them);
+- `SET transaction_timeout` (fails on Postgres 15);
+- the empty `search_path` setting (would leak into the `20260927…` migrations that run after it);
+- `CREATE SCHEMA public`;
+- Supabase's own `supabase_admin` default privileges.
+
+**It adds a reset of default privileges at the top.** Without it, a fresh replay would re-grant what production revoked, for example `anon` EXECUTE on `resolve_user_id_by_email` and reads on `user_ai_providers`. pg_dump writes permissions as if PostgreSQL's built-in defaults applied, but every Supabase database grants new objects to `anon`/`authenticated`/`service_role`. The dump's last lines restore production's defaults.
+
+Expected: `Cleaned …` and no `WARNING`.
+
+- [ ] **Append what `--schema=public` leaves out.** These objects live in the managed `auth` and `storage` schemas and would otherwise be missing from a fresh replay. Append this block to the end of `supabase/migrations/20260926235959_baseline.sql`. Each part is copied from the named historical migration.
 
 ```sql
 -- ---------------------------------------------------------------------------
--- Objects outside the public schema (not included by `db dump --schema public`)
+-- Objects outside the public schema (not included by `pg_dump --schema=public`)
 -- ---------------------------------------------------------------------------
 
 -- auth.users triggers (from 20250212000001_phase1_users.sql and 20260926000001 §4)
@@ -140,14 +192,24 @@ CREATE POLICY "pks-files delete own" ON storage.objects FOR DELETE TO authentica
   USING (bucket_id = 'pks-files' AND (storage.foldername(name))[1] = (auth.uid())::text);
 ```
 
-- [ ] **Cross-check the appended block against production.** In the Step 2 schema dump, run `grep -n "ON auth.users\|ON storage.objects" supabase/backups/2026-09-27-schema.sql`.
-  - If production has an **extra** trigger or storage policy that isn't in the block, add it.
-  - If a policy's text differs, use production's text.
-- [ ] Check the baseline's header. Remove any `CREATE SCHEMA public` / `ALTER SCHEMA public OWNER` lines if `db reset` complains in Step 5. The public schema already exists in a fresh Supabase database.
+- [ ] **Cross-check that block against production.** List production's triggers on `auth.users` and its policies on `storage.objects`:
 
-### Step 5: Archive the old migrations and replay the baseline locally
+```bash
+psql "$PROD" -X -At \
+  -c "select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal order by 1" \
+  -c "select policyname || ' | ' || cmd || ' | ' || coalesce(qual, '') || ' | ' || coalesce(with_check, '') from pg_policies where schemaname = 'storage' and tablename = 'objects' order by 1" \
+  > supabase/backups/prod-extras.txt
+cat supabase/backups/prod-extras.txt
+```
 
-- [ ] Move the history out of the CLI's path (kept for reference, never applied again):
+Expected: the triggers `on_auth_user_created` and `on_auth_user_email_changed`, and the three `pks-files …` policies.
+- If production has an **extra** trigger or storage policy, add it to the block.
+- If a policy's condition differs, use production's text.
+- Ignore triggers and policies that Supabase itself manages, if any show up. Note them in `squash-notes.md`.
+
+### Step 5: Archive the old migrations and prove the baseline equals production
+
+- [ ] Move the history out of the migration path. It is kept for reference and never applied again:
 
 ```bash
 mkdir -p supabase/migrations_archive
@@ -159,42 +221,43 @@ git mv supabase/migrations/20260926000001_security_sharing_and_privileges.sql \
 ls supabase/migrations
 ```
 
-Expected: `20260926235959_baseline.sql`, plus any −1B1/−1B2 migrations (`20260927…`) if their code is already merged.
+Expected: only `20260926235959_baseline.sql`, because the `20260927…` files are still in `../pks-pending`.
 
-- [ ] Replay from scratch:
+- [ ] **Prove the baseline equals production.** Replay the baseline alone and compare:
 
 ```bash
-npx supabase db reset
+bash supabase/local-test/run.sh --build-only
+bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 ```
 
-Expected: success. If it fails, read the error. Common fixes:
-- a statement referencing a role or extension that production has but local doesn't: add `CREATE EXTENSION IF NOT EXISTS <name> WITH SCHEMA extensions;` at the top of the baseline;
-- the `CREATE SCHEMA public` line from Step 4.
+Expected: `Built pks_test.`, then **`No schema differences.`**
 
-Fix and re-run until it passes.
-
-- [ ] If the −1B1 test harness exists, run the tests:
+- If the replay fails, read the error and fix the baseline. A statement may reference an extension production has, in which case you add `CREATE EXTENSION IF NOT EXISTS <name> WITH SCHEMA extensions;` at the top of the baseline. Or it may be a role the local test server lacks; ask for help, since the test stand-in may need that role.
+- If the compare shows differences, the baseline is incomplete. Fix the baseline file and repeat. **Don't continue until it says `No schema differences.`** Permission lines (`GRANT`/`REVOKE`) are not noise: they are real access differences.
+- [ ] Check the auth and storage extras in the replayed database against production:
 
 ```bash
-npx supabase test db
+psql -h localhost -p 54329 -U postgres -d pks_test -X -At \
+  -c "select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal order by 1" \
+  -c "select policyname || ' | ' || cmd || ' | ' || coalesce(qual, '') || ' | ' || coalesce(with_check, '') from pg_policies where schemaname = 'storage' and tablename = 'objects' order by 1" \
+  | diff supabase/backups/prod-extras.txt - && echo "extras match"
+```
+
+Expected: `extras match`. Differences in ignored Supabase-managed items, noted in Step 4, are fine.
+
+- [ ] Put the pending migrations back and run the full test suite on the baseline:
+
+```bash
+mv ../pks-pending/*.sql supabase/migrations/ 2>/dev/null || true
+rmdir ../pks-pending 2>/dev/null || true
+bash supabase/local-test/run.sh
 ```
 
 Expected: `All tests successful.`
 
-- [ ] **Prove the baseline equals production.** Temporarily move any `20260927…` migrations aside, so only the baseline is compared:
-
-```bash
-mkdir -p /tmp/pks-pending && mv supabase/migrations/20260927*.sql /tmp/pks-pending/ 2>/dev/null || true
-npx supabase db reset
-npx supabase db diff --linked --schema public,storage
-mv /tmp/pks-pending/*.sql supabase/migrations/ 2>/dev/null || true
-```
-
-Expected: **"No schema changes found"**, or only harmless noise such as ownership or grant ordering. Any real difference (a missing policy, a different function body) means the baseline is incomplete. Fix it in the baseline file and repeat this check. **Don't continue until the diff is empty.**
-
 ### Step 6: Repair the production migration history
 
-This step only edits `supabase_migrations.schema_migrations` in production. It tells the CLI that the old versions are gone and the baseline is already applied.
+This step only edits `supabase_migrations.schema_migrations` in production. It tells the CLI that the old versions are gone and that the baseline is already applied. No Docker is needed.
 
 - [ ] Mark every archived version as reverted:
 
@@ -203,7 +266,7 @@ ls supabase/migrations_archive/*.sql | xargs -n1 basename | cut -d_ -f1 \
   | xargs npx supabase migration repair --linked --status reverted
 ```
 
-- [ ] Mark the baseline as applied (production already has this schema):
+- [ ] Mark the baseline as applied, since production already has this schema:
 
 ```bash
 npx supabase migration repair --linked --status applied 20260926235959
@@ -213,7 +276,7 @@ npx supabase migration repair --linked --status applied 20260926235959
   1. They are already inside the baseline dump.
   2. Move those files to `supabase/migrations_archive/` as well.
   3. Mark them `--status reverted` with the command above.
-  4. Re-run Step 5's replay and diff.
+  4. Re-run Step 5's replay and compare.
 
 - [ ] Verify:
 
@@ -235,15 +298,15 @@ Expected:
 git rm supabase/scripts/repair-migration-history.ps1 supabase/scripts/apply-link-edges-only.sql
 ```
 
-- [ ] Commit (backups and notes are not committed):
+- [ ] Commit. Backups and notes are not committed:
 
 ```bash
 git add .gitignore supabase/migrations supabase/migrations_archive
 git commit -m "chore(db): squash 46 historical migrations into a verified production baseline"
 ```
 
-- [ ] Push the branch and open a PR. CI's `database` job (from −1B1 Task 10, if merged) must be green.
-- [ ] Keep `supabase/backups/` somewhere safe outside the repo for at least 30 days.
+- [ ] Push the branch and open a PR. CI's `database` job must be green: it replays the baseline and runs every test on the real Supabase stack.
+- [ ] Keep `supabase/backups/` somewhere safe outside the repo for at least 30 days, then delete the password line from `pgpass.conf` if you don't need it any more.
 
 ### Step 8: Unfreeze
 
@@ -267,7 +330,7 @@ If anything in production looks wrong afterwards, restore from the Step 2 dumps.
 
 ## Done when
 
-- `npx supabase db reset` replays cleanly from the baseline.
-- `npx supabase db diff --linked --schema public,storage` shows no changes, with only the baseline in `supabase/migrations`.
+- `bash supabase/local-test/run.sh --build-only` replays cleanly from the baseline.
+- `compare-schema.sh` prints `No schema differences.` against production's `public` dump, with only the baseline in `supabase/migrations`, and the auth/storage extras match.
 - `migration list --linked` shows the baseline in Local and Remote, and no archived versions.
-- The −1B1 test suite (if present) passes on the baseline.
+- The full test suite passes locally on the baseline, and CI's `database` job is green.

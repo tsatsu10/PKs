@@ -1788,10 +1788,27 @@ git commit -m "chore(db): drop export/import bookkeeping, legacy resolver and pu
 
 Nothing is applied to production inside a task. This is the checklist the owner runs.
 
-- [ ] **Step 1: Back up.** Supabase dashboard → Database → Backups: download the latest. Or run `npx supabase db dump --linked -f backup.sql` and `npx supabase db dump --linked --data-only -f backup-data.sql`.
-- [ ] **Step 2: Check for drift.** Run `npx supabase db diff --linked`.
-  - Expected: only the new −1B1 migrations differ.
-  - If other differences show up, stop and do −1C (squash) first.
+No Docker is needed. Set `PROD` (the Session pooler connection, password in pgpass) as in the −1C runbook's Prerequisites.
+
+- [ ] **Step 1: Back up.** Supabase dashboard → Database → Backups: download the latest. Also run:
+
+  ```bash
+  pg_dump "$PROD" --schema-only -f supabase/backups/pre-1b1-schema.sql
+  pg_dump "$PROD" --data-only --schema=public --schema=auth --schema=storage -f supabase/backups/pre-1b1-data.sql
+  ```
+
+- [ ] **Step 2: Check for drift.** −1C must be done first. Production must still equal the baseline:
+
+  ```bash
+  pg_dump "$PROD" --schema-only --schema=public --no-owner -f supabase/backups/prod-public.sql
+  mkdir -p ../pks-pending && mv supabase/migrations/20260927*.sql ../pks-pending/
+  bash supabase/local-test/run.sh --build-only
+  bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
+  mv ../pks-pending/*.sql supabase/migrations/ && rmdir ../pks-pending
+  ```
+
+  - Expected: `No schema differences.`
+  - If differences show up, someone changed production since the squash. Stop and reconcile them first.
 - [ ] **Step 3: Apply.** Run `npx supabase db push` (link first with `npx supabase link --project-ref <ref>`). Then deploy the frontend. Never pass `--include-seed`: `supabase/seed.sql` holds test-only helpers (e.g. `tests.create_user`) that must not reach production.
 - [ ] **Step 4: Check the advisors.** Supabase dashboard → Advisors → Security and Performance: no new errors. Fix any "auth_rls_initplan" or "function_search_path_mutable" warnings the rewrite missed.
 - [ ] **Step 5: Schedule Task 11** two weeks after the frontend deploy.
