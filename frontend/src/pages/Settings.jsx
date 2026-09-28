@@ -177,7 +177,7 @@ export default function Settings() {
       const domain = await createDomain(name);
       setNewDomain('');
       if (domains.some((d) => d.id === domain.id)) {
-        addToast('success', `Domain "${domain.name}" already exists`);
+        addToast('info', `Domain "${domain.name}" already exists`);
       } else {
         setDomains((prev) => [...prev, domain].sort((a, b) => a.name.localeCompare(b.name)));
       }
@@ -198,7 +198,7 @@ export default function Settings() {
       const tag = await createTag(name);
       setNewTag('');
       if (tags.some((t) => t.id === tag.id)) {
-        addToast('success', `Tag "${tag.name}" already exists`);
+        addToast('info', `Tag "${tag.name}" already exists`);
       } else {
         setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
       }

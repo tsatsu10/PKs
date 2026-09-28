@@ -76,6 +76,7 @@ export default function ObjectDetail() {
   const [runPromptSource, setRunPromptSource] = useState('bank');
   const [runPromptEditFromBank, setRunPromptEditFromBank] = useState(false);
   const [runOutput, setRunOutput] = useState('');
+  const [lastRun, setLastRun] = useState(null);
   const [showRunPanel, setShowRunPanel] = useState(false);
   const [savingRun, setSavingRun] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -608,28 +609,13 @@ export default function ObjectDetail() {
     }
     setError('');
     setGeneratingAI(true);
-    let runId = null;
     try {
-      const { data: runRow, error: insertErr } = await supabase
-        .from('prompt_runs')
-        .insert({
-          user_id: user.id,
-          prompt_template_id: runTemplateId || null,
-          knowledge_object_id: object.id,
-          status: 'running',
-          output: null,
-        })
-        .select('id')
-        .single();
-      if (insertErr) throw insertErr;
-      runId = runRow?.id;
-
       const { provider, userProviderId } = resolveRunSelection(runAiProviderId, aiProviders);
       const { data, error: fnErr } = await supabase.functions.invoke('run-prompt', {
         body: {
           promptText: promptToUse,
-          objectTitle: object.title,
-          objectContent: object.content || '',
+          object_id: object.id,
+          prompt_template_id: runTemplateId || undefined,
           provider,
           model: modelForProvider(provider, runAiModel || DEFAULT_AI_MODEL),
           user_provider_id: userProviderId || undefined,
@@ -647,6 +633,9 @@ export default function ObjectDetail() {
                 ? JSON.parse(await ctx.text())
                 : null;
             if (body && typeof body === 'object') {
+              if (body.run) {
+                setPromptRuns((prev) => [{ id: body.run.id, prompt_template_id: runTemplateId || null, status: 'failed', output: body.error || null, created_at: body.run.created_at }, ...prev]);
+              }
               if (body.code === 'RATE_LIMITED') {
                 const sec = typeof body.retryAfter === 'number' ? body.retryAfter : 60;
                 msg = `Too many requests. Try again in ${sec} second${sec !== 1 ? 's' : ''}.`;
@@ -671,15 +660,15 @@ export default function ObjectDetail() {
       if (data?.error) throw new Error(data.hint || data.error);
       const outputText = data?.output ?? '';
       setRunOutput(outputText);
-      if (runId) {
-        await supabase.from('prompt_runs').update({ status: 'completed', output: outputText }).eq('id', runId);
+      setLastRun(data?.run ?? null);
+      if (data?.run) {
+        setPromptRuns((prev) => [{ id: data.run.id, prompt_template_id: runTemplateId || null, status: 'completed', output: outputText, created_at: data.run.created_at }, ...prev]);
       }
+      if (data?.truncated) addToast('info', 'This object is long, so only its first 50,000 characters were sent to the AI.');
+      if (data?.output_truncated) addToast('info', 'The AI hit its length limit, so this answer may be cut off.');
     } catch (err) {
       const msg = getErrorMessage(err, 'AI generation failed.');
       setError(msg);
-      if (runId) {
-        await supabase.from('prompt_runs').update({ status: 'failed', output: msg }).eq('id', runId);
-      }
     } finally {
       setGeneratingAI(false);
     }
@@ -690,17 +679,9 @@ export default function ObjectDetail() {
     setError('');
     setSavingRun(true);
     try {
-      const { data, error: err } = await supabase.from('prompt_runs').insert({
-        user_id: user.id,
-        prompt_template_id: runTemplateId || null,
-        knowledge_object_id: object.id,
-        status: 'completed',
-        output: runOutput.trim() || null,
-      }).select('id, created_at').single();
-      if (err) throw err;
-      setPromptRuns((prev) => [{ id: data.id, prompt_template_id: runTemplateId || null, status: 'completed', output: runOutput.trim(), created_at: data.created_at }, ...prev]);
       setShowRunPanel(false);
       setRunOutput('');
+      setLastRun(null);
       setRunPromptText('');
       setRunTemplateId('');
       createNotification(user.id, 'prompt_completed', 'Prompt run saved', `Run saved for "${object.title.slice(0, 50)}${object.title.length > 50 ? '…' : ''}"`, { type: 'knowledge_object', id: object.id });
@@ -720,30 +701,17 @@ export default function ObjectDetail() {
     try {
       const template = promptTemplates.find((t) => t.id === runTemplateId);
       const title = template ? `${template.name} — ${object.title}` : `Prompt output — ${object.title}`;
-      const { data: newObj, error: objErr } = await supabase.from('knowledge_objects').insert({
-        user_id: user.id,
-        type: 'prompt',
-        title: title.slice(0, 500),
-        content: runOutput.trim(),
-        summary: null,
-      }).select('id').single();
-      if (objErr) throw objErr;
-      const { error: linkErr } = await supabase.from('link_edges').insert({
-        from_object_id: object.id,
-        to_object_id: newObj.id,
-        relationship_type: 'references',
+      if (!lastRun?.id) throw new Error('Generate an output first.');
+      const { data: newId, error: saveErr } = await supabase.rpc('save_prompt_output_as_object', {
+        p_run_id: lastRun.id,
+        p_title: title,
+        p_content: runOutput.trim(),
       });
-      if (linkErr) throw linkErr;
-      const { data: runData, error: runErr } = await supabase.from('prompt_runs').insert({
-        user_id: user.id,
-        prompt_template_id: runTemplateId || null,
-        knowledge_object_id: object.id,
-        status: 'completed',
-        output: runOutput.trim(),
-      }).select('id, created_at').single();
-      if (!runErr) setPromptRuns((prev) => [{ id: runData.id, prompt_template_id: runTemplateId || null, status: 'completed', output: runOutput.trim(), created_at: runData.created_at }, ...prev]);
+      if (saveErr) throw saveErr;
+      const newObj = { id: newId };
       setShowRunPanel(false);
       setRunOutput('');
+      setLastRun(null);
       setRunTemplateId('');
       setRunPromptText('');
       createNotification(user.id, 'prompt_completed', 'Prompt saved as new object', `Created "${title.slice(0, 60)}${title.length > 60 ? '…' : ''}"`, { type: 'knowledge_object', id: newObj.id });
