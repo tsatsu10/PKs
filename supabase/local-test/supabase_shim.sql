@@ -32,7 +32,8 @@ $$;
 SET search_path = "$user", public, extensions;
 
 -- Supabase's default privileges in public (RLS, not missing grants, decides access)
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+-- postgres first, as on Supabase, so a dumped ACL lists the roles in production's order.
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public

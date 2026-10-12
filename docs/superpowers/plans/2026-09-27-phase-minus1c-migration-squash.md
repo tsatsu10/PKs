@@ -117,10 +117,10 @@ Expected: two non-empty files. Check with `wc -l supabase/backups/*.sql`.
 pg_dump "$PROD" --schema-only --schema=public --no-owner -f supabase/backups/prod-public.sql
 ```
 
-- [ ] Replay the current repo history locally, without the new `20260927…` files, and compare it with production:
+- [ ] Replay the current repo history locally, without the new −1B1 (`20260927…`) and −1B2 (`20260928…`) files, and compare it with production:
 
 ```bash
-mkdir -p ../pks-pending && mv supabase/migrations/20260927*.sql ../pks-pending/ 2>/dev/null || true
+mkdir -p ../pks-pending && mv supabase/migrations/202609{27,28}*.sql ../pks-pending/ 2>/dev/null || true
 bash supabase/local-test/run.sh --build-only
 bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 ```
@@ -128,7 +128,16 @@ bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 - **If `run.sh` fails:** note the failing migration file and error in `squash-notes.md`. That is exactly the drift the squash removes. Continue; the baseline comes from production, not from these files.
 - **If the compare reports differences:** read `schema-diff.txt`. Lines starting with `-` exist only in production; `+` exist only in the repo history. Each one is a place where production differs from the repo, for example a policy edited in the SQL editor. Production is the source of truth, and the baseline captures it. Copy anything surprising into `squash-notes.md`, then delete `schema-diff.txt`.
 
-Leave the `20260927…` files in `../pks-pending` until Step 5 says to restore them.
+**Drift already found (2026-10-12, catalog comparison through the read-only Supabase MCP).** Expect these in `schema-diff.txt`; all other categories matched:
+
+| Object | Production | Repo history | Handling |
+|---|---|---|---|
+| `import_register()` | No ownership check (`20250309100004` recorded as applied but never ran) | Ownership check | Keep production's in the baseline; `20261012000001_drop_import_rpcs.sql` drops the unused import RPCs |
+| `suggest_tags_for_object()` / `_fallback()` | No `caller_can_read` guard (`20250309100003` likewise) | Guard | Keep production's in the baseline; `20260927000000_restore_suggest_tags_guard.sql` restores the guard |
+| `link_edges` "Users can insert links between own objects" | Owner of both ends only (`20250518000001` likewise) | Shared editors may link from a shared object | Keep production's in the baseline; −1B1's `20260927000009` redefines it |
+| `rls_auto_enable()` + event trigger `ensure_rls` | Present (likely the dashboard's automatic-RLS setting) | Absent | Keep the function in the baseline so Step 5's comparison is clean; `pg_dump --schema=public` leaves out the event trigger, which is fine for replays |
+
+Leave the `20260927…` and `20260928…` files in `../pks-pending` until Step 5 says to restore them.
 
 ### Step 4: Create the baseline from production
 
@@ -139,7 +148,7 @@ cp supabase/backups/prod-public.sql supabase/migrations/20260926235959_baseline.
 bash supabase/local-test/clean-baseline.sh supabase/migrations/20260926235959_baseline.sql
 ```
 
-The timestamp sorts after every old migration and before −1B1's `20260927000001`.
+The timestamp sorts after every old migration and before −1B1's `20260927000001` (and so before −1B2's `20260928…`).
 
 `clean-baseline.sh` does two things.
 
@@ -221,7 +230,7 @@ git mv supabase/migrations/20260926000001_security_sharing_and_privileges.sql \
 ls supabase/migrations
 ```
 
-Expected: only `20260926235959_baseline.sql`, because the `20260927…` files are still in `../pks-pending`.
+Expected: only `20260926235959_baseline.sql`, because the `20260927…` and `20260928…` files are still in `../pks-pending`.
 
 - [ ] **Prove the baseline equals production.** Replay the baseline alone and compare:
 
@@ -272,7 +281,7 @@ ls supabase/migrations_archive/*.sql | xargs -n1 basename | cut -d_ -f1 \
 npx supabase migration repair --linked --status applied 20260926235959
 ```
 
-- [ ] **"Already applied" variant.** If any `20260927…` migrations were already pushed to production before this runbook:
+- [ ] **"Already applied" variant.** If any `20260927…` or `20260928…` migrations were already pushed to production before this runbook (check `squash-history-before.txt`):
   1. They are already inside the baseline dump.
   2. Move those files to `supabase/migrations_archive/` as well.
   3. Mark them `--status reverted` with the command above.
@@ -288,7 +297,7 @@ cat squash-history-after.txt
 Expected:
 - The baseline shows in both the Local and Remote columns.
 - No archived versions remain.
-- Any pending `20260927…` migrations show as Local only, ready for `db push` later.
+- Any pending `20260927…` / `20260928…` migrations show as Local only, ready for `db push` later.
 
 ### Step 7: Clean up and commit
 

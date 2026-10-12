@@ -261,7 +261,6 @@ export default function Integrations() {
           <li><strong>Object CRUD:</strong> <code>knowledge_objects</code> table (insert, select, update, delete).</li>
           <li><strong>Search:</strong> RPC <code>search_knowledge_objects</code> (query, filters, pagination).</li>
           <li><strong>Export:</strong> Build TXT/MD in the app or replicate the export logic client-side.</li>
-          <li><strong>Import dedupe:</strong> Before creating an object from an import, call <code>import_get_existing_object(integration_id, source_identifier)</code>; if it returns an id, update that object instead of creating. After creating, call <code>import_register(integration_id, source_identifier, object_id, payload)</code>.</li>
         </ul>
       </section>
     </div>
