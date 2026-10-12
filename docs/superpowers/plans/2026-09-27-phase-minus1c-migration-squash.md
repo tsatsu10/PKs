@@ -128,6 +128,15 @@ bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 - **If `run.sh` fails:** note the failing migration file and error in `squash-notes.md`. That is exactly the drift the squash removes. Continue; the baseline comes from production, not from these files.
 - **If the compare reports differences:** read `schema-diff.txt`. Lines starting with `-` exist only in production; `+` exist only in the repo history. Each one is a place where production differs from the repo, for example a policy edited in the SQL editor. Production is the source of truth, and the baseline captures it. Copy anything surprising into `squash-notes.md`, then delete `schema-diff.txt`.
 
+**Drift already found (2026-10-12, catalog comparison through the read-only Supabase MCP).** Expect these in `schema-diff.txt`; all other categories matched:
+
+| Object | Production | Repo history | Handling |
+|---|---|---|---|
+| `import_register()` | No ownership check (`20250309100004` recorded as applied but never ran) | Ownership check | Keep production's in the baseline; −1B1 drops the unused import RPCs |
+| `suggest_tags_for_object()` / `_fallback()` | No `caller_can_read` guard (`20250309100003` likewise) | Guard | Keep production's in the baseline; `20260927000000_restore_suggest_tags_guard.sql` restores the guard |
+| `link_edges` "Users can insert links between own objects" | Owner of both ends only (`20250518000001` likewise) | Shared editors may link from a shared object | Keep production's in the baseline; −1B1's `20260927000009` redefines it |
+| `rls_auto_enable()` + event trigger `ensure_rls` | Present (likely the dashboard's automatic-RLS setting) | Absent | Keep the function in the baseline so Step 5's comparison is clean; `pg_dump --schema=public` leaves out the event trigger, which is fine for replays |
+
 Leave the `20260927…` and `20260928…` files in `../pks-pending` until Step 5 says to restore them.
 
 ### Step 4: Create the baseline from production
