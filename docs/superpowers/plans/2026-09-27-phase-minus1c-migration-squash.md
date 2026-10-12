@@ -132,7 +132,7 @@ bash supabase/local-test/compare-schema.sh supabase/backups/prod-public.sql
 
 | Object | Production | Repo history | Handling |
 |---|---|---|---|
-| `import_register()` | No ownership check (`20250309100004` recorded as applied but never ran) | Ownership check | Keep production's in the baseline; −1B1 drops the unused import RPCs |
+| `import_register()` | No ownership check (`20250309100004` recorded as applied but never ran) | Ownership check | Keep production's in the baseline; `20261012000001_drop_import_rpcs.sql` drops the unused import RPCs |
 | `suggest_tags_for_object()` / `_fallback()` | No `caller_can_read` guard (`20250309100003` likewise) | Guard | Keep production's in the baseline; `20260927000000_restore_suggest_tags_guard.sql` restores the guard |
 | `link_edges` "Users can insert links between own objects" | Owner of both ends only (`20250518000001` likewise) | Shared editors may link from a shared object | Keep production's in the baseline; −1B1's `20260927000009` redefines it |
 | `rls_auto_enable()` + event trigger `ensure_rls` | Present (likely the dashboard's automatic-RLS setting) | Absent | Keep the function in the baseline so Step 5's comparison is clean; `pg_dump --schema=public` leaves out the event trigger, which is fine for replays |
