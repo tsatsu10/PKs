@@ -162,7 +162,7 @@ export default function Integrations() {
       <header className="integrations-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
         <h1>Integrations</h1>
-        <p className="integrations-desc">Manage integrations for imports and API. Enable or disable each one. Use import_items and RPCs for deduplication when importing.</p>
+        <p className="integrations-desc">Send webhooks to your own services when you create an object, finish a prompt run or export an object. Enable or disable each one.</p>
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}
 

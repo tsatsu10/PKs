@@ -31,6 +31,9 @@ export const PROVIDERS: Record<Provider, {
   },
 };
 
+/** Provider for server-key runs when the request names none (owner decision 2026-10-13: Claude). */
+export const DEFAULT_SERVER_PROVIDER: Provider = "anthropic";
+
 export function isProvider(v: unknown): v is Provider {
   return v === "deepseek" || v === "anthropic";
 }

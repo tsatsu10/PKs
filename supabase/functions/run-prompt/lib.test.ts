@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import {
   buildUserMessage,
+  DEFAULT_SERVER_PROVIDER,
   completionOutcome,
   EMPTY_OUTPUT_BODY,
   failedRunOutput,
@@ -116,4 +117,9 @@ Deno.test("upstreamFailure: other errors are 502 UPSTREAM_ERROR, generic on the 
   const parse = upstreamFailure(new SyntaxError("Unexpected token < in JSON"), false, "DeepSeek");
   assertEquals(parse.body.error, "DeepSeek request failed: Unexpected token < in JSON");
   assertEquals(upstreamFailure("weird", false, "Claude").body.error, "Claude request failed: weird");
+});
+
+Deno.test("server-key runs default to Claude", () => {
+  assertEquals(DEFAULT_SERVER_PROVIDER, "anthropic");
+  assertEquals(pickModel(DEFAULT_SERVER_PROVIDER, "claude-opus-5", true), "claude-sonnet-5");
 });
