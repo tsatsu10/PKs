@@ -20,7 +20,7 @@ Optimistic mutations, client-generated UUIDs, autosave and its indicator, the `c
 ## 1. Query client and persistence
 
 **Query client** (`src/data/queryClient.ts`):
-- `staleTime` 30 s, `gcTime` 24 h, `refetchOnWindowFocus: true` (off for `ObjectDetail`'s object query, see below).
+- `staleTime` 30 s, `gcTime` 7 days (must be at least the persister's `maxAge`, or saved entries expire with memory), `refetchOnWindowFocus: true` (off for `ObjectDetail`'s object query, see below).
 - `networkMode: 'online'` (the default): queries pause while offline and resume on reconnect.
 - Retry is decided by `classifyError()` (section 3): `permission`, `validation`, `not_found` and `conflict` never retry; `network` and `server` retry up to 2 times with backoff; `auth` (expired JWT) retries once, because supabase-js may be refreshing the token.
 - Reads that may legitimately find nothing use `.maybeSingle()` and return `null`; "not found" is an empty state, not an error.
@@ -28,7 +28,7 @@ Optimistic mutations, client-generated UUIDs, autosave and its indicator, the `c
 **Persistence:**
 - Packages: `@tanstack/react-query`, `@tanstack/react-query-persist-client`, `@tanstack/query-async-storage-persister`, `idb-keyval`.
 - Stored in IndexedDB under `pks-query-cache:<userId>`. `buster` is a `CACHE_SCHEMA_VERSION` constant, bumped only when a persisted data shape changes (not on every deploy). `maxAge` 7 days.
-- Persisted: successful queries whose key root is one of `objects`, `object` (which includes every `ObjectDetail` panel, backlinks among them), `taxonomy`, `templates`, `prompts`. Never persisted: search results, notifications, audit logs, errored or pending queries.
+- Persisted: successful queries whose key root is one of `objects`, `object` (every `ObjectDetail` panel except version history, which can hold 50 full copies), `taxonomy`, `templates`, `prompts`. Never persisted: search results, notifications, audit logs, errored or pending queries.
 - `PersistQueryClientProvider` sits inside `AuthProvider` and is enabled once a session user id exists. On an offline boot the id comes from the local session (`verifyAndEnrichUser` returns `undefined` when it can't reach the server). Accepted: a revoked session reloaded on the same device can briefly show data already stored on that device before verification fails.
 
 **Session lifecycle:**

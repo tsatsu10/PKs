@@ -26,11 +26,12 @@
   - Frontend checks: `npm run lint`, `npm run typecheck` (from Task 1), `npm test`, `npm run build`, `npm run check:bundle`.
   - DB tests: run `supabase/local-test/run.sh` locally (private PG18 on :54329, no Docker). CI runs `supabase test db` on the real stack.
 - **Versions (exact ranges):** `@tanstack/react-query@^5.104.2`, `@tanstack/react-query-persist-client@^5.104.2`, `@tanstack/query-async-storage-persister@^5.104.2`, `idb-keyval@^6.3.0`, `typescript@~6.0.3` (**not 7.x**: `typescript-eslint` 8.71 requires `>=4.8.4 <6.1.0`), `typescript-eslint@^8.71.2`, `fake-indexeddb@^6.2.5` (dev).
-- **Query defaults:** `staleTime` 30 s, `gcTime` 24 h, `refetchOnWindowFocus: true` (off for `ObjectDetail`'s object query and Journal's day entry), `networkMode: 'online'`.
-- **Persistence:** IndexedDB key `pks-query-cache:<userId>`, `buster` = `CACHE_SCHEMA_VERSION` (`'1'`), `maxAge` 7 days. Persisted key roots: `objects`, `object`, `taxonomy`, `templates`, `prompts`. Only queries with `status === 'success'`.
+- **Query defaults:** `staleTime` 30 s, `gcTime` 7 days (= persistence `maxAge`; TanStack drops a query from the saved cache once it's garbage-collected from memory, so a shorter `gcTime` would silently cap the saved cache at that length), `refetchOnWindowFocus: true` (off for `ObjectDetail`'s object query and Journal's day entry), `networkMode: 'online'`.
+- **Persistence:** IndexedDB key `pks-query-cache:<userId>`, `buster` = `CACHE_SCHEMA_VERSION` (`'1'`), `maxAge` 7 days. Persisted key roots: `objects`, `object` (except `['object', id, 'versions']`), `taxonomy`, `templates`, `prompts`. Only queries with `status === 'success'`.
 - **Retries:** `network` and `server` retry up to 2 times; `auth` once; every other kind never.
 - **Reported kinds:** `server`, `permission`, and `unknown` when the error is not an app-authored plain `Error`. Limits: 60 s per fingerprint, 20 per session, nothing while offline; server side 30 per user per hour, 5,000 per day globally, 30-day retention; field caps message 500, stack 4096, route 300, app version 40, user agent 200, fingerprint 64.
 - **No `select('*')`** anywhere in `src/data`. Every select lists its columns.
+- **Every write refreshes what it changed.** Writes stay imperative, so the cache only learns about them through invalidation. After a successful write that creates, deletes, restores or edits knowledge objects (or their tags, domains, links or files), call `invalidateObjectLists()`; for one object's panels also call `invalidateObject(id)` or the matching setter. Taxonomy, prompts, templates, integrations, notifications, paste bin, journal and AI providers each have their own `invalidate*` helper, and the write that changes them calls it. A write that skips this leaves the dashboard showing old data for up to 30 s, and longer for keys nothing refetches.
 - **Owner filters stay.** Every read that filtered `.eq('user_id', …)` keeps that filter: RLS also returns rows visible through sharing, and these pages show the user's own data. Hooks therefore take `userId: string | null` and are enabled only when it is set. The cache is per user, so keys still omit the id.
 - **`.maybeSingle()`** for reads that may find nothing; never `.single()` in a read.
 - **Key roots never contain the user id** (the cache is cleared on user change), and **pages never build keys by hand**: they call `qk.*` or a named `invalidate*` helper.
@@ -532,6 +533,7 @@ SELECT plan(12);
 
 SELECT tests.create_user('alice');
 SELECT tests.create_user('bob');
+SELECT tests.create_user('carol');
 
 SELECT ok(NOT has_function_privilege('anon',
   'public.report_client_error(text,text,text,text,text,text,text)', 'EXECUTE'), 'anon cannot report');
@@ -563,8 +565,9 @@ SELECT ok(NOT public.report_client_error('server', 'over', NULL, '/', 'v', 'ua',
   'the 31st report in an hour is dropped');
 RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
 
+-- Carol fills the global budget; bob has no reports of his own, so only the global cap can stop him.
 INSERT INTO public.client_errors (user_id, kind, message, fingerprint)
-SELECT tests.uid('bob'), 'server', 'bulk', 'fp' FROM generate_series(1, 5000);
+SELECT tests.uid('carol'), 'server', 'bulk', 'fp' FROM generate_series(1, 5000);
 SELECT tests.act_as('bob');
 SELECT ok(NOT public.report_client_error('server', 'x', NULL, '/', 'v', 'ua', 'fp-b'),
   'the global daily cap drops reports');
@@ -968,7 +971,7 @@ git commit -m "feat(errors): report production errors to client_errors with scru
 
 **Files:**
 - Create: `frontend/src/data/queryClient.ts`, `frontend/src/data/persistence.ts`, `frontend/src/data/QueryProvider.tsx`, `frontend/src/data/persistence.test.tsx`, `frontend/src/test/queryTestUtils.tsx`
-- Modify: `frontend/src/lib/userStorage.js` (`clearUserData`, `claimUserData`), `frontend/src/App.jsx`, `frontend/package.json`
+- Modify: `frontend/src/lib/userStorage.js` (`registerUserDataHooks`, `clearUserData`, `claimUserData`), `frontend/src/lib/userStorage.test.js`, `frontend/src/test/setup.js`, `frontend/src/App.jsx`, `frontend/package.json`
 
 **Interfaces:**
 - Consumes: `classifyError` (Task 2), `reportError` (Task 4), `useAuth()` (`user?.id`).
@@ -979,6 +982,7 @@ git commit -m "feat(errors): report production errors to client_errors with scru
   - `startPersisting(userId: string, client?: QueryClient): Promise<void>` (resolves when restore finished), `stopPersisting(): void`
   - `dropQueryCache(ownerId: string | null, client?: QueryClient): Promise<void>` (explicit logout)
   - `claimQueryCache(userId: string, client?: QueryClient): Promise<void>` (sign-in)
+  - `connectCacheToSession(): () => void`; in `lib/userStorage.js`: `registerUserDataHooks({ onClear, onClaim }): () => void`
   - `<QueryProvider>{children}</QueryProvider>`
   - Test utils: `createTestQueryClient(): QueryClient`, `renderWithClient(ui, client?)`, `wrapperFor(client)`
 
@@ -1057,6 +1061,7 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(q(['search', {}], 'success'))).toBe(false);
     expect(shouldPersistQuery(q(['notifications', 'recent'], 'success'))).toBe(false);
     expect(shouldPersistQuery(q(['object', '1', 'detail'], 'error'))).toBe(false);
+    expect(shouldPersistQuery(q(['object', '1', 'versions'], 'success'))).toBe(false);
   });
 });
 
@@ -1151,7 +1156,8 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        gcTime: 24 * 60 * 60 * 1000,
+        // Must be >= the persister's maxAge (persistence.CACHE_MAX_AGE), or saved entries expire early.
+        gcTime: 7 * 24 * 60 * 60 * 1000,
         retry: shouldRetry,
         refetchOnWindowFocus: true,
         networkMode: 'online',
@@ -1182,9 +1188,13 @@ export const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 export const cacheKey = (userId: string) => `${CACHE_PREFIX}${userId}`;
 
+/** Large and rarely needed instantly: version history holds up to 50 full copies of an object. */
+const NOT_PERSISTED_LEAVES = new Set(['versions']);
+
 export function shouldPersistQuery(query: Query): boolean {
   return query.state.status === 'success'
-    && (PERSISTED_ROOTS as readonly unknown[]).includes(query.queryKey[0]);
+    && (PERSISTED_ROOTS as readonly unknown[]).includes(query.queryKey[0])
+    && !NOT_PERSISTED_LEAVES.has(String(query.queryKey[2]));
 }
 
 let active: { userId: string; enabled: boolean; unsubscribe: () => void } | null = null;
@@ -1253,7 +1263,26 @@ Note for the reviewer: on a fresh page load `lastClaimedUserId` is `null`, so me
 
 - [ ] **Step 7: Hook the lifecycle into `userStorage.js`**
 
-In `frontend/src/lib/userStorage.js`, add `import { dropQueryCache, claimQueryCache } from '../data/persistence';` and change the two functions:
+**Don't import `src/data` from `userStorage.js`.** `persistence.ts` → `queryClient.ts` → `reportError.ts` → `lib/supabase.js`, and `lib/supabase.js` throws when `VITE_SUPABASE_URL` is missing. `userStorage.test.js` and `draftStorage.test.js` import `userStorage.js` without mocking Supabase; they'd still pass locally (because `frontend/.env` exists) and then fail in CI, which has no `.env`. So `userStorage.js` exposes hooks and the data layer registers itself.
+
+In `frontend/src/lib/userStorage.js`, add near the top:
+
+```js
+/**
+ * Per-user stores outside this module (the TanStack Query cache) register here, so this
+ * file stays free of data-layer imports. Hooks must never throw.
+ * @type {{ onClear: (ownerId: string | null) => void, onClaim: (userId: string) => void }[]}
+ */
+const userDataHooks = [];
+
+/** @param {{ onClear: (ownerId: string | null) => void, onClaim: (userId: string) => void }} hooks */
+export function registerUserDataHooks(hooks) {
+  userDataHooks.push(hooks);
+  return () => { userDataHooks.splice(userDataHooks.indexOf(hooks), 1); };
+}
+```
+
+Change the two functions:
 
 ```js
 export function clearUserData() {
@@ -1262,8 +1291,7 @@ export function clearUserData() {
   clearUserLocalData();
   try { sessionStorage.removeItem(DRAFT_OWNER_KEY); } catch (_e) { void _e; }
   removeLocal([DATA_OWNER_KEY]);
-  // Async IndexedDB delete; nothing waits for it because each user only reads their own key.
-  void dropQueryCache(owner);
+  userDataHooks.forEach((h) => h.onClear(owner));
 }
 ```
 
@@ -1274,11 +1302,44 @@ export function claimUserData(userId) {
   writeItem(sessionStorage, DRAFT_OWNER_KEY, userId);
   if (shouldClearForOwner(readItem(localStorage, DATA_OWNER_KEY), userId)) clearUserLocalData();
   writeItem(localStorage, DATA_OWNER_KEY, userId);
-  void claimQueryCache(userId);
+  userDataHooks.forEach((h) => h.onClaim(userId));
 }
 ```
 
-Update the file's header comment to list "the TanStack Query cache (memory + IndexedDB)" among per-user data, with the same expiry rule as drafts. Run `npx vitest run src/lib/userStorage.test.js`; if it imports `userStorage.js` without IndexedDB, add `import 'fake-indexeddb/auto';` at its top.
+At the bottom of `frontend/src/data/persistence.ts`:
+
+```ts
+import { registerUserDataHooks } from '../lib/userStorage';
+
+/** Called once from QueryProvider's module: logout and sign-in drive the cache lifecycle. */
+export function connectCacheToSession(): () => void {
+  return registerUserDataHooks({
+    // Async IndexedDB work; nothing waits for it because each user only reads their own key.
+    onClear: (owner) => { void dropQueryCache(owner).catch(() => undefined); },
+    onClaim: (userId) => { void claimQueryCache(userId).catch(() => undefined); },
+  });
+}
+```
+
+(Move the import to the top of the file with the others.) Update `userStorage.js`'s header comment to list "the TanStack Query cache (memory + IndexedDB, via `registerUserDataHooks`)" among per-user data, with the same expiry rule as drafts.
+
+Add one test to `frontend/src/lib/userStorage.test.js`:
+
+```js
+it('runs registered hooks on clear and claim', () => {
+  const onClear = vi.fn();
+  const onClaim = vi.fn();
+  const unregister = registerUserDataHooks({ onClear, onClaim });
+  localStorage.setItem(DATA_OWNER_KEY, 'u1');
+  clearUserData();
+  claimUserData('u2');
+  unregister();
+  expect(onClear).toHaveBeenCalledWith('u1');
+  expect(onClaim).toHaveBeenCalledWith('u2');
+});
+```
+
+(Add `vi` to its `vitest` import and `registerUserDataHooks`, `DATA_OWNER_KEY` to its `./userStorage` import if missing.) Then add `import 'fake-indexeddb/auto';` as the first line of `frontend/src/test/setup.js`, so any test that reaches `idb-keyval` has an IndexedDB.
 
 - [ ] **Step 8: Provider**
 
@@ -1289,7 +1350,11 @@ import { useEffect, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { queryClient } from './queryClient';
-import { startPersisting, stopPersisting } from './persistence';
+import { connectCacheToSession, startPersisting, stopPersisting } from './persistence';
+
+// Registered at import time: App.jsx imports this module before AuthProvider's first effect
+// can call claimUserData / clearUserData.
+connectCacheToSession();
 
 /** The app's query cache. Persistence runs while a session user exists (also offline, from the local session). */
 export function QueryProvider({ children }: { children: ReactNode }) {
@@ -1323,7 +1388,7 @@ Run: `npx vitest run src/data/persistence.test.tsx` → PASS (5 lifecycle tests,
 - [ ] **Step 10: Commit**
 
 ```bash
-git add frontend/src/data frontend/src/test/queryTestUtils.tsx frontend/src/lib/userStorage.js frontend/src/App.jsx frontend/package.json frontend/package-lock.json
+git add frontend/src/data frontend/src/test/queryTestUtils.tsx frontend/src/test/setup.js frontend/src/lib/userStorage.js frontend/src/lib/userStorage.test.js frontend/src/App.jsx frontend/package.json frontend/package-lock.json
 git commit -m "feat(data): query client with per-user IndexedDB persistence tied to the session rules"
 ```
 
@@ -1509,7 +1574,7 @@ git commit -m "feat(ui): inline query errors with Retry and an app-wide offline 
   - `unwrap<T>(res: { data: T; error: unknown }): T`
   - `fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>, pageSize?: number): Promise<T[]>` (`pageSize` default `MAX_ROWS = 1000`)
   - `quoteFilterValue(v: string): string`, `type Cursor = { value: string; id: string }`, `afterCursorDesc(column: string, cursor: Cursor): string`, `nextCursor<T extends { id: string }>(rows: T[], column: keyof T, pageSize: number): Cursor | null`, `KEYSET_PAGE_SIZE = 50`
-  - `chunk<T>(items: T[], size: number): T[][]`, `IN_CHUNK = 200`
+  - `chunk<T>(items: T[], size: number): T[][]`, `IN_CHUNK = 100`
   - `qk` (full shape below) and `type SearchPayload`
   - Test helper `mockSupabase()` (below)
 
@@ -1692,7 +1757,7 @@ export function nextCursor<T extends { id: string }>(rows: T[], column: keyof T,
 
 ```ts
 /** Keeps `.in()` URLs short; matches useDashboardBulkActions' existing chunk size. */
-export const IN_CHUNK = 200;
+export const IN_CHUNK = 100;
 
 export function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -2012,7 +2077,7 @@ git commit -m "feat(data): shared taxonomy query that loads every domain and tag
 
 **Files:**
 - Create: `frontend/src/data/objects.ts`, `frontend/src/data/objects.test.tsx`
-- Modify: `frontend/src/hooks/useDashboardSearch.js`, `frontend/src/pages/Search.jsx`, `frontend/src/hooks/search.integration.test.js`, the dashboard row components that link to an object (find them with a search for `to={\`/objects/${` under `src/features/dashboard/components/Views/`) and `Search.jsx`'s result rows
+- Modify: `frontend/src/hooks/useDashboardSearch.js`, `frontend/src/pages/Search.jsx`, `frontend/src/hooks/search.integration.test.js`, `frontend/src/features/dashboard/hooks/useDashboardPage.js`, `frontend/src/features/dashboard/hooks/useDashboardBulkActions.js`, `frontend/src/pages/ObjectNew.jsx`, `frontend/src/pages/QuickCapture.jsx`, `frontend/src/pages/Import.jsx` (list invalidation after writes), and the dashboard list view that renders the error (search `error &&` under `src/features/dashboard/components/Views/` and in `src/pages/Dashboard.jsx`)
 
 **Interfaces:**
 - Consumes: `qk.objects`, `qk.search`, `SearchPayload` (Task 7); `useTaxonomy` (Task 8). Prefetch on these rows is added by Task 11, which owns `objectDetailQuery`.
@@ -2021,7 +2086,7 @@ git commit -m "feat(data): shared taxonomy query that loads every domain and tag
   - `useObjectsPage(payload: SearchPayload | null, offset: number)` — `useQuery` with `placeholderData: keepPreviousData`
   - `useObjectsCount(payload: SearchPayload | null)` — returns `number | null` data (null when the RPC fails; the failure must not fail the list)
   - `useSearchResults(payload: SearchPayload | null)` — `useInfiniteQuery`, 20 per page, offset paging (search ranking can't use keyset)
-  - `invalidateObjectLists(client?: QueryClient): Promise<void>` (invalidates `qk.objects.all` and `['search']`)
+  - `invalidateObjectLists(client?: QueryClient): Promise<void>` (invalidates `qk.objects.all`, `['search']`, `qk.trash.list()` and `['dashboard']`)
   - `setObjectInLists(id: string, patch: Record<string, unknown> | null, client?: QueryClient): void` — patch a row in every cached dashboard page/search page, or remove it when `patch === null`
 
 - [ ] **Step 1: Write the failing test**
@@ -2153,10 +2218,16 @@ export function useSearchResults(payload: SearchPayload | null) {
   });
 }
 
+/**
+ * After any write that creates, deletes, restores or changes knowledge objects (or their tags,
+ * domains or links): dashboard pages, counts, resume/trailheads, search, Trash and dashboard stats.
+ */
 export async function invalidateObjectLists(client: QueryClient = defaultClient): Promise<void> {
   await Promise.all([
     client.invalidateQueries({ queryKey: qk.objects.all }),
     client.invalidateQueries({ queryKey: ['search'] }),
+    client.invalidateQueries({ queryKey: qk.trash.list() }),
+    client.invalidateQueries({ queryKey: ['dashboard'] }),
   ]);
 }
 
@@ -2210,7 +2281,13 @@ Keep: the filter `useState`s, `createEmptyFiltersOverride`, `resolveSearchRpcFil
 - Expose `retry: () => pageQ.refetch()` in the returned object, and in the dashboard list view render `<QueryError what="your objects" error={pageQ.error} onRetry={retry} />` in place of the current error text when `pageQ.error` is set (find the current rendering by searching `error &&` in `src/features/dashboard/components/Views/` and `src/pages/Dashboard.jsx`).
 - The resume-object read (lines 256-279) moves to Task 10; leave it for now.
 - `goToPage` uses `setOffset` via `runSearch((p - 1) * PAGE_SIZE)` exactly as today.
-- After writes that change lists (quick add in `useDashboardPage.handleQuickAddCreate`, bulk actions), replace `runSearch(0)` re-fetch calls with `invalidateObjectLists()` where the intent is "refresh the list", and keep `runSearch(0)` where the intent is "go back to page 1".
+- After writes that change lists, call `invalidateObjectLists()` once the write succeeds. Every one of these sites, found by searching `.insert(`, `.update(`, `.delete(`, `.upsert(` and write RPCs:
+  - `useDashboardPage.handleQuickAddCreate` (keep its `runSearch(0)`: that means "back to page 1")
+  - every bulk action in `useDashboardBulkActions.js` (add/remove domain or tag, move to Trash, change type, change status); replace their "re-run the search" calls with `invalidateObjectLists()` unless they also intend to reset the page
+  - `ObjectNew.jsx` after the object (and its domain/tag rows) is created, before `navigate(...)`
+  - `QuickCapture.jsx` after its insert
+  - `Import.jsx` after its batch insert
+- Add a test to `objects.test.tsx`: seed `qk.objects.page(empty, 0)`, `qk.trash.list()` and `qk.dashboard.stats()` in a client, call `invalidateObjectLists(client)`, and assert all three are invalidated (`client.getQueryState(key)?.isInvalidated === true`).
 
 - [ ] **Step 5: Search page and prefetch**
 
@@ -2243,7 +2320,7 @@ In `frontend/src/hooks/search.integration.test.js`, wrap with `wrapperFor(create
 - [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/src/data/objects.* frontend/src/hooks frontend/src/pages/Search.jsx frontend/src/features/dashboard frontend/src/pages/Dashboard.jsx
+git add frontend/src/data/objects.* frontend/src/hooks frontend/src/pages/Search.jsx frontend/src/pages/ObjectNew.jsx frontend/src/pages/QuickCapture.jsx frontend/src/pages/Import.jsx frontend/src/features/dashboard frontend/src/pages/Dashboard.jsx
 git commit -m "feat(data): cached dashboard and search lists that keep rows while filtering (B11, U9)"
 ```
 
@@ -2768,7 +2845,12 @@ export const invalidateAiProviders = (client: import('@tanstack/react-query').Qu
 - **Versions refresh after save (lines ~306-313):** replace with `invalidateObjectVersions(object.id);`.
 - **After restoring a version (line ~352):** `reload()` already maps to `invalidateObject`; keep it.
 - **Shares (lines ~930-950):** `loadShares` becomes `try { setShares(await fetchShares(object.id)); } catch (e) { reportError(e); setShares([]); setError(getErrorMessage(e, 'Failed to load shares')); }`.
-- **After writes:** wherever a handler already calls `setObject`, `setObjectTags`, etc., leave it. Additionally call `setObjectInLists(object.id, { is_pinned: … })` after a pin toggle, `setObjectInLists(object.id, null)` after moving to Trash, and `invalidateObjectLists()` after a save that changes the title, type or status.
+- **After writes:** wherever a handler already calls `setObject`, `setObjectTags`, etc., leave it (that keeps this page instant). Additionally:
+  - pin toggle → `setObjectInLists(object.id, { is_pinned: !object.is_pinned })`
+  - move to Trash → `setObjectInLists(object.id, null)` then `invalidateObjectLists()` (refreshes Trash and counts)
+  - save, restore version, add/remove domain, tag, link or attachment → `invalidateObjectLists()` (dashboard rows show titles, tags and link counts)
+  - add/remove link → also `invalidateObject(otherId)` for the other end, so its backlinks panel is fresh
+  - "save AI output as object" (`save_prompt_output_as_object`) → `invalidateObjectLists()`
 - **Failed writes:** replace `addToast('error', getErrorMessage(err, '…'))` pairs with `notifyError(err, '…')` from `useNotifyError()`, keeping each `setError(msg)` by using the returned message: `setError(notifyError(err, 'Failed to add tag'))`. The run-prompt handler (lines ~614-672) builds its own message from the function body; pass it as `notifyError(err, { message: msg })` so the shown text doesn't change.
 
 - [ ] **Step 6: Panel error states**
@@ -3370,11 +3452,14 @@ git commit -m "feat(data): notification bell through the cache with an error sta
 - Produces:
   - `profile.ts`: `PROFILE_COLS = 'email, display_name, timezone, created_at'`, `fetchProfile(userId: string): Promise<ProfileRow | null>`
   - `exports.ts`:
+    - `OBJECT_EXPORT_COLS`, `JOURNAL_EXPORT_COLS`, `PASTE_EXPORT_COLS` (every column except the `fts` tsvector)
+    - `type ExportObject = Record<string, unknown> & { id: string; domains: Entity[]; tags: Entity[] }`
     - `fetchByIdsChunked<T>(table: string, columns: string, column: string, ids: string[]): Promise<T[]>` (uses `chunk(ids, IN_CHUNK)`)
-    - `fetchAllOwnObjects(columns: string): Promise<Row[]>` (keyset-free `fetchAll`, ordered by `created_at, id`)
-    - `fetchAccountExport(userId: string): Promise<AccountExport>` (journal, paste bin, domains, tags, objects, object-domain and object-tag joins — exactly the data `downloadFullAccountData` builds today)
-    - `fetchMatchingObjectIds(payload: SearchPayload): Promise<string[]>` (the "export all matching" path of bulk actions)
-  - `settings.ts`: add `invalidateAiProviders` usage in Settings
+    - `fetchOwnObjectsForExport(userId: string): Promise<ExportObject[]>` (non-deleted, `updated_at desc, id desc`, with domains and tags attached; replaces `Settings.fetchAllKnowledgeObjectsPaginated` plus its unchunked joins)
+    - `fetchObjectsByIdsForExport(ids: string[]): Promise<ExportObject[]>` (replaces the bulk export's `selectInChunks` calls)
+    - `fetchAccountExtras(userId: string): Promise<{ journal_entries: Row[]; paste_bin: Row[]; domains: Entity[]; tags: Entity[] }>`
+    - `fetchFilteredObjectIds(payload: SearchPayload): Promise<string[]>` (replaces bulk actions' `fetchFilteredIds`, same RPC choice and paging)
+  - `settings.ts`: `invalidateAiProviders` is used by Settings
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3390,11 +3475,35 @@ vi.mock('../lib/supabase', async () => {
   return { supabase: sb.current.client };
 });
 
-import { fetchByIdsChunked } from './exports';
+import { fetchByIdsChunked, fetchObjectsByIdsForExport, fetchFilteredObjectIds, OBJECT_EXPORT_COLS } from './exports';
 import { fetchProfile } from './profile';
 import { IN_CHUNK } from './chunk';
+import type { SearchPayload } from './keys';
 
 describe('exports', () => {
+  it('attaches domains and tags to each object and never selects * or fts', async () => {
+    sb.current!.respond = (call) => {
+      if (call.table === 'knowledge_objects') return { data: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }], error: null };
+      if (call.table === 'knowledge_object_domains') return { data: [{ knowledge_object_id: 'a', domains: { id: 'd', name: 'Work' } }], error: null };
+      return { data: [{ knowledge_object_id: 'b', tags: { id: 't', name: 'ai' } }, { knowledge_object_id: 'b', tags: null }], error: null };
+    };
+    const objs = await fetchObjectsByIdsForExport(['a', 'b']);
+    expect(objs).toEqual([
+      { id: 'a', title: 'A', domains: [{ id: 'd', name: 'Work' }], tags: [] },
+      { id: 'b', title: 'B', domains: [], tags: [{ id: 't', name: 'ai' }] },
+    ]);
+    expect(OBJECT_EXPORT_COLS).not.toMatch(/\*|fts/);
+  });
+
+  it('collects filtered ids with the same RPC choice and paging as before', async () => {
+    const payload = { search_query: 'rust' } as SearchPayload;
+    sb.current!.rpc.mockImplementation((_n: string, args: { offset_n: number }) =>
+      Promise.resolve({ data: Array.from({ length: args.offset_n === 0 ? 100 : 3 }, (_, i) => ({ id: `${args.offset_n + i}` })), error: null }));
+    const ids = await fetchFilteredObjectIds(payload);
+    expect(ids).toHaveLength(103);
+    expect(sb.current!.rpc.mock.calls.every(([n]) => n === 'search_knowledge_objects_with_snippets')).toBe(true);
+  });
+
   it('splits large id lists so the URL never gets too long', async () => {
     const ids = Array.from({ length: IN_CHUNK * 2 + 7 }, (_, i) => `id${i}`);
     sb.current!.respond = (call) => ({ data: (call.ops.find(([m]) => m === 'in')![1][1] as string[]).map((id) => ({ id })), error: null });
@@ -3442,9 +3551,17 @@ import { supabase } from '../lib/supabase';
 import { unwrap } from './unwrap';
 import { chunk, IN_CHUNK } from './chunk';
 import { fetchAll } from './fetchAll';
+import { fetchDomains, fetchTags, type Entity } from './taxonomy';
 import type { SearchPayload } from './keys';
 
 type AnyRow = Record<string, unknown>;
+export type ExportObject = AnyRow & { id: string; domains: Entity[]; tags: Entity[] };
+
+// "Export my data" means every column, but never the fts search index (P5). Confirm against
+// database.types.ts: add any column present there (except fts) that is missing here.
+export const OBJECT_EXPORT_COLS = 'id, user_id, type, title, source, content, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, last_viewed_at, revision';
+export const JOURNAL_EXPORT_COLS = 'id, user_id, entry_date, content, created_at, updated_at';
+export const PASTE_EXPORT_COLS = 'id, user_id, title, content, created_at, updated_at';
 
 // Export collectors are one-off actions, not cached queries. They take table names dynamically,
 // so they use the untyped client.
@@ -3456,31 +3573,84 @@ export async function fetchByIdsChunked<T = AnyRow>(table: string, columns: stri
   return out;
 }
 
-export function fetchAllOwnObjects(userId: string, columns: string): Promise<AnyRow[]> {
-  return fetchAll<AnyRow>((from, to) => supabase.from('knowledge_objects').select(columns)
-    .eq('user_id', userId).order('created_at').order('id').range(from, to));
+type JoinRow = { knowledge_object_id: string; domains?: Entity | null; tags?: Entity | null };
+
+function groupBy(rows: JoinRow[], pick: (r: JoinRow) => Entity | null | undefined): Record<string, Entity[]> {
+  const out: Record<string, Entity[]> = {};
+  for (const r of rows) {
+    const v = pick(r);
+    if (v) (out[r.knowledge_object_id] ??= []).push(v);
+  }
+  return out;
 }
 
-export async function fetchMatchingObjectIds(payload: SearchPayload): Promise<string[]> {
+async function attachTaxonomy(objs: Array<AnyRow & { id: string }>): Promise<ExportObject[]> {
+  const ids = objs.map((o) => o.id);
+  const [kod, kot] = await Promise.all([
+    fetchByIdsChunked<JoinRow>('knowledge_object_domains', 'knowledge_object_id, domain_id, domains(id, name)', 'knowledge_object_id', ids),
+    fetchByIdsChunked<JoinRow>('knowledge_object_tags', 'knowledge_object_id, tag_id, tags(id, name)', 'knowledge_object_id', ids),
+  ]);
+  const domains = groupBy(kod, (r) => r.domains);
+  const tags = groupBy(kot, (r) => r.tags);
+  return objs.map((o) => ({ ...o, domains: domains[o.id] ?? [], tags: tags[o.id] ?? [] }));
+}
+
+/** All of the user's non-deleted objects, newest first (the Markdown ZIP numbers files in this order). */
+export async function fetchOwnObjectsForExport(userId: string): Promise<ExportObject[]> {
+  const objs = await fetchAll<AnyRow & { id: string }>((from, to) => supabase.from('knowledge_objects')
+    .select(OBJECT_EXPORT_COLS).eq('user_id', userId).eq('is_deleted', false)
+    .order('updated_at', { ascending: false }).order('id', { ascending: false }).range(from, to));
+  return attachTaxonomy(objs);
+}
+
+export async function fetchObjectsByIdsForExport(ids: string[]): Promise<ExportObject[]> {
+  return attachTaxonomy(await fetchByIdsChunked<AnyRow & { id: string }>('knowledge_objects', OBJECT_EXPORT_COLS, 'id', ids));
+}
+
+export async function fetchAccountExtras(userId: string) {
+  const [journal_entries, paste_bin, domains, tags] = await Promise.all([
+    fetchAll<AnyRow>((from, to) => supabase.from('journal_entries').select(JOURNAL_EXPORT_COLS).eq('user_id', userId)
+      .order('entry_date', { ascending: false }).order('id').range(from, to)),
+    fetchAll<AnyRow>((from, to) => supabase.from('paste_bin').select(PASTE_EXPORT_COLS).eq('user_id', userId)
+      .order('created_at', { ascending: false }).order('id').range(from, to)),
+    fetchDomains(userId),
+    fetchTags(userId),
+  ]);
+  return { journal_entries, paste_bin, domains, tags };
+}
+
+/** Ids of every object matching the applied dashboard filters ("export all matching"). */
+export async function fetchFilteredObjectIds(payload: SearchPayload): Promise<string[]> {
+  const PAGE = 100;
+  const rpc = payload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
   const ids: string[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    const rows = (unwrap(await supabase.rpc('search_knowledge_objects', { ...payload, search_query: payload.search_query, limit_n: 1000, offset_n: offset })) ?? []) as { id: string }[];
+  for (let offset = 0; ; offset += PAGE) {
+    const rows = (unwrap(await supabase.rpc(rpc, { ...payload, limit_n: PAGE, offset_n: offset })) ?? []) as { id: string }[];
     ids.push(...rows.map((r) => r.id));
-    if (rows.length < 1000) return ids;
+    if (rows.length < PAGE) return ids;
   }
 }
 ```
 
-Then read `Settings.jsx` lines ~305-460 and `useDashboardBulkActions.js` lines ~15-20 and ~79-135 and move each read into `exports.ts` as a named function that returns exactly what the caller uses today (for example `fetchAccountExport(userId)` returning `{ journal, pasteBin, domains, tags, objects, objectDomains, objectTags }`). Rules:
-- Replace every `.select('*')` with the column list the export writes out (read the code that builds the JSON/Markdown/ZIP to see which fields it uses; for the account-data export, list every column of the table from `database.types.ts`, except `search_vector`/tsvector columns, because "all my data" is the point of that export).
-- Every `.in(...)` over object ids goes through `fetchByIdsChunked`.
-- `fetchMatchingObjectIds` replaces the RPC loop in `useDashboardBulkActions.js` that collects ids for "export all matching" (P5: it currently pulls content and the search index just to collect ids). Check which RPC and args the existing code uses and mirror them exactly; if the existing code uses `search_knowledge_objects_with_snippets` for text queries, do the same.
-- `AuthContext.jsx`'s `fetchProfile` is replaced by an import of `fetchProfile` from `data/profile` (keep the `.catch(() => null)` at the call site; a missing profile is still `null`). `Login.jsx` and `Register.jsx` profile reads use the same function.
+**Switch the callers (keep every file name, format and JSON shape the same):**
+
+- `Settings.jsx`:
+  - Delete `fetchAllKnowledgeObjectsPaginated` and the three copies of the `domainsByObj` / `tagsByObj` grouping.
+  - `downloadFullAccountData`: `const [objects, extras] = await Promise.all([fetchOwnObjectsForExport(user.id), fetchAccountExtras(user.id)]);` then build `parts` from `objects`, `extras.journal_entries`, `extras.paste_bin`, `extras.domains`, `extras.tags` exactly as today.
+  - `downloadBackupJson`: `const normalized = await fetchOwnObjectsForExport(user.id);` then the existing `parts` loop.
+  - `downloadBackupMarkdownZip`: `const objs = await fetchOwnObjectsForExport(user.id);` and inside the loop use `buildObjectMarkdown(o, include)` directly (each `o` already has `domains` and `tags`).
+  - Each `catch` keeps `setBackupError(getErrorMessage(err, 'Export failed'))` and adds `reportError(err)`.
+- `useDashboardBulkActions.js`:
+  - Delete `IN_CHUNK` and `selectInChunks`.
+  - `fetchFilteredIds` body becomes `return fetchFilteredObjectIds(appliedRpcPayload ?? {});`.
+  - In `handleExportSelected`, replace the `selectInChunks` block and its grouping with `const objs = await fetchObjectsByIdsForExport(ids); if (!objs.length) throw new Error('No objects found'); const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));` and keep the rest (ZIP building) unchanged.
+- `AuthContext.jsx`: delete the local `fetchProfile`; import it from `../data/profile`. The call site in `verifyAndEnrichUser` already has `.catch(() => null)`, so a failed or missing profile still maps to defaults.
+- `Login.jsx` (line ~70) and `Register.jsx` (line ~50): replace their inline `users` selects with `fetchProfile(id)`, keeping each caller's error handling.
 
 - [ ] **Step 4: Settings providers and profile**
 
 - `Settings.jsx` `load()` providers part → `useAiProviders(user?.id ?? null)` (from Task 11's `settings.ts`); after add/delete provider succeed → `invalidateAiProviders(client)`; failed writes → `notifyError`.
-- Export buttons: wrap each export in `try/catch` that calls `notifyError(e, 'Export failed')`.
+- Profile save in `saveProfile` already writes `users`; after it succeeds nothing else caches the profile (AuthContext holds it), so no invalidation is needed.
 
 - [ ] **Step 5: Run tests and checks** — `npm test && npm run typecheck && npm run lint && npm run build` → PASS. Manually run each Settings export in `npm run dev` against your account and compare the downloaded file's structure with one exported from production before this change.
 
