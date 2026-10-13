@@ -76,22 +76,25 @@ export const AUDIT_ACTION_LIST = [
 export const RUN_PROMPT_STORAGE_KEY = 'pks_run_prompt_template';
 
 /** Run prompt providers (must match PROVIDERS in supabase/functions/run-prompt). */
+// The first entry is the server default (empty selection in Run prompt).
 export const AI_PROVIDERS = [
-  { id: 'deepseek', label: 'DeepSeek', keyPlaceholder: 'sk-… (from platform.deepseek.com/api_keys)' },
   { id: 'anthropic', label: 'Claude', keyPlaceholder: 'sk-ant-… (from console.anthropic.com)' },
+  { id: 'deepseek', label: 'DeepSeek', keyPlaceholder: 'sk-… (from platform.deepseek.com/api_keys)' },
 ];
 
 export const AI_PROVIDER_IDS = AI_PROVIDERS.map((p) => p.id);
 
-export const DEFAULT_AI_PROVIDER = 'deepseek';
+export const DEFAULT_AI_PROVIDER = 'anthropic';
 
 /**
- * AI/LLM models for "Run prompt".
+ * AI/LLM models for "Run prompt" (must match PROVIDERS in supabase/functions/run-prompt/lib.ts).
+ * `server: true` marks the models the shared server key may run.
  */
 export const AI_MODELS = [
-  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: 'deepseek' },
-  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: 'deepseek' },
-  { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic' },
+  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: 'deepseek', server: true },
+  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', provider: 'deepseek', server: true },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic', server: false },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', server: true },
 ];
 
 export const DEFAULT_AI_MODEL_BY_PROVIDER = {
@@ -99,7 +102,12 @@ export const DEFAULT_AI_MODEL_BY_PROVIDER = {
   anthropic: 'claude-opus-5',
 };
 
-export const DEFAULT_AI_MODEL = DEFAULT_AI_MODEL_BY_PROVIDER[DEFAULT_AI_PROVIDER];
+export const DEFAULT_SERVER_AI_MODEL_BY_PROVIDER = {
+  deepseek: 'deepseek-chat',
+  anthropic: 'claude-sonnet-5',
+};
+
+export const DEFAULT_AI_MODEL = DEFAULT_SERVER_AI_MODEL_BY_PROVIDER[DEFAULT_AI_PROVIDER];
 
 export function aiProviderLabel(providerId) {
   return AI_PROVIDERS.find((p) => p.id === providerId)?.label ?? providerId;

@@ -617,7 +617,7 @@ export default function ObjectDetail() {
           object_id: object.id,
           prompt_template_id: runTemplateId || undefined,
           provider,
-          model: modelForProvider(provider, runAiModel || DEFAULT_AI_MODEL),
+          model: modelForProvider(provider, runAiModel || DEFAULT_AI_MODEL, !userProviderId),
           user_provider_id: userProviderId || undefined,
         },
       });

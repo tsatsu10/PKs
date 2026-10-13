@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { AI_PROVIDERS, aiProviderLabel } from '../constants';
-import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection } from '../lib/aiProviders';
+import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection, isServerSelection } from '../lib/aiProviders';
 
 /**
  * Run prompt overlay: source, template, prompt, provider (default or user's API), model, context, generate, output.
@@ -35,8 +35,9 @@ export default function ObjectDetailRunPromptPanel({
   onClose,
 }) {
   const { provider } = resolveRunSelection(runAiProviderId, aiProviders);
-  const allowedModels = modelsForProvider(provider);
-  const effectiveModel = modelForProvider(provider, runAiModel);
+  const usingServerKey = isServerSelection(runAiProviderId);
+  const allowedModels = modelsForProvider(provider, usingServerKey);
+  const effectiveModel = modelForProvider(provider, runAiModel, usingServerKey);
 
   useEffect(() => {
     if (effectiveModel && effectiveModel !== runAiModel) setRunAiModel(effectiveModel);
@@ -57,7 +58,7 @@ export default function ObjectDetailRunPromptPanel({
     const next = selection === '' ? null : selection;
     setRunAiProviderId(next);
     const nextProvider = resolveRunSelection(next, aiProviders).provider;
-    setRunAiModel(modelForProvider(nextProvider, runAiModel));
+    setRunAiModel(modelForProvider(nextProvider, runAiModel, isServerSelection(next)));
   };
 
   return (

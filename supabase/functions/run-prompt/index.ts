@@ -9,6 +9,7 @@ import { hintForDeepSeekAuthCode, validateDeepSeekApiKey } from "./deepseekKey.t
 import {
   buildUserMessage,
   completionOutcome,
+  DEFAULT_SERVER_PROVIDER,
   EMPTY_OUTPUT_BODY,
   failedRunOutput,
   isProvider,
@@ -252,7 +253,7 @@ Deno.serve(async (req) => {
       if (!check.ok) return reply(check.body, 400);
       apiKey = check.key;
     } else {
-      provider = input.provider ?? "deepseek";
+      provider = input.provider ?? DEFAULT_SERVER_PROVIDER;
       const cfg = PROVIDERS[provider];
       const serverKey = Deno.env.get(cfg.serverKeyEnv);
       if (!serverKey) {

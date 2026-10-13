@@ -2,9 +2,9 @@
  * Run-prompt provider helpers (must match supabase/functions/run-prompt).
  *
  * The Run prompt "Provider" select holds either a saved key's id (user_ai_providers.id) or a
- * server-default choice encoded as `server:<provider>`; null/'' means the DeepSeek server default.
+ * server-default choice encoded as `server:<provider>`; null/'' means the Claude server default.
  */
-import { AI_MODELS, DEFAULT_AI_PROVIDER, DEFAULT_AI_MODEL_BY_PROVIDER } from '../constants';
+import { AI_MODELS, DEFAULT_AI_PROVIDER, DEFAULT_AI_MODEL_BY_PROVIDER, DEFAULT_SERVER_AI_MODEL_BY_PROVIDER } from '../constants';
 import { normalizeDeepSeekApiKey, validateDeepSeekApiKey } from './deepseekKey';
 
 export const SERVER_SELECTION_PREFIX = 'server:';
@@ -31,15 +31,17 @@ export function resolveRunSelection(selection, aiProviders = []) {
   return { provider: saved?.provider_type ?? DEFAULT_AI_PROVIDER, userProviderId: selection };
 }
 
-export function modelsForProvider(provider) {
-  return AI_MODELS.filter((m) => m.provider === provider);
+/** Models offered for a provider; the shared server key runs a narrower set. */
+export function modelsForProvider(provider, usingServerKey = false) {
+  return AI_MODELS.filter((m) => m.provider === provider && (!usingServerKey || m.server));
 }
 
-/** Keep the chosen model if the provider offers it, else fall back to that provider's default. */
-export function modelForProvider(provider, model) {
-  const models = modelsForProvider(provider);
+/** Keep the chosen model if it's offered, else fall back to the provider's default for this key type. */
+export function modelForProvider(provider, model, usingServerKey = false) {
+  const models = modelsForProvider(provider, usingServerKey);
   if (models.some((m) => m.id === model)) return model;
-  return DEFAULT_AI_MODEL_BY_PROVIDER[provider] ?? models[0]?.id;
+  const defaults = usingServerKey ? DEFAULT_SERVER_AI_MODEL_BY_PROVIDER : DEFAULT_AI_MODEL_BY_PROVIDER;
+  return defaults[provider] ?? models[0]?.id;
 }
 
 /**
