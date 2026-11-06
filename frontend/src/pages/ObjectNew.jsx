@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext';
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
 import { useTaxonomy } from '../data/taxonomy';
+import { invalidateObjectLists } from '../data/objects';
 import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
@@ -197,6 +198,7 @@ export default function ObjectNew() {
       createNotification(user.id, 'object_created', 'Object created', (title || 'Untitled').slice(0, 80), { type: 'knowledge_object', id: objectId });
       addToast('success', 'Object created');
       clearDraft(DRAFT_KEYS.new);
+      await invalidateObjectLists();
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to create object');

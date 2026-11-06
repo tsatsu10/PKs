@@ -1,30 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import TypeMark from '../components/TypeMark';
-import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';
+import QueryError from '../components/QueryError';
+import { createEmptyFiltersOverride, resolveSearchRpcFilters, buildRpcPayload } from '../hooks/useDashboardSearch';
 import { useTaxonomy } from '../data/taxonomy';
+import { useSearchResults } from '../data/objects';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
-
-const PAGE_SIZE = 20;
 
 export default function Search() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const qFromUrl = searchParams.get('q') ?? '';
   const [query, setQuery] = useState(qFromUrl);
-  const [objects, setObjects] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [domainFilter, setDomainFilter] = useState('');
@@ -37,6 +29,14 @@ export default function Search() {
   const [showFilters, setShowFilters] = useState(false);
   const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
+  // Filters of the search that actually ran; identical payloads share one cache entry (B11).
+  const [applied, setApplied] = useState(null);
+  const results = useSearchResults(user?.id ? applied : null);
+  const objects = useMemo(() => results.data?.pages.flat() ?? [], [results.data]);
+  const loading = results.isPending && applied !== null;
+  const loadingMore = results.isFetchingNextPage;
+  const hasMore = !!results.hasNextPage;
+
   const listVirtualizer = useVirtualizer({
     count: objects.length,
     getScrollElement: () => listScrollRef.current,
@@ -48,53 +48,14 @@ export default function Search() {
     setQuery(qFromUrl);
   }, [qFromUrl]);
 
-  const runSearch = useCallback(async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
-    if (!user?.id) return;
+  function runSearch(queryOverride = null, filtersOverride = null) {
     const state = { searchQuery: query, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo };
-    const { q, typeF, domF, tagF, statusF, dateFromF, dateToF, dueFromF, dueToF } = resolveSearchRpcFilters(
-      filtersOverride,
-      state
-    );
-    const searchQ = queryOverride !== null && queryOverride !== undefined ? String(queryOverride).trim() : q;
-    const isLoadMore = nextOffset > 0;
-    if (!isLoadMore) setLoading(true);
-    else setLoadingMore(true);
-    setError('');
-    try {
-      const { data, error: err } = await supabase.rpc(
-        searchQ ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects',
-        {
-          search_query: searchQ || null,
-          type_filter: typeF,
-          domain_id_f: domF,
-          tag_id_f: tagF,
-          date_from_f: dateFromF ? `${dateFromF}T00:00:00Z` : null,
-          date_to_f: dateToF ? `${dateToF}T23:59:59Z` : null,
-          status_filter: statusF,
-          due_from_f: dueFromF ? `${dueFromF}T00:00:00Z` : null,
-          due_to_f: dueToF ? `${dueToF}T23:59:59Z` : null,
-          limit_n: PAGE_SIZE,
-          offset_n: nextOffset,
-        }
-      );
-      if (err) throw err;
-      const list = data || [];
-      if (isLoadMore) setObjects((prev) => [...prev, ...list]);
-      else setObjects(list);
-      setHasMore(list.length === PAGE_SIZE);
-      setOffset(nextOffset + list.length);
-    } catch (e) {
-      setError(getErrorMessage(e, 'Search failed'));
-      if (!isLoadMore) setObjects([]);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [user?.id, query, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]);
+    setApplied(buildRpcPayload(resolveSearchRpcFilters(filtersOverride, state, queryOverride)));
+  }
 
   useEffect(() => {
     if (!user?.id) return;
-    runSearch(0, qFromUrl || undefined);
+    runSearch(qFromUrl || undefined);
     // Only run when user or URL query changes, not when runSearch identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, qFromUrl]);
@@ -103,11 +64,10 @@ export default function Search() {
     e.preventDefault();
     const q = query.trim();
     setSearchParams(q ? { q } : {});
-    runSearch(0, q);
   }
 
   function loadMore() {
-    runSearch(offset);
+    results.fetchNextPage();
   }
 
   return (
@@ -156,7 +116,7 @@ export default function Search() {
             setDueTo={setDueTo}
             domains={domains}
             tags={tags}
-            onApply={() => runSearch(0, null, {
+            onApply={() => runSearch(null, {
               searchQuery: query,
               typeFilter,
               statusFilter,
@@ -177,13 +137,15 @@ export default function Search() {
               setDateTo('');
               setDueFrom('');
               setDueTo('');
-              runSearch(0, '', empty);
+              runSearch('', empty);
             }}
           />
         )}
       </header>
 
-      {error && <div className="search-error" role="alert">{error}</div>}
+      {results.error && (
+        <QueryError what="search results" error={results.error} onRetry={() => results.refetch()} />
+      )}
 
       {loading ? (
         <div className="search-loading" role="status" aria-live="polite">

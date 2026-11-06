@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { SkeletonList } from '../../../components/Skeleton';
+import QueryError from '../../../components/QueryError';
 import DashboardFilterPanel from '../../../components/DashboardFilterPanel';
 import DashboardQuickAddForm from '../../../components/DashboardQuickAddForm';
 import DashboardHero from './Hero/DashboardHero';
@@ -43,7 +44,7 @@ export default function DashboardView(props) {
     toggleSelect, selectAllOnPage, clearSelection, handleQuickAddCreate, handleExportSelected,
     bulkAddDomain, bulkAddTag, bulkRemoveDomain, bulkRemoveTag, bulkDelete, bulkChangeType,
     bulkSetStatus, dismissOnboarding, saveCurrentFilters, applySavedFilter, deleteSavedFilter,
-    showBanner, bannerKind
+    showBanner, bannerKind, retryList, listError
   } = props;
 
   return (
@@ -369,7 +370,9 @@ export default function DashboardView(props) {
           </button>
         )}
 
-        {error && (
+        {listError ? (
+          <QueryError what="your objects" error={listError} onRetry={retryList} />
+        ) : error && (
           <div className="dashboard-error" role="alert" aria-live="assertive">
             {error}
           </div>

@@ -9,6 +9,7 @@ import { useToast } from '../../../context/ToastContext';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../../../constants';
 import { getErrorMessage } from '../../../lib/errors';
 import { useDashboardSearch, createEmptyFiltersOverride } from '../../../hooks/useDashboardSearch';
+import { invalidateObjectLists } from '../../../data/objects';
 import { useTrailheads } from './useTrailheads';
 import { useDashboardBulkActions } from './useDashboardBulkActions';
 import { useDashboardKeyboard } from './useDashboardKeyboard';
@@ -66,6 +67,8 @@ export function useDashboardPage() {
     hasActiveFilters,
     resumeObject,
     appliedRpcPayload,
+    retry,
+    listError,
   } = useDashboardSearch({ userId: user?.id ?? null });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState(() => loadViewMode());
@@ -100,7 +103,6 @@ export function useDashboardPage() {
     addToast,
     setError,
     objects,
-    runSearch,
     appliedRpcPayload,
   });
 
@@ -393,6 +395,7 @@ export function useDashboardPage() {
       setShowQuickAdd(false);
       setQuickAddTitle('');
       setQuickAddContent('');
+      await invalidateObjectLists();
       runSearch(0);
       navigate(`/objects/${data.id}`);
     } catch (err) {
@@ -569,6 +572,8 @@ export function useDashboardPage() {
     showBanner,
     bannerKind,
     showOnboarding,
+    retryList: retry,
+    listError,
     ...bulk,
     ...keyboard,
   };

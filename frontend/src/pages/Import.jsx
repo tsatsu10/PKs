@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { parseCsvRows } from '../lib/csv';
+import { invalidateObjectLists } from '../data/objects';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { OBJECT_TYPES } from '../constants';
@@ -108,6 +109,7 @@ export default function Import() {
           created += chunk.length;
         }
       }
+      if (created > 0) await invalidateObjectLists();
       setResult({ created, failed, total: items.length });
       if (created > 0 && failed === 0) {
         addToast('success', `Imported ${created} object(s)`);

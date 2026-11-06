@@ -7,6 +7,7 @@ import { getExportIncludeFromTemplate, buildObjectMarkdown, zipEntryName } from 
 import { downloadBlob } from '../../../lib/download';
 import { getErrorMessage } from '../../../lib/errors';
 import { resolveOwnedObjectIds } from '../lib/dashboardUtils';
+import { invalidateObjectLists } from '../../../data/objects';
 
 // Keep `.in()` filters well under URL length limits (~36 chars per UUID).
 const IN_CHUNK = 100;
@@ -30,7 +31,6 @@ export function useDashboardBulkActions({
   addToast,
   setError,
   objects,
-  runSearch,
   appliedRpcPayload,
 }) {
   const [rawSelectedIds, setSelectedIds] = useState(new Set());
@@ -248,13 +248,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkDomainId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk add domain failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkAddTag = useCallback(async () => {
     const tagId = bulkTagId;
@@ -278,13 +278,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkTagId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk add tag failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkRemoveDomain = useCallback(async () => {
     const domainId = bulkDomainId;
@@ -308,13 +308,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkDomainId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk remove domain failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkRemoveTag = useCallback(async () => {
     const tagId = bulkTagId;
@@ -338,13 +338,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkTagId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk remove tag failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -362,13 +362,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk delete failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkChangeType = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkType) return;
@@ -386,13 +386,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk change type failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, bulkType, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, bulkType, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkSetStatus = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkStatus) return;
@@ -410,13 +410,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk set status failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, bulkStatus, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, bulkStatus, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   return {
     selectedIds,

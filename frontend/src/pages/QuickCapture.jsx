@@ -8,6 +8,7 @@ import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { createNotification } from '../lib/notifications';
 import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
+import { invalidateObjectLists } from '../data/objects';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
 import BlockNoteEditor from '../components/BlockNoteEditor';
@@ -70,6 +71,7 @@ export default function QuickCapture() {
       createNotification(user.id, 'object_created', 'Quick capture', t.slice(0, 80), { type: 'knowledge_object', id: objectId });
       addToast('success', 'Captured');
       clearDraft(DRAFT_KEYS.quick);
+      await invalidateObjectLists();
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to capture');
