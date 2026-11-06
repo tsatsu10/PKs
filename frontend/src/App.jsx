@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { QueryProvider } from './data/QueryProvider';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -12,6 +13,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <QueryProvider>
         <ThemeProvider>
         <ToastProvider>
         <BrowserRouter>
@@ -33,6 +35,7 @@ function App() {
         </BrowserRouter>
         </ToastProvider>
         </ThemeProvider>
+        </QueryProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
