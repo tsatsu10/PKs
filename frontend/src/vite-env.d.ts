@@ -1,0 +1,18 @@
+/// <reference types="vite/client" />
+
+declare const __APP_VERSION__: string;
+
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string;
+  readonly VITE_SUPABASE_ANON_KEY: string;
+  readonly VITE_TURNSTILE_SITE_KEY?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+interface Window {
+  /** Cloudflare Turnstile API, present once loadTurnstile()'s script loads. */
+  turnstile?: unknown;
+}

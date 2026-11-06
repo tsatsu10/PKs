@@ -9,7 +9,7 @@
 export function isTypingTarget(el) {
   if (!el || typeof el.tagName !== 'string') return false;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return true;
-  if (el.isContentEditable === true) return true;
+  if (/** @type {HTMLElement} */ (el).isContentEditable === true) return true;
   const editable = el.closest?.('[contenteditable]');
   return editable != null && editable.getAttribute('contenteditable') !== 'false';
 }

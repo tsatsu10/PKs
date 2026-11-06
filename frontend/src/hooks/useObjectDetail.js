@@ -5,8 +5,9 @@ import { getErrorMessage } from '../lib/errors';
 
 /**
  * Loads a single knowledge object and all related data (versions, domains, tags, links, files, prompts, suggestions).
+ * Returns the object plus its related state (versions, domains, tags, links, files, prompts, suggestions)
+ * and the matching state setters, loading/error state, reload and draft.
  * @param {{ id: string | undefined, userId: string | undefined }} options
- * @returns { object, setObject, loading, error, setError, reload, draft, initialEditForm, ...related state }
  */
 export function useObjectDetail({ id, userId }) {
   const [object, setObject] = useState(null);
