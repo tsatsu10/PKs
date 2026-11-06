@@ -1,40 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { AUDIT_ACTION_LIST } from '../constants';
 import { SkeletonList } from '../components/Skeleton';
+import QueryError from '../components/QueryError';
+import LoadMore from '../components/LoadMore';
+import { useAuditLogs } from '../data/auditLogs';
 import './AuditLogs.css';
-
-const PAGE_SIZE = 50;
 
 export default function AuditLogs() {
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      setLoading(true);
-      let q = supabase
-        .from('audit_logs')
-        .select('id, action, entity_type, entity_id, payload, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
-      if (actionFilter) q = q.eq('action', actionFilter);
-      if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00Z`);
-      if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59Z`);
-      const { data, error } = await q;
-      setList(error ? [] : (data || []));
-      setLoading(false);
-    })();
-  }, [user?.id, actionFilter, dateFrom, dateTo]);
+  const { rows: list, query } = useAuditLogs(user?.id ?? null, { action: actionFilter, dateFrom, dateTo });
+  const loading = query.isPending;
 
   function formatAction(action) {
     return action.replace(/_/g, ' ');
@@ -70,12 +51,15 @@ export default function AuditLogs() {
         <div className="audit-logs-loading" role="status" aria-live="polite">
           <SkeletonList lines={8} />
         </div>
+      ) : query.error ? (
+        <QueryError what="audit logs" error={query.error} onRetry={() => query.refetch()} />
       ) : list.length === 0 ? (
         <section className="audit-logs-empty" aria-label="No audit entries">
           <p>No audit entries match your filters.</p>
           <Link to="/">Back to Dashboard</Link>
         </section>
       ) : (
+        <>
         <ul className="audit-logs-list">
           {list.map((entry) => (
             <li key={entry.id} className="audit-logs-item">
@@ -94,6 +78,8 @@ export default function AuditLogs() {
             </li>
           ))}
         </ul>
+        <LoadMore query={query} />
+        </>
       )}
     </div>
   );

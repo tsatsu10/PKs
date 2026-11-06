@@ -1,55 +1,47 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../context/ToastContext';
+import { useNotifyError } from '../lib/useNotifyError';
 import Breadcrumbs from '../components/Breadcrumbs';
+import QueryError from '../components/QueryError';
+import LoadMore from '../components/LoadMore';
+import { usePasteList, usePasteItem, invalidatePasteBin } from '../data/pasteBin';
 import './PasteBin.css';
 
 export default function PasteBin() {
   const { user } = useAuth();
   const { addToast } = useToast();
-  const [pastes, setPastes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const notifyError = useNotifyError();
+  const queryClient = useQueryClient();
+  const { rows: pastes, query, removeRow } = usePasteList(user?.id ?? null);
+  const loading = query.isPending;
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const itemQ = usePasteItem(selectedId);
+  const item = itemQ.data ?? null;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Seed the editor once per selected item; user edits afterwards must not be overwritten.
   useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    async function load() {
-      const { data, error: e } = await supabase
-        .from('paste_bin')
-        .select('id, title, content, created_at, updated_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (cancelled) return;
-      setError(getErrorMessage(e, ''));
-      setPastes(data || []);
-      setLoading(false);
+    if (!selectedId) return;
+    if (item && item.id === selectedId) {
+      setTitle(item.title ?? '');
+      setContent(item.content ?? '');
     }
-    load();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
-  const selected = pastes.find((p) => p.id === selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, item?.id]);
 
   useEffect(() => {
-    if (selected) {
-      setTitle(selected.title ?? '');
-      setContent(selected.content ?? '');
-    } else if (!creating) {
+    if (!selectedId && !creating) {
       setTitle('');
       setContent('');
     }
-    // Sync from selected paste; use primitives to avoid re-running when selected ref changes but content is same
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, selected?.title, selected?.content, creating]);
+  }, [selectedId, creating]);
 
   async function handleSave() {
     if (!user?.id) return;
@@ -63,25 +55,22 @@ export default function PasteBin() {
           .eq('id', selectedId)
           .eq('user_id', user.id);
         if (err) throw err;
-        setPastes((prev) =>
-          prev.map((p) => (p.id === selectedId ? { ...p, title: title.trim() || null, content: content.trim() || '', updated_at: new Date().toISOString() } : p))
-        );
+        await invalidatePasteBin(queryClient);
         addToast('success', 'Paste updated');
       } else {
         const { data, error: err } = await supabase
           .from('paste_bin')
           .insert({ user_id: user.id, title: title.trim() || null, content: content.trim() || '' })
-          .select('id, title, content, created_at, updated_at')
+          .select('id')
           .single();
         if (err) throw err;
-        setPastes((prev) => [data, ...prev]);
+        await invalidatePasteBin(queryClient);
         setSelectedId(data.id);
         setCreating(false);
         addToast('success', 'Paste created');
       }
     } catch (err) {
-      const msg = getErrorMessage(err, 'Failed to save');
-      addToast('error', msg);
+      const msg = notifyError(err, 'Failed to save');
       setError(msg);
     } finally {
       setSaving(false);
@@ -95,14 +84,14 @@ export default function PasteBin() {
     try {
       const { error: err } = await supabase.from('paste_bin').delete().eq('id', selectedId).eq('user_id', user.id);
       if (err) throw err;
-      setPastes((prev) => prev.filter((p) => p.id !== selectedId));
+      removeRow(selectedId);
+      invalidatePasteBin(queryClient);
       setSelectedId(null);
       setTitle('');
       setContent('');
       addToast('success', 'Paste deleted');
     } catch (err) {
-      const msg = getErrorMessage(err, 'Failed to delete');
-      addToast('error', msg);
+      const msg = notifyError(err, 'Failed to delete');
       setError(msg);
     }
   }
@@ -143,6 +132,8 @@ export default function PasteBin() {
           <h2 className="paste-bin-list-title">Recent pastes</h2>
           {loading ? (
             <p className="paste-bin-muted">Loading…</p>
+          ) : query.error ? (
+            <QueryError what="pastes" error={query.error} onRetry={() => query.refetch()} />
           ) : pastes.length === 0 ? (
             <div className="paste-bin-empty empty-state">
               <p className="empty-state-title">No pastes yet</p>
@@ -152,6 +143,7 @@ export default function PasteBin() {
               </button>
             </div>
           ) : (
+            <>
             <ul className="paste-bin-list-ul" role="list">
               {pastes.map((p) => (
                 <li key={p.id}>
@@ -161,13 +153,15 @@ export default function PasteBin() {
                     onClick={() => selectPaste(p)}
                   >
                     <span className="paste-bin-list-label">
-                      {p.title || (p.content ? p.content.slice(0, 40).replace(/\n/g, ' ') + (p.content.length > 40 ? '…' : '') : 'Untitled')}
+                      {p.title || 'Untitled'}
                     </span>
                     <span className="paste-bin-list-date">{new Date(p.updated_at ?? p.created_at).toLocaleDateString()}</span>
                   </button>
                 </li>
               ))}
             </ul>
+            <LoadMore query={query} />
+            </>
           )}
         </aside>
 

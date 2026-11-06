@@ -1,48 +1,28 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
 import { useToast } from '../context/ToastContext';
+import { useNotifyError } from '../lib/useNotifyError';
 import Breadcrumbs from '../components/Breadcrumbs';
 import TypeMark from '../components/TypeMark';
+import QueryError from '../components/QueryError';
+import LoadMore from '../components/LoadMore';
 import { SkeletonList } from '../components/Skeleton';
+import { useTrashList } from '../data/trash';
+import { invalidateObjectLists } from '../data/objects';
 import './Trash.css';
 
 export default function Trash() {
   const { user } = useAuth();
   const { addToast } = useToast();
-  const [objects, setObjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const notifyError = useNotifyError();
+  const { rows: objects, query, removeRow } = useTrashList(user?.id ?? null);
+  const loading = query.isPending;
   const [error, setError] = useState('');
   const [restoringId, setRestoringId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-
-  const load = useCallback(async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    setError('');
-    try {
-      const { data, error: err } = await supabase
-        .from('knowledge_objects')
-        .select('id, type, title, updated_at')
-        .eq('user_id', user.id)
-        .eq('is_deleted', true)
-        .order('updated_at', { ascending: false });
-      if (err) throw err;
-      setObjects(data || []);
-    } catch (e) {
-      setError(getErrorMessage(e, 'Failed to load trash'));
-      setObjects([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function handleRestore(id) {
     setRestoringId(id);
@@ -55,9 +35,10 @@ export default function Trash() {
         .eq('user_id', user.id);
       if (err) throw err;
       addToast('success', 'Restored');
-      setObjects((prev) => prev.filter((o) => o.id !== id));
+      removeRow(id);
+      invalidateObjectLists();
     } catch (e) {
-      addToast('error', getErrorMessage(e, 'Restore failed'));
+      notifyError(e, 'Restore failed');
     } finally {
       setRestoringId(null);
     }
@@ -76,9 +57,9 @@ export default function Trash() {
         if (storageErr && import.meta.env.DEV) console.warn('Storage cleanup failed:', storageErr);
       }
       addToast('success', 'Permanently deleted');
-      setObjects((prev) => prev.filter((o) => o.id !== id));
+      removeRow(id);
     } catch (e) {
-      addToast('error', getErrorMessage(e, 'Delete failed'));
+      notifyError(e, 'Delete failed');
     } finally {
       setDeletingId(null);
     }
@@ -96,6 +77,8 @@ export default function Trash() {
 
       {loading ? (
         <SkeletonList lines={6} />
+      ) : query.error ? (
+        <QueryError what="trash" error={query.error} onRetry={() => query.refetch()} />
       ) : objects.length === 0 ? (
         <section className="trash-empty empty-state" aria-label="Trash empty">
           <p className="empty-state-title">Nothing in trash</p>
@@ -103,6 +86,7 @@ export default function Trash() {
           <Link to="/" className="btn btn-primary">Back to Dashboard</Link>
         </section>
       ) : (
+        <>
         <ul className="trash-list" aria-label="Deleted objects">
           {objects.map((o) => (
             <li key={o.id} className="trash-item">
@@ -130,6 +114,8 @@ export default function Trash() {
             </li>
           ))}
         </ul>
+        <LoadMore query={query} />
+        </>
       )}
     </div>
   );
