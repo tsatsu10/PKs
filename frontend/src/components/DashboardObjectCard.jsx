@@ -3,6 +3,7 @@ import { formatObjectTypeLabel } from '../constants';
 import TypeMark from './TypeMark';
 import LinkedBar from '../features/dashboard/components/Views/LinkedBar';
 import { useRowVisibility } from '../features/dashboard/hooks/useRowVisibility';
+import { usePrefetchObject } from '../data/usePrefetchObject';
 import '../features/dashboard/components/Views/LinkedBar.css';
 
 function formatRelativeTime(iso) {
@@ -54,6 +55,7 @@ export default function DashboardObjectCard({
   const summary = obj.snippet || obj.summary;
   const status = obj.status && obj.status !== 'active' ? obj.status : null;
   const rowRef = useRowVisibility(obj.id);
+  const prefetch = usePrefetchObject();
 
   return (
     <article
@@ -63,6 +65,7 @@ export default function DashboardObjectCard({
     >
       <Link
         to={to}
+        {...prefetch(obj.id)}
         className={`object-card${selected ? ' object-card--selected' : ''}`}
         data-type={obj.type || 'note'}
         data-status={obj.status || 'active'}

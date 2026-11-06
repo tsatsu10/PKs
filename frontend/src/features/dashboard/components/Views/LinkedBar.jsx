@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
 import { useLinkedObjectsOptional } from '../../context/linkedObjectsHooks';
+import { usePrefetchObject } from '../../../../data/usePrefetchObject';
 import './LinkedBar.css';
 
 function truncateTitle(title, max = 14) {
@@ -16,6 +17,7 @@ function truncateTitle(title, max = 14) {
 export default function LinkedBar({ objectId, runPromptSuffix = '', compact = false }) {
   const linked = useLinkedObjectsOptional();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const prefetch = usePrefetchObject();
 
   if (!linked || !objectId) return null;
 
@@ -36,6 +38,7 @@ export default function LinkedBar({ objectId, runPromptSuffix = '', compact = fa
             className="linked-bar-chip"
             title={link.title}
             onClick={(e) => e.stopPropagation()}
+            {...prefetch(link.id)}
           >
             <TypeMark type={link.type} size="sm" className="linked-bar-chip-mark" />
             <span className="linked-bar-chip-title">{truncateTitle(link.title)}</span>
@@ -68,6 +71,7 @@ export default function LinkedBar({ objectId, runPromptSuffix = '', compact = fa
                         to={`/objects/${link.id}${runPromptSuffix}`}
                         className="linked-bar-popover-link"
                         onClick={() => setPopoverOpen(false)}
+                        {...prefetch(link.id)}
                       >
                         <TypeMark type={link.type} size="sm" />
                         <span>{link.title}</span>

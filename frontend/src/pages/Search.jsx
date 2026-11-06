@@ -9,6 +9,7 @@ import QueryError from '../components/QueryError';
 import { createEmptyFiltersOverride, resolveSearchRpcFilters, buildRpcPayload } from '../hooks/useDashboardSearch';
 import { useTaxonomy } from '../data/taxonomy';
 import { useSearchResults } from '../data/objects';
+import { usePrefetchObject } from '../data/usePrefetchObject';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
 
@@ -26,6 +27,7 @@ export default function Search() {
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
   const { domains, tags } = useTaxonomy(user?.id ?? null);
+  const prefetch = usePrefetchObject();
   const [showFilters, setShowFilters] = useState(false);
   const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
@@ -171,7 +173,7 @@ export default function Search() {
                       }}
                       role="listitem"
                     >
-                      <Link to={`/objects/${o.id}`} className="search-result-link">
+                      <Link to={`/objects/${o.id}`} className="search-result-link" {...prefetch(o.id)}>
                         <TypeMark type={o.type} size="sm" className="search-result-type-mark" />
                         <span className="search-result-title">{o.title || 'Untitled'}</span>
                         {(o.snippet || o.summary) && (

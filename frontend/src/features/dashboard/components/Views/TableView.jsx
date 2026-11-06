@@ -3,6 +3,7 @@ import TypeMark from '../../../../components/TypeMark';
 import { formatObjectTypeLabel } from '../../../../constants';
 import TitleCluster from '../../primitives/TitleCluster';
 import MetaCluster from '../../primitives/MetaCluster';
+import { usePrefetchObject } from '../../../../data/usePrefetchObject';
 import './TableView.css';
 
 /**
@@ -18,6 +19,7 @@ export default function TableViewRow({
   compact,
 }) {
   const summary = obj.snippet || obj.summary;
+  const prefetch = usePrefetchObject();
 
   return (
     <div
@@ -34,7 +36,7 @@ export default function TableViewRow({
           aria-label={`Select ${obj.title}`}
         />
       </label>
-      <Link to={to} className="table-view-row">
+      <Link to={to} className="table-view-row" {...prefetch(obj.id)}>
         <span className="table-view-type" title={formatObjectTypeLabel(obj.type)}>
           <TypeMark type={obj.type} size="sm" />
           <span className="table-view-type-label">{formatObjectTypeLabel(obj.type)}</span>
