@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { deferAfterPaint } from '../lib/defer';
 import { createDomain, createTag } from '../lib/entities';
+import { useTaxonomy, upsertTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
 
 export const PAGE_SIZE = 20;
 
@@ -68,12 +70,7 @@ function buildRpcPayload(filters) {
   };
 }
 
-function mergeEntityList(prev, item) {
-  if (prev.some((e) => e.id === item.id)) {
-    return prev.map((e) => (e.id === item.id ? item : e));
-  }
-  return [...prev, item].sort((a, b) => a.name.localeCompare(b.name));
-}
+export { buildRpcPayload };
 
 /**
  * Hook for dashboard object list: search, filters, and page-based pagination.
@@ -95,8 +92,6 @@ export function useDashboardSearch({ userId }) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(null);
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
   const [resumeObject, setResumeObject] = useState(null);
   // Filters of the last search that actually ran; paging and export reuse these, so
   // unapplied edits in the filter panel don't leak into page 2 or "export all matching".
@@ -120,29 +115,24 @@ export function useDashboardSearch({ userId }) {
     [searchQuery, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]
   );
 
-  const refreshDomains = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase.from('domains').select('id, name').eq('user_id', userId).order('name');
-    setDomains(data || []);
-  }, [userId]);
+  const queryClient = useQueryClient();
+  const { domains, tags } = useTaxonomy(userId);
 
-  const refreshTags = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase.from('tags').select('id, name').eq('user_id', userId).order('name');
-    setTags(data || []);
-  }, [userId]);
+  const refreshTaxonomy = useCallback(() => invalidateTaxonomy(queryClient), [queryClient]);
+  const refreshDomains = refreshTaxonomy;
+  const refreshTags = refreshTaxonomy;
 
   const createDomainInline = useCallback(async (name) => {
     const created = await createDomain(name);
-    setDomains((prev) => mergeEntityList(prev, created));
+    upsertTaxonomyEntity('domains', created, queryClient);
     return created;
-  }, []);
+  }, [queryClient]);
 
   const createTagInline = useCallback(async (name) => {
     const created = await createTag(name);
-    setTags((prev) => mergeEntityList(prev, created));
+    upsertTaxonomyEntity('tags', created, queryClient);
     return created;
-  }, []);
+  }, [queryClient]);
 
   const runSearch = useCallback(
     async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
@@ -230,27 +220,6 @@ export function useDashboardSearch({ userId }) {
     if (!userId) return;
     runSearch(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when user becomes available
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const [dRes, tRes] = await Promise.all([
-          supabase.from('domains').select('id, name').eq('user_id', userId).order('name'),
-          supabase.from('tags').select('id, name').eq('user_id', userId).order('name'),
-        ]);
-        if (!cancelled) {
-          setDomains(dRes.data || []);
-          setTags(tRes.data || []);
-        }
-      })();
-    });
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
   }, [userId]);
 
   useEffect(() => {

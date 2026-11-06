@@ -8,6 +8,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
 import TypeMark from '../components/TypeMark';
 import { createEmptyFiltersOverride, resolveSearchRpcFilters } from '../hooks/useDashboardSearch';
+import { useTaxonomy } from '../data/taxonomy';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
 
@@ -32,8 +33,7 @@ export default function Search() {
   const [dateTo, setDateTo] = useState('');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
+  const { domains, tags } = useTaxonomy(user?.id ?? null);
   const [showFilters, setShowFilters] = useState(false);
   const listScrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
@@ -98,18 +98,6 @@ export default function Search() {
     // Only run when user or URL query changes, not when runSearch identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, qFromUrl]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const [dRes, tRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-      ]);
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-    })();
-  }, [user?.id]);
 
   function handleSubmit(e) {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Turnstile from '../components/Turnstile';
 import { useAuth } from '../context/AuthContext';
@@ -12,14 +13,17 @@ import { getErrorMessage } from '../lib/errors';
 import { createDomain, createTag } from '../lib/entities';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
+import QueryError from '../components/QueryError';
+import { useTaxonomy, upsertTaxonomyEntity, removeTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
 import './Settings.css';
 
 export default function Settings() {
   const { user, refreshUser, profileLoaded } = useAuth();
   const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
+  const queryClient = useQueryClient();
+  const taxonomy = useTaxonomy(user?.id ?? null);
+  const { domains, tags } = taxonomy;
   const [loading, setLoading] = useState(true);
   const [newDomain, setNewDomain] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -164,15 +168,14 @@ export default function Settings() {
     if (!user?.id) return;
     let cancelled = false;
     async function load() {
-      const [dRes, tRes, pRes] = await Promise.all([
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('user_ai_providers').select('id, name, provider_type').eq('user_id', user.id).in('provider_type', AI_PROVIDER_IDS).order('name'),
-      ]);
+      const { data } = await supabase
+        .from('user_ai_providers')
+        .select('id, name, provider_type')
+        .eq('user_id', user.id)
+        .in('provider_type', AI_PROVIDER_IDS)
+        .order('name');
       if (cancelled) return;
-      setDomains(dRes.data || []);
-      setTags(tRes.data || []);
-      setAiProviders(pRes.data || []);
+      setAiProviders(data || []);
       setLoading(false);
     }
     load();
@@ -191,7 +194,7 @@ export default function Settings() {
       if (domains.some((d) => d.id === domain.id)) {
         addToast('info', `Domain "${domain.name}" already exists`);
       } else {
-        setDomains((prev) => [...prev, domain].sort((a, b) => a.name.localeCompare(b.name)));
+        upsertTaxonomyEntity('domains', domain, queryClient);
       }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add domain'));
@@ -212,7 +215,7 @@ export default function Settings() {
       if (tags.some((t) => t.id === tag.id)) {
         addToast('info', `Tag "${tag.name}" already exists`);
       } else {
-        setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
+        upsertTaxonomyEntity('tags', tag, queryClient);
       }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to add tag'));
@@ -228,7 +231,8 @@ export default function Settings() {
       await supabase.from('knowledge_object_domains').delete().eq('domain_id', id);
       const { error: err } = await supabase.from('domains').delete().eq('id', id).eq('user_id', user.id);
       if (err) throw err;
-      setDomains((prev) => prev.filter((d) => d.id !== id));
+      removeTaxonomyEntity('domains', id, queryClient);
+      await invalidateTaxonomy(queryClient);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to delete domain'));
     } finally {
@@ -243,7 +247,8 @@ export default function Settings() {
       await supabase.from('knowledge_object_tags').delete().eq('tag_id', id);
       const { error: err } = await supabase.from('tags').delete().eq('id', id).eq('user_id', user.id);
       if (err) throw err;
-      setTags((prev) => prev.filter((t) => t.id !== id));
+      removeTaxonomyEntity('tags', id, queryClient);
+      await invalidateTaxonomy(queryClient);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to delete tag'));
     } finally {
@@ -654,6 +659,7 @@ export default function Settings() {
       <section className="settings-section page-section">
         <h2 className="page-section-title">Domains</h2>
         <p className="settings-desc page-section-desc">Domains group your knowledge by area (e.g. Health, Tech, Projects).</p>
+        {taxonomy.error && <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />}
         <form onSubmit={addDomain} className="settings-form form">
           <input
             type="text"

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { createTestQueryClient, wrapperFor } from '../test/queryTestUtils';
 import { useDashboardSearch } from './useDashboardSearch';
 
 const mockRpc = vi.fn();
@@ -21,19 +22,16 @@ function mockFromChain(resolvedData = []) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
-    order: vi.fn(),
+    order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({ data: resolvedData, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  chain.order.mockImplementation((col) => {
-    if (col === 'name') {
-      return Promise.resolve({ data: resolvedData, error: null });
-    }
-    return chain;
-  });
   mockFrom.mockReturnValue(chain);
   return chain;
 }
+
+const wrapper = () => wrapperFor(createTestQueryClient());
 
 describe('useDashboardSearch (integration)', () => {
   beforeEach(() => {
@@ -48,7 +46,7 @@ describe('useDashboardSearch (integration)', () => {
   });
 
   it('calls search_knowledge_objects with pagination when no query', async () => {
-    renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalled();
@@ -66,7 +64,7 @@ describe('useDashboardSearch (integration)', () => {
 
   it('calls search_knowledge_objects_with_snippets when query is set and runSearch called', async () => {
     mockRpc.mockResolvedValue({ data: [], error: null });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalled();
@@ -92,7 +90,7 @@ describe('useDashboardSearch (integration)', () => {
 
   it('passes type and domain filters to RPC', async () => {
     mockRpc.mockResolvedValue({ data: [], error: null });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalled();
@@ -121,7 +119,7 @@ describe('useDashboardSearch (integration)', () => {
       }
       return Promise.resolve({ data: Array(20).fill({ id: 'x', title: 't' }), error: null });
     });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await waitFor(() => {
       expect(result.current.page).toBe(1);

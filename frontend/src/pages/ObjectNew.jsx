@@ -12,6 +12,8 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
+import { useTaxonomy } from '../data/taxonomy';
+import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 
@@ -23,8 +25,8 @@ export default function ObjectNew() {
   const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
+  const taxonomy = useTaxonomy(user?.id ?? null);
+  const { domains, tags } = taxonomy;
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateValues, setTemplateValues] = useState({});
@@ -51,21 +53,15 @@ export default function ObjectNew() {
       : null;
   const templateFields = schema?.fields || [];
 
-  const fetchDomainsTagsTemplates = useCallback(async () => {
+  const fetchTemplates = useCallback(async () => {
     if (!user?.id) return;
-    const [dRes, tRes, tmplRes] = await Promise.all([
-      supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-      supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-      supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name'),
-    ]);
-    setDomains(dRes.data || []);
-    setTags(tRes.data || []);
-    setTemplates(tmplRes.data || []);
+    const { data } = await supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name');
+    setTemplates(data || []);
   }, [user?.id]);
 
   useEffect(() => {
-    fetchDomainsTagsTemplates();
-  }, [fetchDomainsTagsTemplates]);
+    fetchTemplates();
+  }, [fetchTemplates]);
 
   // Pre-select template from URL ?template=<id>
   const hasAppliedTemplateUrl = useRef(false);
@@ -78,14 +74,14 @@ export default function ObjectNew() {
     }
   }, [templateFromUrl, templates]);
 
-  // Refetch when user returns to this tab (e.g. after adding domains/tags in Settings in another tab)
+  // Refetch templates when user returns to this tab (taxonomy refetches on focus via the query cache)
   useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === 'visible') fetchDomainsTagsTemplates();
+      if (document.visibilityState === 'visible') fetchTemplates();
     }
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [fetchDomainsTagsTemplates]);
+  }, [fetchTemplates]);
 
   // Template values restored from a draft; the reset effect below must not wipe them.
   // Holds { templateId, values } so the reset effect only consumes it once
@@ -473,7 +469,10 @@ export default function ObjectNew() {
                       </div>
                     </div>
                   )}
-                  {domains.length === 0 && tags.length === 0 && (
+                  {taxonomy.error && (
+                    <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />
+                  )}
+                  {!taxonomy.error && domains.length === 0 && tags.length === 0 && (
                     <p className="form-hint notion-hint"><Link to="/settings">Settings</Link> → Add domains and tags to classify objects.</p>
                   )}
                 </div>
