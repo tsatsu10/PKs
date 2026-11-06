@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
-import { deferAfterPaint } from '../lib/defer';
 import { createDomain, createTag } from '../lib/entities';
 import { useTaxonomy, upsertTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
 import { useObjectsPage, useObjectsCount } from '../data/objects';
+import { useResumeObject } from '../data/dashboard';
 import { qk } from '../data/keys';
 
 export const PAGE_SIZE = 20;
@@ -91,7 +90,6 @@ export function useDashboardSearch({ userId }) {
   const [dateTo, setDateTo] = useState('');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
-  const [resumeObject, setResumeObject] = useState(null);
   // Filters of the last search that actually ran; paging and export reuse these, so
   // unapplied edits in the filter panel don't leak into page 2 or "export all matching".
   const [appliedRpcPayload, setAppliedRpcPayload] = useState(null);
@@ -115,6 +113,8 @@ export function useDashboardSearch({ userId }) {
 
   const queryClient = useQueryClient();
   const { domains, tags } = useTaxonomy(userId);
+  const resumeQ = useResumeObject(userId);
+  const resumeObject = resumeQ.data ?? null;
 
   const pageQ = useObjectsPage(userId ? appliedRpcPayload : null, offset);
   const countQ = useObjectsCount(userId ? appliedRpcPayload : null);
@@ -182,31 +182,6 @@ export function useDashboardSearch({ userId }) {
     },
     [runSearch, totalCount]
   );
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const { data, error: resumeErr } = await supabase
-          .from('knowledge_objects')
-          .select('id, title, last_viewed_at')
-          .eq('user_id', userId)
-          .eq('is_deleted', false)
-          .not('last_viewed_at', 'is', null)
-          .order('last_viewed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!cancelled && !resumeErr && data) {
-          setResumeObject({ id: data.id, title: data.title });
-        }
-      })();
-    });
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
-  }, [userId]);
 
   const clearFilters = useCallback(() => {
     const empty = createEmptyFiltersOverride();

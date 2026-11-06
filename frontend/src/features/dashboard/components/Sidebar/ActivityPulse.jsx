@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
+import QueryError from '../../../../components/QueryError';
 import { useActivityPulse } from '../../hooks/useActivityPulse';
 import './ActivityPulse.css';
 
@@ -7,11 +8,15 @@ import './ActivityPulse.css';
  * Right-rail activity: trending tags, recent links.
  */
 export default function ActivityPulse({ userId, heroStats, dueSoonCount = 0, onTagFilter }) {
-  const { activity } = useActivityPulse(userId);
+  const { activity, error, retry } = useActivityPulse(userId);
 
   return (
     <aside className="activity-pulse" aria-label="Activity pulse">
       <h3 className="activity-pulse-heading">Activity</h3>
+
+      {error && (
+        <QueryError what="activity" error={error} onRetry={retry} />
+      )}
 
       {dueSoonCount > 0 && (
         <div className="activity-pulse-card">
