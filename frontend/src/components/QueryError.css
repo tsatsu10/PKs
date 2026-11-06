@@ -1,0 +1,11 @@
+.query-error {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--polar-white);
+}
+.query-error-message { margin: 0; }

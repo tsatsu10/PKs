@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import UpdatePrompt from './components/UpdatePrompt';
+import OfflineBanner from './components/OfflineBanner';
 import { publicRoutes, protectedLayoutRoute, PageLoadFallback } from './routeConfig';
 import './App.css';
 
@@ -17,6 +18,7 @@ function App() {
         <ThemeProvider>
         <ToastProvider>
         <BrowserRouter>
+          <OfflineBanner />
           <a href="#main-content" className="skip-link">Skip to main content</a>
           <Suspense fallback={<PageLoadFallback />}>
             <Routes>
