@@ -55,6 +55,18 @@ jobs:
       # running (not verified safe to exclude).
       - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime
       - run: supabase test db
+      - name: Generate types from this branch's migrations
+        run: supabase gen types typescript --local --schema public > database.types.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: database-types
+          path: database.types.ts
+      - name: Warn when committed types drift from the migrations
+        run: |
+          if ! diff -q database.types.ts frontend/src/data/database.types.ts > /dev/null; then
+            echo "::warning title=Database types drift::frontend/src/data/database.types.ts differs from this branch's migrations. For a migration PR, commit the database-types artifact; otherwise run npm run gen:types."
+            echo "⚠️ Committed database types differ from this branch's migrations. See the database-types artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   functions:
     runs-on: ubuntu-latest

@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc -b",
+    "gen:types": "supabase gen types typescript --project-id qtsxnipmbuvfflifvusn --schema public > src/data/database.types.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
