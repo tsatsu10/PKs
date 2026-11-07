@@ -43,4 +43,22 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
     },
   },
+  {
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    ignores: ['src/data/**', 'src/**/*.test.*', 'src/test/**'],
+    rules: {
+      'no-restricted-syntax': ['error',
+        {
+          // supabase.from('x').select(...) — a read. Writes chain .insert/.update/.delete/.upsert first.
+          selector: "CallExpression[callee.property.name='select'] > MemberExpression.callee > CallExpression.object[callee.object.name='supabase'][callee.property.name='from']",
+          message: 'Supabase reads belong in src/data (see docs/superpowers/specs/2026-10-13-phase-0a-part1-data-layer-design.md).',
+        },
+        {
+          // supabase.rpc('name') for anything that isn't a known write.
+          selector: "CallExpression[callee.object.name='supabase'][callee.property.name='rpc'][arguments.0.value!=/^(create_domain|create_tag|touch_object_view|delete_object_permanently|share_object_by_email|save_prompt_output_as_object|report_client_error)$/]",
+          message: 'Supabase read RPCs belong in src/data. If this RPC writes, add it to the allow-list in eslint.config.js.',
+        },
+      ],
+    },
+  },
 ])

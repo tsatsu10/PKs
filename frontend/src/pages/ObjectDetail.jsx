@@ -26,7 +26,7 @@ import { useNotifyError } from '../lib/useNotifyError';
 import { downloadBlob, printHtml } from '../lib/download';
 import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
-import { fetchObjectRow, fetchShares, searchLinkTargets, invalidateObjectVersions, invalidateObject } from '../data/objectDetail';
+import { fetchObjectRow, fetchVersionSnapshot, fetchShares, searchLinkTargets, invalidateObjectVersions, invalidateObject } from '../data/objectDetail';
 import { setObjectInLists, invalidateObjectLists } from '../data/objects';
 import { useAiProviders } from '../data/settings';
 import { usePrefetchObject } from '../data/usePrefetchObject';
@@ -125,6 +125,14 @@ export default function ObjectDetail() {
     if (!object || editing) return;
     setEditForm(objectToEditForm(object));
   }, [object, editing]);
+
+  // Owner perf check (hand-off): measure from open to first visible content per object id.
+  const visibleMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!object?.id || visibleMarkedRef.current === object.id) return;
+    visibleMarkedRef.current = object.id;
+    performance.mark('pks:object-visible');
+  }, [object?.id]);
 
   const draftAppliedRef = useRef(false);
   useEffect(() => {
@@ -303,12 +311,7 @@ export default function ObjectDetail() {
     setError('');
     try {
       // Read the snapshot fresh so a partially-loaded version list can never restore blanks.
-      const { data: snap, error: snapErr } = await supabase
-        .from('knowledge_object_versions')
-        .select('title, content, summary, key_points')
-        .eq('id', ver.id)
-        .single();
-      if (snapErr) throw snapErr;
+      const snap = await fetchVersionSnapshot(ver.id);
       const { data: restoredRows, error: err } = await supabase
         .from('knowledge_objects')
         .update({

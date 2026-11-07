@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { getErrorMessage } from '../lib/errors';
@@ -19,6 +19,11 @@ export function useObjectDetail({ id, userId }) {
   const panels = useObjectPanels(id, userId, !!object);
   const taxonomy = useTaxonomy(object ? userId : null);
   const [actionError, setError] = useState('');
+
+  // Owner perf check (hand-off): marks the open of each new object id.
+  useEffect(() => {
+    if (id) performance.mark('pks:object-open');
+  }, [id]);
 
   const loadError = objectQ.error
     ? getErrorMessage(objectQ.error, 'Load failed')

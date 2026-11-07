@@ -15,6 +15,16 @@ export async function fetchObjectRow(id: string): Promise<ObjectRow | null> {
   return (unwrap(await db.from('knowledge_objects').select(OBJECT_COLS).eq('id', id).maybeSingle()) as ObjectRow | null);
 }
 
+export type VersionSnapshot = { title: string; content: string | null; summary: string | null; key_points: unknown };
+
+/** One version snapshot, read fresh so a partially-loaded version list can never restore blanks. */
+export async function fetchVersionSnapshot(versionId: string): Promise<VersionSnapshot> {
+  const row = unwrap(await db.from('knowledge_object_versions').select('title, content, summary, key_points')
+    .eq('id', versionId).maybeSingle()) as VersionSnapshot | null;
+  if (!row) throw new Error("That version doesn't exist or was deleted.");
+  return row;
+}
+
 export const objectDetailQuery = (id: string) => queryOptions({
   queryKey: qk.object.detail(id),
   queryFn: () => fetchObjectRow(id),
