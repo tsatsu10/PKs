@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { db } from './client';
 import { unwrap } from './unwrap';
 import { qk } from './keys';
@@ -25,3 +25,26 @@ export function useNotificationsList(userId: string | null, filter: 'all' | 'unr
 
 export const invalidateNotifications = (client: QueryClient) =>
   client.invalidateQueries({ queryKey: qk.notifications.all });
+
+export function useUnreadCount(userId: string | null) {
+  return useQuery({
+    queryKey: qk.notifications.unreadCount(),
+    enabled: !!userId,
+    queryFn: async () => {
+      const { count, error } = await db.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId as string).is('read_at', null);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
+export function useRecentNotifications(userId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.notifications.recent(),
+    enabled: !!userId && enabled,
+    queryFn: async () => (unwrap(await db.from('notifications')
+      .select('id, type, title, body, read_at, related_type, related_id, created_at')
+      .eq('user_id', userId as string).order('created_at', { ascending: false }).limit(10)) ?? []) as NotificationRow[],
+  });
+}
