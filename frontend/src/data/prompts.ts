@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 import { db } from './client';
 import { fetchAll } from './fetchAll';
 import { qk } from './keys';
@@ -12,3 +12,6 @@ export const fetchPrompts = (userId: string) =>
     .order('name').order('id').range(from, to));
 
 export const promptsQuery = (userId: string) => queryOptions({ queryKey: qk.prompts.list(), queryFn: () => fetchPrompts(userId) });
+
+export const usePromptsList = (userId: string | null) => useQuery({ ...promptsQuery(userId ?? ''), enabled: !!userId });
+export const invalidatePrompts = (client: QueryClient) => client.invalidateQueries({ queryKey: qk.prompts.list() });

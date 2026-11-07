@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
+import { useNotifyError } from '../lib/useNotifyError';
 import { useToast } from '../context/ToastContext';
 import Breadcrumbs from '../components/Breadcrumbs';
+import QueryError from '../components/QueryError';
+import { useJournalMonth, useJournalDay, invalidateJournal } from '../data/journal';
 import './Journal.css';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -27,43 +30,41 @@ function getDaysInMonth(year, month) {
 export default function Journal() {
   const { user } = useAuth();
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
   const [view, setView] = useState('calendar'); // 'calendar' | 'entry'
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
-  const [entryDates, setEntryDates] = useState(new Set()); // dates that have entries
-  const [loadingDates, setLoadingDates] = useState(false);
   // entry state kept in sync with loaded row; content is the editable copy
   const [entry, setEntry] = useState(null); // eslint-disable-line no-unused-vars -- used for reset/sync
   const [content, setContent] = useState('');
-  const [loadingEntry, setLoadingEntry] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const { days, startWeekday } = useMemo(() => getDaysInMonth(year, month), [year, month]);
+  const startStr = formatDateKey(new Date(year, month, 1));
+  const endStr = formatDateKey(new Date(year, month + 1, 0));
 
+  const monthQ = useJournalMonth(user?.id ?? null, startStr, endStr);
+  const entryDates = useMemo(() => new Set(monthQ.data ?? []), [monthQ.data]);
+  const loadingDates = monthQ.isPending;
+
+  const dayQ = useJournalDay(user?.id ?? null, view === 'entry' ? selectedDate : null);
+  const loadingEntry = dayQ.isPending;
+
+  // Seed the editable copy only when the date changes or the first successful load for that
+  // date arrives — never on later data changes (a refetch must not wipe what the user typed).
+  const seededRef = useRef(null);
   useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    setLoadingDates(true);
-    const start = new Date(year, month, 1);
-    const end = new Date(year, month + 1, 0);
-    const startStr = formatDateKey(start);
-    const endStr = formatDateKey(end);
-    supabase
-      .from('journal_entries')
-      .select('entry_date')
-      .eq('user_id', user.id)
-      .gte('entry_date', startStr)
-      .lte('entry_date', endStr)
-      .then(({ data, error: e }) => {
-        if (cancelled) return;
-        if (e && import.meta.env.DEV) console.warn('Journal dates fetch failed:', e);
-        setEntryDates(new Set((data || []).map((r) => r.entry_date)));
-        setLoadingDates(false);
-      });
-    return () => { cancelled = true; };
-  }, [user?.id, year, month]);
+    if (view !== 'entry' || !selectedDate || !dayQ.isSuccess) return;
+    const data = dayQ.data ?? null;
+    const seedKey = `${selectedDate}|${data?.id ?? 'none'}`;
+    if (seededRef.current === seedKey) return;
+    seededRef.current = seedKey;
+    setEntry(data);
+    setContent(data?.content ?? '');
+  }, [view, selectedDate, dayQ.data, dayQ.isSuccess]);
 
   function goPrevMonth() {
     if (month === 0) {
@@ -84,27 +85,6 @@ export default function Journal() {
     setView('entry');
   }
 
-  useEffect(() => {
-    if (view !== 'entry' || !selectedDate || !user?.id) return;
-    let cancelled = false;
-    setLoadingEntry(true);
-    setError('');
-    supabase
-      .from('journal_entries')
-      .select('id, content, entry_date, updated_at')
-      .eq('user_id', user.id)
-      .eq('entry_date', selectedDate)
-      .maybeSingle()
-      .then(({ data, error: e }) => {
-        if (cancelled) return;
-        setEntry(data || null);
-        setContent(data?.content ?? '');
-        setError(getErrorMessage(e, ''));
-        setLoadingEntry(false);
-      });
-    return () => { cancelled = true; };
-  }, [view, selectedDate, user?.id]);
-
   async function handleSaveEntry() {
     if (!user?.id || !selectedDate) return;
     setError('');
@@ -120,12 +100,10 @@ export default function Journal() {
         { onConflict: 'user_id,entry_date' }
       );
       if (err) throw err;
-      setEntryDates((prev) => new Set([...prev, selectedDate]));
+      await invalidateJournal(queryClient);
       addToast('success', 'Entry saved');
     } catch (err) {
-      const msg = getErrorMessage(err, 'Failed to save');
-      addToast('error', msg);
-      setError(msg);
+      setError(notifyError(err, 'Failed to save'));
     } finally {
       setSaving(false);
     }
@@ -136,6 +114,7 @@ export default function Journal() {
     setSelectedDate(null);
     setEntry(null);
     setContent('');
+    seededRef.current = null;
   }
 
   const monthLabel = useMemo(() => new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' }), [year, month]);
@@ -159,7 +138,9 @@ export default function Journal() {
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="journal-entry-block">
           <h2 className="journal-entry-date-title">{selectedDate && new Date(selectedDate + 'T12:00:00').toLocaleDateString('default', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
-          {loadingEntry ? (
+          {dayQ.error ? (
+            <QueryError what="the entry" error={dayQ.error} onRetry={() => dayQ.refetch()} />
+          ) : loadingEntry ? (
             <p className="journal-muted">Loading…</p>
           ) : (
             <textarea

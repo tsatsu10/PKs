@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext';
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
 import { useTaxonomy } from '../data/taxonomy';
+import { useTemplatesList } from '../data/templates';
 import { invalidateObjectLists } from '../data/objects';
 import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
@@ -28,7 +29,8 @@ export default function ObjectNew() {
   const [error, setError] = useState('');
   const taxonomy = useTaxonomy(user?.id ?? null);
   const { domains, tags } = taxonomy;
-  const [templates, setTemplates] = useState([]);
+  const templatesQ = useTemplatesList(user?.id ?? null);
+  const templates = useMemo(() => templatesQ.data ?? [], [templatesQ.data]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateValues, setTemplateValues] = useState({});
   const [form, setForm] = useState({
@@ -54,16 +56,6 @@ export default function ObjectNew() {
       : null;
   const templateFields = schema?.fields || [];
 
-  const fetchTemplates = useCallback(async () => {
-    if (!user?.id) return;
-    const { data } = await supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name');
-    setTemplates(data || []);
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
-
   // Pre-select template from URL ?template=<id>
   const hasAppliedTemplateUrl = useRef(false);
   useEffect(() => {
@@ -74,15 +66,6 @@ export default function ObjectNew() {
       hasAppliedTemplateUrl.current = true;
     }
   }, [templateFromUrl, templates]);
-
-  // Refetch templates when user returns to this tab (taxonomy refetches on focus via the query cache)
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState === 'visible') fetchTemplates();
-    }
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [fetchTemplates]);
 
   // Template values restored from a draft; the reset effect below must not wipe them.
   // Holds { templateId, values } so the reset effect only consumes it once
