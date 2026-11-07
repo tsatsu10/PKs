@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Turnstile from '../components/Turnstile';
 import { useAuth } from '../context/AuthContext';
-import { AI_PROVIDERS, AI_PROVIDER_IDS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
+import { AI_PROVIDERS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
 import { validateApiKeyForProvider } from '../lib/aiProviders';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { useNotifyError } from '../lib/useNotifyError';
+import { reportError } from '../lib/reportError';
 import { createDomain, createTag } from '../lib/entities';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
 import QueryError from '../components/QueryError';
 import { useTaxonomy, upsertTaxonomyEntity, removeTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
+import { useAiProviders, invalidateAiProviders } from '../data/settings';
+import { fetchOwnObjectsForExport, fetchAccountExtras } from '../data/exports';
 import './Settings.css';
 
 export default function Settings() {
@@ -22,9 +26,12 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
   const taxonomy = useTaxonomy(user?.id ?? null);
   const { domains, tags } = taxonomy;
-  const [loading, setLoading] = useState(true);
+  const providersQ = useAiProviders(user?.id ?? null);
+  const aiProviders = useMemo(() => providersQ.data ?? [], [providersQ.data]);
+  const loading = providersQ.isPending;
   const [newDomain, setNewDomain] = useState('');
   const [newTag, setNewTag] = useState('');
   const [addingDomain, setAddingDomain] = useState(false);
@@ -35,7 +42,6 @@ export default function Settings() {
   const [backupError, setBackupError] = useState('');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
-  const [aiProviders, setAiProviders] = useState([]);
   const [aiProviderName, setAiProviderName] = useState('');
   const [aiProviderKey, setAiProviderKey] = useState('');
   const [aiProviderType, setAiProviderType] = useState(DEFAULT_AI_PROVIDER);
@@ -164,24 +170,6 @@ export default function Settings() {
     }
   }
 
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    async function load() {
-      const { data } = await supabase
-        .from('user_ai_providers')
-        .select('id, name, provider_type')
-        .eq('user_id', user.id)
-        .in('provider_type', AI_PROVIDER_IDS)
-        .order('name');
-      if (cancelled) return;
-      setAiProviders(data || []);
-      setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
   async function addDomain(e) {
     e.preventDefault();
     const name = newDomain.trim();
@@ -277,16 +265,9 @@ export default function Settings() {
       if (err) throw err;
       setAiProviderName('');
       setAiProviderKey('');
-      const { data, error: refetchErr } = await supabase
-        .from('user_ai_providers')
-        .select('id, name, provider_type')
-        .eq('user_id', user.id)
-        .in('provider_type', AI_PROVIDER_IDS)
-        .order('name');
-      if (refetchErr && import.meta.env.DEV) console.warn('AI providers refetch failed:', refetchErr);
-      setAiProviders(data || []);
+      await invalidateAiProviders(queryClient);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to add AI provider'));
+      setError(notifyError(err, 'Failed to add AI provider'));
     } finally {
       setAddingAiProvider(false);
     }
@@ -298,34 +279,12 @@ export default function Settings() {
     try {
       const { error: err } = await supabase.from('user_ai_providers').delete().eq('id', id).eq('user_id', user.id);
       if (err) throw err;
-      setAiProviders((prev) => prev.filter((p) => p.id !== id));
+      await invalidateAiProviders(queryClient);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove AI provider'));
+      setError(notifyError(err, 'Failed to remove AI provider'));
     } finally {
       setDeletingId(null);
     }
-  }
-
-  /** Fetch all non-deleted knowledge_objects in pages (avoids huge single response for large accounts). */
-  async function fetchAllKnowledgeObjectsPaginated() {
-    const PAGE = 500;
-    let objs = [];
-    let offset = 0;
-    while (true) {
-      const { data, error } = await supabase
-        .from('knowledge_objects')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_deleted', false)
-        .order('updated_at', { ascending: false })
-        .range(offset, offset + PAGE - 1);
-      if (error) throw error;
-      if (!data?.length) break;
-      objs = objs.concat(data);
-      if (data.length < PAGE) break;
-      offset += PAGE;
-    }
-    return objs;
   }
 
   /** Full account export: objects, journal, paste bin, domains, tags as one JSON. */
@@ -333,40 +292,15 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const [journalRes, pasteRes, domainsRes, tagsRes] = await Promise.all([
-        supabase.from('journal_entries').select('*').eq('user_id', user.id).order('entry_date', { ascending: false }),
-        supabase.from('paste_bin').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
+      const [objects, extras] = await Promise.all([
+        fetchOwnObjectsForExport(user.id),
+        fetchAccountExtras(user.id),
       ]);
-      if (journalRes.error) throw journalRes.error;
-      if (pasteRes.error) throw pasteRes.error;
-      if (domainsRes.error) throw domainsRes.error;
-      if (tagsRes.error) throw tagsRes.error;
-      const objs = await fetchAllKnowledgeObjectsPaginated();
-      const ids = objs.map((o) => o.id);
-      const [kodRes, kotRes] = ids.length
-        ? await Promise.all([
-            supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', ids),
-            supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', ids),
-          ])
-        : [{ data: [] }, { data: [] }];
-      const domainsByObj = {};
-      (kodRes.data || []).forEach((r) => {
-        if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
-        if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
-      });
-      const tagsByObj = {};
-      (kotRes.data || []).forEach((r) => {
-        if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
-        if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
-      });
-      const objects = objs.map((o) => ({ ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] }));
       const exported_at = new Date().toISOString();
-      const journal_entries = journalRes.data || [];
-      const paste_bin = pasteRes.data || [];
-      const domains = domainsRes.data || [];
-      const tags = tagsRes.data || [];
+      const journal_entries = extras.journal_entries;
+      const paste_bin = extras.paste_bin;
+      const domains = extras.domains;
+      const tags = extras.tags;
       const CHUNK = 50;
       const parts = [
         '{"exported_at":"', exported_at, '","version":1,"objects":[',
@@ -389,6 +323,7 @@ export default function Settings() {
       const blob = new Blob([parts.join('')], { type: 'application/json' });
       downloadBlob(blob, `pks-my-data-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
+      reportError(err);
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);
@@ -399,22 +334,7 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const objs = await fetchAllKnowledgeObjectsPaginated();
-      const [kodRes, kotRes] = await Promise.all([
-        supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', (objs || []).map((o) => o.id)),
-        supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', (objs || []).map((o) => o.id)),
-      ]);
-      const domainsByObj = {};
-      (kodRes.data || []).forEach((r) => {
-        if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
-        if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
-      });
-      const tagsByObj = {};
-      (kotRes.data || []).forEach((r) => {
-        if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
-        if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
-      });
-      const normalized = (objs || []).map((o) => ({ ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] }));
+      const normalized = await fetchOwnObjectsForExport(user.id);
       const exported_at = new Date().toISOString();
       const CHUNK = 50;
       const parts = ['{"exported_at":"', exported_at, '","objects":['];
@@ -430,6 +350,7 @@ export default function Settings() {
       const blob = new Blob([parts.join('')], { type: 'application/json' });
       downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (err) {
+      reportError(err);
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);
@@ -440,34 +361,19 @@ export default function Settings() {
     setBackupError('');
     setBackupLoading(true);
     try {
-      const objs = await fetchAllKnowledgeObjectsPaginated();
-      const ids = (objs || []).map((o) => o.id);
-      const [kodRes, kotRes] = await Promise.all([
-        supabase.from('knowledge_object_domains').select('knowledge_object_id, domain_id, domains(id, name)').in('knowledge_object_id', ids),
-        supabase.from('knowledge_object_tags').select('knowledge_object_id, tag_id, tags(id, name)').in('knowledge_object_id', ids),
-      ]);
-      const domainsByObj = {};
-      (kodRes.data || []).forEach((r) => {
-        if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
-        if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
-      });
-      const tagsByObj = {};
-      (kotRes.data || []).forEach((r) => {
-        if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
-        if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
-      });
+      const objs = await fetchOwnObjectsForExport(user.id);
       const include = getExportIncludeFromTemplate('full', { includeLinks: false });
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
-      (objs || []).forEach((o, i) => {
-        const obj = { ...o, domains: domainsByObj[o.id] || [], tags: tagsByObj[o.id] || [] };
-        const md = buildObjectMarkdown(obj, include);
+      objs.forEach((o, i) => {
+        const md = buildObjectMarkdown(o, include);
         const safeTitle = (o.title || 'untitled').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80);
         zip.file(`${String(i + 1).padStart(3, '0')}-${safeTitle}.md`, md);
       });
       const blob = await zip.generateAsync({ type: 'blob' });
       downloadBlob(blob, `pks-backup-${new Date().toISOString().slice(0, 10)}.zip`);
     } catch (err) {
+      reportError(err);
       setBackupError(getErrorMessage(err, 'Export failed'));
     } finally {
       setBackupLoading(false);

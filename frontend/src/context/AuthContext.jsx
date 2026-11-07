@@ -11,6 +11,7 @@ import {
   clearExplicitLogoutMark,
 } from '../lib/authEvents';
 import { clearUserData, clearOrphanedLocalData, claimUserData } from '../lib/userStorage';
+import { fetchProfile } from '../data/profile';
 
 const AuthContext = createContext(null);
 
@@ -23,16 +24,6 @@ function mapUser(au, profile) {
     timezone: profile?.timezone ?? 'Africa/Accra',
     createdAt: profile?.created_at ?? au.created_at,
   };
-}
-
-async function fetchProfile(userId) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('email, display_name, timezone, created_at')
-    .eq('id', userId)
-    .single();
-  if (error) return null;
-  return data;
 }
 
 /**
