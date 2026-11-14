@@ -154,6 +154,15 @@ describe('saveQueue: leaving', () => {
     const b = await open();
     expect(b.queue).toBe(a.queue);
   });
+
+  it('a queue opened twice keeps working until both have disposed it', async () => {
+    const a = await open();
+    await open();
+    a.queue.dispose();
+    a.queue.change({ title: 'A' });
+    window.dispatchEvent(new Event('pagehide'));
+    expect(h.updates()).toHaveLength(1);
+  });
 });
 
 describe('saveQueue: sign out', () => {

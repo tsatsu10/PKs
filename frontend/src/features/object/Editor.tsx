@@ -1,17 +1,95 @@
-import { memo, type ComponentType } from 'react';
-import BlockNoteEditorJs from '../../components/BlockNoteEditor';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCreateBlockNote } from '@blocknote/react';
+import { BlockNoteView } from '@blocknote/mantine';
+import '@blocknote/mantine/style.css';
+import BlockNoteMantineProvider from '../../components/BlockNoteMantineProvider';
+import { createPasteHandler } from '../../components/blockNotePaste';
+import { useTheme } from '../../context/ThemeContext';
+import '../../components/BlockNoteEditor.css';
+import { toContentFields, type ContentFields } from './content';
 
-type Props = { initialValue: string; onChange: (markdown: string) => void };
+type Props = {
+  /** BlockNote blocks (content_json). Preferred when present. */
+  initialJson: unknown[] | null;
+  /** Markdown (content), parsed once when there is no JSON. */
+  initialMarkdown: string;
+  onChange: (fields: ContentFields) => void;
+  autoFocus?: boolean;
+};
 
-// The JS component's inferred props make every prop required; these are the ones it reads.
-const BlockNoteEditor = BlockNoteEditorJs as unknown as ComponentType<Props & { minHeight?: number; 'aria-label'?: string }>;
+const MIN_HEIGHT = 280;
 
 /**
- * The content editor. It takes its starting value once and reports changes through `onChange`;
- * the parent keeps the value in a ref, so typing doesn't re-render the page (P3).
+ * The content editor. It seeds once (remount it with a new key to reload) and reports both
+ * content columns through `onChange`; it never sets state per keystroke, so typing doesn't
+ * re-render the page (P3).
  */
-function Editor({ initialValue, onChange }: Props) {
-  return <BlockNoteEditor initialValue={initialValue} onChange={onChange} minHeight={280} aria-label="Content" />;
+function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }: Props) {
+  const hasJson = Array.isArray(initialJson) && initialJson.length > 0;
+  // Seeded once per mount: later prop changes never replace what the user is typing.
+  const options = useMemo(() => ({
+    pasteHandler: createPasteHandler(),
+    initialContent: hasJson ? (initialJson as never) : undefined,
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const editor = useCreateBlockNote(options);
+  const markdownRef = useRef(initialMarkdown);
+  const initializing = useRef(!hasJson);
+  const [ready, setReady] = useState(hasJson);
+  const onChangeRef = useRef(onChange);
+  const { resolvedTheme } = useTheme() as { resolvedTheme: 'light' | 'dark' };
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  useEffect(() => {
+    if (!initializing.current) return;
+    let mounted = true;
+    const md = (markdownRef.current ?? '').trim();
+    (async () => {
+      try {
+        const blocks = md ? await editor.tryParseMarkdownToBlocks(md) : [{ type: 'paragraph', content: [] }];
+        if (mounted) editor.replaceBlocks(editor.document, blocks as never);
+      } catch {
+        // Keep the raw text visible rather than an empty editor, so an edit can't wipe it.
+        if (mounted) editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: md }] as never);
+      }
+      if (mounted) {
+        initializing.current = false;
+        setReady(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [editor]);
+
+  useEffect(() => {
+    if (ready && autoFocus) editor.focus();
+  }, [ready, autoFocus, editor]);
+
+  const handleChange = useCallback(async () => {
+    if (initializing.current) return;
+    try {
+      onChangeRef.current(await toContentFields(editor as never));
+    } catch {
+      // Conversion failed: keep the last good value instead of reporting empty content.
+    }
+  }, [editor]);
+
+  return (
+    <BlockNoteMantineProvider>
+      <div
+        className="blocknote-editor-wrapper"
+        data-mantine-color-scheme={resolvedTheme}
+        data-color-scheme={resolvedTheme}
+        style={{ minHeight: `${MIN_HEIGHT}px` }}
+        aria-label="Content"
+      >
+        {ready ? (
+          <BlockNoteView editor={editor} onChange={handleChange} theme={resolvedTheme} formattingToolbar slashMenu />
+        ) : (
+          <div style={{ minHeight: `${MIN_HEIGHT}px` }} className="blocknote-editor-placeholder" aria-hidden="true" />
+        )}
+      </div>
+    </BlockNoteMantineProvider>
+  );
 }
 
 export default memo(Editor);

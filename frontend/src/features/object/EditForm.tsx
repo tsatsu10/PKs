@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 import { OBJECT_STATUSES } from '../../constants';
+import type { ContentFields } from './content';
 import Editor from './Editor';
 import type { useEditSession } from './hooks/useEditSession';
 import type { ObjectRow } from './types';
@@ -9,6 +11,7 @@ type Props = { object: ObjectRow; isOwner: boolean; edit: ReturnType<typeof useE
 export default function EditForm({ object, isOwner, edit }: Props) {
   const { editForm, setField, initialContent, onContentChange } = edit;
   const isBookmark = object.type === 'bookmark';
+  const onContentFields = useCallback((f: ContentFields) => onContentChange(f.content), [onContentChange]);
   return (
     <div className="detail-edit" key={`edit-${object?.id}`}>
       <label>Title <input type="text" value={editForm.title} onChange={(e) => setField('title', e.target.value)} required /></label>
@@ -21,7 +24,7 @@ export default function EditForm({ object, isOwner, edit }: Props) {
       <label>Summary <textarea value={editForm.summary} onChange={(e) => setField('summary', e.target.value)} rows={2} /></label>
       <div className="detail-edit-field">
         <span className="detail-edit-label">Content</span>
-        <Editor initialValue={initialContent} onChange={onContentChange} />
+        <Editor initialJson={null} initialMarkdown={initialContent} onChange={onContentFields} />
       </div>
     </div>
   );

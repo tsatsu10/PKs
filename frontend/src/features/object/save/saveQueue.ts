@@ -86,7 +86,9 @@ class Queue implements SaveQueue {
   private authRetried = false;
   private stopWaitingOnline: (() => void) | null = null;
   private reloadListeners = new Set<() => void>();
-  private attached = false;
+  /** Pages holding this queue open (StrictMode and quick re-opens can overlap). */
+  private holders = 0;
+  private get attached() { return this.holders > 0; }
   /** Signed out: never send or write again. */
   closed = false;
 
@@ -124,8 +126,8 @@ class Queue implements SaveQueue {
   attach(isOwner: boolean, client: QueryClient | undefined) {
     this.isOwner = isOwner;
     if (client) this.client = client;
-    if (this.attached) return;
-    this.attached = true;
+    this.holders += 1;
+    if (this.holders > 1) return;
     window.addEventListener('pagehide', this.onHide);
     document.addEventListener('visibilitychange', this.onVisibility);
     if (Object.keys(this.queued).length > 0 && !this.sending) this.schedule();
@@ -388,6 +390,7 @@ class Queue implements SaveQueue {
   };
 
   dispose() {
+    if (this.holders > 1) { this.holders -= 1; return; }
     this.clearTimers();
     this.stopRetry();
     this.stopWaiting();
@@ -395,7 +398,7 @@ class Queue implements SaveQueue {
       window.removeEventListener('pagehide', this.onHide);
       document.removeEventListener('visibilitychange', this.onVisibility);
     }
-    this.attached = false;
+    this.holders = 0;
     // An idle queue is forgotten; one with unsent edits stays so reopening finds them.
     if (!this.hasUnsent() && registry.get(this.objectId) === this) registry.delete(this.objectId);
   }
@@ -403,6 +406,7 @@ class Queue implements SaveQueue {
   close() {
     this.closed = true;
     if (this.fade) clearTimeout(this.fade);
+    this.holders = Math.min(this.holders, 1);
     this.dispose();
   }
 }
