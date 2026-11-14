@@ -1105,9 +1105,9 @@ export type Database = {
         Args: { p_limit_per_minute?: number }
         Returns: Json
       }
+      markdown_plain_text: { Args: { p_md: string }; Returns: string }
       merge_case_duplicate_taxonomy: { Args: never; Returns: undefined }
       owns_knowledge_object: { Args: { obj_id: string }; Returns: boolean }
-      markdown_plain_text: { Args: { p_md: string }; Returns: string }
       report_client_error: {
         Args: {
           p_app_version: string
