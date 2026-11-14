@@ -3,13 +3,15 @@
  * the IndexedDB local copy, flush on hide, and the revision check. One queue per object id,
  * kept in a module-level registry so leaving the page doesn't lose an edit still being sent.
  */
-import type { QueryClient } from '@tanstack/react-query';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
+import { classifyError, getErrorMessage } from '../../../lib/errors';
+import { reportError } from '../../../lib/reportError';
 import { slugForTitle } from '../../../lib/objectForm';
 import { registerUserDataHooks } from '../../../lib/userStorage';
 import { queryClient as defaultClient } from '../../../data/queryClient';
 import { qk } from '../../../data/keys';
-import { OBJECT_COLS, invalidateObjectVersions } from '../../../data/objectDetail';
+import { OBJECT_COLS, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
 import { invalidateObjectLists, setObjectInLists } from '../../../data/objects';
 import {
   readLocalCopy, writeLocalCopy, writeLocalCopyNow, deleteLocalCopy, deleteLocalCopies, deleteOtherUsersLocalCopies,
@@ -33,11 +35,31 @@ export interface SaveQueue {
   baseRevision(): number;
   /** Stop timers and listeners; keeps the local copy. */
   dispose(): void;
+  /** Conflict: save their version to history, then overwrite it with mine. */
+  keepMine(): Promise<void>;
+  /** Conflict: save my unsent edit to history, drop it, and reload theirs (emits onReloaded). */
+  loadTheirs(): Promise<void>;
+  /** Save version: flush, then snapshot the current row. Resolves to the new version number. */
+  snapshot(reason?: string): Promise<number>;
+  /** Restore: flush, snapshot the current row, then save the version's fields (emits onReloaded). */
+  applyVersion(v: VersionFields): Promise<void>;
+  /** The fields on the page must be re-seeded from the server row plus pending(). */
+  onReloaded(listener: () => void): () => void;
 }
+export type VersionFields = {
+  version: number; title: string; content: string | null; content_json: unknown[] | null;
+  summary: string | null; key_points: unknown;
+};
 
 export const DEBOUNCE_MS = 800;
 export const MAX_WAIT_MS = 5000;
 export const SAVED_FADE_MS = 2000;
+export const RETRY_DELAYS_MS = [1000, 2000, 5000, 10_000, 30_000];
+export const DELETED_MESSAGE = 'This object was deleted';
+export const NO_ACCESS_MESSAGE = 'You no longer have edit access';
+export const KEEP_MINE_REASON = 'Kept from a conflict before overwrite';
+export const LOAD_THEIRS_REASON = 'Unsaved edit kept from a conflict';
+const SNAPSHOT_KEYS = ['title', 'content', 'content_json', 'summary', 'key_points'] as const;
 
 const OWNER_ONLY = ['type', 'status', 'due_at', 'remind_at', 'cover_url'] as const;
 type Patch = SaveFields & { slug?: string | null };
@@ -59,6 +81,11 @@ class Queue implements SaveQueue {
   private debounce: ReturnType<typeof setTimeout> | null = null;
   private maxWait: ReturnType<typeof setTimeout> | null = null;
   private fade: ReturnType<typeof setTimeout> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryCount = 0;
+  private authRetried = false;
+  private stopWaitingOnline: (() => void) | null = null;
+  private reloadListeners = new Set<() => void>();
   private attached = false;
   /** Signed out: never send or write again. */
   closed = false;
@@ -119,7 +146,11 @@ class Queue implements SaveQueue {
     if (Object.keys(next).length === 0) return;
     this.queued = { ...this.queued, ...next };
     writeLocalCopy(this.userId, this.objectId, { fields: this.pending(), baseRevision: this.base });
-    if (!this.canSend()) { this.listeners.forEach((l) => l()); return; }
+    // Paused (conflict, blocked) or waiting (retry timer, offline): keep it, don't send yet.
+    if (!this.canSend() || this.state.status === 'retrying' || this.state.status === 'offline') {
+      this.listeners.forEach((l) => l());
+      return;
+    }
     if (!this.sending) this.setState('pending');
     this.schedule();
   }
@@ -137,48 +168,122 @@ class Queue implements SaveQueue {
     this.maxWait = null;
   }
 
+  private stopRetry() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+  }
+
+  private stopWaiting() {
+    this.stopWaitingOnline?.();
+    this.stopWaitingOnline = null;
+  }
+
   private send() {
     this.clearTimers();
+    this.stopRetry();
     if (this.sending || !this.canSend() || Object.keys(this.queued).length === 0) return;
+    if (!onlineManager.isOnline()) { this.goOffline(); return; }
     const patch = this.queued;
     this.queued = {};
     this.inFlight = patch;
     this.setState('saving');
     this.sending = this.request(patch).finally(() => {
       this.sending = null;
-      // Edits made while that request was out go next, unless the user is still typing.
-      if (!this.debounce && Object.keys(this.queued).length > 0) this.send();
+      // Edits made while that request was out (or a retry due now) go next, unless the user
+      // is still typing or a backoff timer owns the next attempt.
+      if (!this.debounce && !this.retryTimer && Object.keys(this.queued).length > 0) this.send();
     });
   }
 
   private async request(patch: Patch) {
     let row: Row | null = null;
     let failed = false;
+    let error: unknown = null;
     try {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('knowledge_objects')
         .update(patch)
         .eq('id', this.objectId)
         .eq('revision', this.base)
         .select(OBJECT_COLS);
-      if (error) failed = true;
-      else row = ((data as Row[] | null) ?? [])[0] ?? null;
-    } catch {
+      if (result.error) { failed = true; error = result.error; }
+      else row = ((result.data as Row[] | null) ?? [])[0] ?? null;
+    } catch (err) {
       failed = true;
+      error = err;
     }
     if (this.closed) return;
     if (failed || !row) {
-      // Task 5 refines this into retrying / offline / conflict / blocked outcomes.
+      // Not saved: the patch goes back in front of anything typed since.
       this.queued = { ...patch, ...this.queued };
       this.inFlight = null;
-      this.setState('blocked', 'Not saved');
+      if (failed) await this.onError(error);
+      else await this.onZeroRows();
       return;
     }
     this.inFlight = null;
     this.onSaved(row);
   }
 
+  private block(message: string) {
+    this.setState('blocked', message);
+  }
+
+  private retryLater() {
+    const delay = RETRY_DELAYS_MS[Math.min(this.retryCount, RETRY_DELAYS_MS.length - 1)];
+    this.retryCount += 1;
+    this.setState('retrying');
+    this.stopRetry();
+    this.retryTimer = setTimeout(() => { this.retryTimer = null; this.send(); }, delay);
+  }
+
+  private goOffline() {
+    this.setState('offline');
+    if (this.stopWaitingOnline) return;
+    this.stopWaitingOnline = onlineManager.subscribe((online) => {
+      if (!online) return;
+      this.stopWaiting();
+      this.send();
+    });
+  }
+
+  private async onError(err: unknown) {
+    const kind = classifyError(err);
+    if (kind === 'server' || kind === 'permission') reportError(err);
+    if (kind === 'offline') { this.goOffline(); return; }
+    if (kind === 'auth') {
+      if (this.authRetried) { this.block(getErrorMessage(err)); return; }
+      this.authRetried = true;
+      this.setState('retrying');
+      try { await supabase.auth.refreshSession(); } catch { /* the retry will tell */ }
+      return; // send()'s finally retries at once (no timer is set)
+    }
+    if (kind === 'validation' || kind === 'permission' || kind === 'not_found' || kind === 'conflict') {
+      this.block(getErrorMessage(err));
+      return;
+    }
+    this.retryLater(); // network, server, rate limited, unknown
+  }
+
+  /** R7: zero rows matched. Say why, instead of always blaming another edit. */
+  private async onZeroRows() {
+    let check;
+    try {
+      check = await fetchSaveCheck(this.objectId, this.userId);
+    } catch (err) {
+      await this.onError(err);
+      return;
+    }
+    if (this.closed) return;
+    if (!check.row || check.row.is_deleted) this.block(DELETED_MESSAGE);
+    else if (check.row.revision !== this.base) this.setState('conflict');
+    else if (check.row.user_id !== this.userId && check.shareRole !== 'editor') this.block(NO_ACCESS_MESSAGE);
+    else this.retryLater();
+  }
+
   private onSaved(row: Row) {
+    this.retryCount = 0;
+    this.authRetried = false;
     const prev = this.client.getQueryData<Row>(qk.object.detail(this.objectId));
     this.base = row.revision;
     this.client.setQueryData(qk.object.detail(this.objectId), row);
@@ -203,13 +308,74 @@ class Queue implements SaveQueue {
   }
 
   async flush(): Promise<void> {
+    let tried = false;
     for (;;) {
       if (this.sending) { await this.sending; continue; }
-      if (Object.keys(this.queued).length === 0 || !this.canSend()) return;
+      if (Object.keys(this.queued).length === 0 || !this.canSend() || this.state.status === 'offline') return;
+      // One attempt now, even mid-backoff; then leave it to the retry timer.
+      if (tried && this.state.status === 'retrying') return;
+      tried = true;
       this.send();
       if (!this.sending) return;
     }
   }
+
+  private async rpcSnapshot(fields: SaveFields | null, reason: string | null): Promise<number> {
+    const { data, error } = await supabase.rpc('snapshot_knowledge_object', {
+      p_object_id: this.objectId, p_fields: fields, p_reason: reason,
+    });
+    if (error) throw error;
+    void invalidateObjectVersions(this.objectId, this.client).catch(() => undefined);
+    return data as number;
+  }
+
+  async keepMine(): Promise<void> {
+    await this.rpcSnapshot(null, KEEP_MINE_REASON);
+    const check = await fetchSaveCheck(this.objectId, this.userId);
+    if (!check.row || check.row.is_deleted) { this.block(DELETED_MESSAGE); return; }
+    this.base = check.row.revision;
+    this.setState('pending');
+    await this.flush();
+  }
+
+  async loadTheirs(): Promise<void> {
+    const pending = this.pending();
+    const mine: Record<string, unknown> = {};
+    for (const k of SNAPSHOT_KEYS) if (k in pending) mine[k] = pending[k];
+    await this.rpcSnapshot(mine as SaveFields, LOAD_THEIRS_REASON);
+    this.clearTimers();
+    this.stopRetry();
+    this.queued = {};
+    await deleteLocalCopy(this.userId, this.objectId);
+    const row = await this.client.fetchQuery({ ...objectDetailQuery(this.objectId), staleTime: 0 });
+    if (row) this.base = row.revision;
+    this.setState('idle');
+    this.reloadListeners.forEach((l) => l());
+  }
+
+  async snapshot(reason?: string): Promise<number> {
+    await this.flush();
+    return this.rpcSnapshot(null, reason ?? null);
+  }
+
+  async applyVersion(v: VersionFields): Promise<void> {
+    await this.flush();
+    await this.snapshot(`Before restoring v${v.version}`);
+    this.change({
+      title: v.title,
+      content: v.content ?? '',
+      content_json: v.content_json,
+      summary: v.summary,
+      key_points: Array.isArray(v.key_points) ? v.key_points : [],
+    });
+    await this.flush();
+    this.reloadListeners.forEach((l) => l());
+  }
+
+  onReloaded = (listener: () => void) => {
+    this.reloadListeners.add(listener);
+    return () => { this.reloadListeners.delete(listener); };
+  };
 
   private onHide = () => {
     if (this.closed || !this.hasUnsent()) return;
@@ -223,6 +389,8 @@ class Queue implements SaveQueue {
 
   dispose() {
     this.clearTimers();
+    this.stopRetry();
+    this.stopWaiting();
     if (this.attached) {
       window.removeEventListener('pagehide', this.onHide);
       document.removeEventListener('visibilitychange', this.onVisibility);

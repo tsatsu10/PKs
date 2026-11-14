@@ -45,7 +45,8 @@ export function mockSupabase() {
     };
     return chain;
   };
-  const client = { from: vi.fn(from), rpc, storage };
+  const auth = { refreshSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })) };
+  const client = { from: vi.fn(from), rpc, storage, auth };
   return {
     client,
     calls,
@@ -53,6 +54,7 @@ export function mockSupabase() {
     set respond(fn) { state.respond = fn; },
     rpc: state.rpc,
     rpcSelects,
+    auth,
     bucket,
   };
 }

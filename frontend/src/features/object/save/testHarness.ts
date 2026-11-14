@@ -49,6 +49,7 @@ export function saveHarness(get: () => Mock) {
       get().calls.length = 0;
       get().rpc.mockReset();
       get().rpc.mockImplementation(() => Promise.resolve({ data: 1, error: null }));
+      get().auth.refreshSession.mockClear();
       get().respond = respond;
     },
     /** The server-side row (null: deleted or hidden by RLS). */
