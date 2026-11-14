@@ -120,17 +120,36 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
     }
   });
 
-  it('editor does not see link search or related Link buttons', async () => {
+  it('link search offers only objects the user owns, for owner and editor alike', async () => {
     auth.currentUser = 'ed';
     myShare = { id: 's', role: 'editor' };
     sb.current!.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'suggest_linked_objects' ? { data: [{ id: 'o9', title: 'Nine', type: 'note' }], error: null } : { data: [], error: null },
+      name === 'search_knowledge_objects'
+        ? { data: [{ id: 'mine', title: 'Mine', type: 'note', user_id: 'ed' }, { id: 'theirs', title: 'Theirs', type: 'note', user_id: 'owner' }], error: null }
+        : name === 'suggest_linked_objects' ? { data: [{ id: 'o9', title: 'Nine', type: 'note' }], error: null } : { data: [], error: null },
     ));
     renderPage();
     await heading('First');
-    expect(await screen.findByRole('button', { name: 'Edit' })).toBeInTheDocument();
-    expect(screen.queryByRole('searchbox', { name: 'Search objects to link' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Link' })).not.toBeInTheDocument();
+    const search = await screen.findByRole('searchbox', { name: 'Search objects to link' });
+    fireEvent.change(search, { target: { value: 'm' } });
+    expect(await screen.findByRole('link', { name: 'Mine' }, { timeout: 2000 })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Theirs' })).not.toBeInTheDocument();
+    // The "Related you might link" card stays owner-only.
+    expect(screen.queryByRole('link', { name: 'Nine' })).not.toBeInTheDocument();
+  });
+
+  it('a draft written mid-edit is not restored over what the user is typing', async () => {
+    sessionStorage.setItem('pks-drafts-owner', 'owner');
+    renderPage();
+    await heading('First');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    fireEvent.change(title, { target: { value: 'FirstA' } });
+    await waitFor(() => expect(sessionStorage.getItem('pks-draft-o1')).not.toBeNull(), { timeout: 2000 });
+    fireEvent.change(title, { target: { value: 'FirstAB' } });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('FirstAB');
+    expect(screen.queryByText('Draft restored')).not.toBeInTheDocument();
   });
 
   it('viewer sees no edit controls', async () => {

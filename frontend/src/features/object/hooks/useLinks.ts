@@ -32,7 +32,8 @@ export function useLinks({ object, userId, otherObjects, outgoingLinks, incoming
     }
     const t = setTimeout(async () => {
       try {
-        setResults((await searchLinkTargets(query.trim())).filter((o) => o.id !== objectId));
+        // link_edges INSERT (RLS) needs the target to be the user's own object, for owners and shared editors alike (B13).
+        setResults((await searchLinkTargets(query.trim())).filter((o) => o.id !== objectId && o.user_id === userId));
       } catch {
         setResults([]);
       }

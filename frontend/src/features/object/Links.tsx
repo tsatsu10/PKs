@@ -7,7 +7,7 @@ import type { LinkTarget, OutgoingLink, IncomingLink, SuggestedLink } from './ty
 
 type Props = {
   isOwner: boolean;
-  /** Shows the "Related you might link" card. Creating links is owner-only under RLS. */
+  /** Shows the "Related you might link" card (owner only, as before). */
   canLink: boolean;
   outgoing: OutgoingLink[];
   incoming: IncomingLink[];

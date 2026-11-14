@@ -111,6 +111,7 @@ export function useEditSession({ id, object, isOwner, draft, setObject, setError
 
   function start() {
     if (!object) return;
+    draftAppliedRef.current = true; // an edit started by hand never adopts a stored draft later
     baseRevisionRef.current = object.revision;
     loadForm(toForm(object));
     setEditing(true);

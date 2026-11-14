@@ -41,9 +41,9 @@ describe('useLinks', () => {
     expect(result.current.search.open).toBe(false);
   });
 
-  it('search waits 300 ms and excludes the current object', async () => {
+  it('search waits 300 ms and offers only own objects other than this one', async () => {
     vi.useFakeTimers();
-    sb.current!.rpc.mockResolvedValue({ data: [{ id: 'o1' }, { id: 'o9' }], error: null });
+    sb.current!.rpc.mockResolvedValue({ data: [{ id: 'o1', user_id: 'owner' }, { id: 'o9', user_id: 'owner' }, { id: 'o7', user_id: 'someone' }], error: null });
     const { result } = setup();
     act(() => result.current.search.setQuery('fo'));
     await act(async () => { vi.advanceTimersByTime(299); });
@@ -51,6 +51,6 @@ describe('useLinks', () => {
     await act(async () => { vi.advanceTimersByTime(1); });
     await act(async () => { await Promise.resolve(); });
     expect(sb.current!.rpc).toHaveBeenCalledWith('search_knowledge_objects', expect.objectContaining({ search_query: 'fo' }));
-    expect(result.current.search.results).toEqual([{ id: 'o9' }]);
+    expect(result.current.search.results).toEqual([{ id: 'o9', user_id: 'owner' }]);
   });
 });

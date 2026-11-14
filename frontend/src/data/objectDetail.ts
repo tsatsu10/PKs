@@ -108,7 +108,7 @@ export async function fetchShares(objectId: string): Promise<ShareRow[]> {
 }
 
 export async function searchLinkTargets(query: string) {
-  return ((unwrap(await supabase.rpc('search_knowledge_objects', { search_query: query, limit_n: 8, offset_n: 0 })) ?? []) as LinkTarget[]);
+  return ((unwrap(await supabase.rpc('search_knowledge_objects', { search_query: query, limit_n: 8, offset_n: 0 })) ?? []) as Array<LinkTarget & { user_id: string }>);
 }
 
 export const invalidateObject = (id: string, client: QueryClient = defaultClient) =>

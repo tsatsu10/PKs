@@ -52,7 +52,9 @@ export function useObjectPage({ id, userId }: { id?: string; userId?: string }) 
   const oid = id ?? '';
   const setObject = useMemo(() => setter(qk.object.detail(oid)) as unknown as ObjectSetter, [setter, oid]);
   const reload = useCallback(() => invalidateObject(oid, client), [oid, client]);
-  const draft = (id ? getDraft(DRAFT_KEYS.object(id)) : null) as ObjectDraft | null;
+  // Read once per mount (the page remounts per id). Re-reading every render would see this
+  // session's own draft writes and "restore" them over what the user is typing.
+  const [draft] = useState(() => (id ? getDraft(DRAFT_KEYS.object(id)) : null) as ObjectDraft | null);
 
   const panelErrors: Partial<Record<PanelName, unknown>> = {
     versions: panels.versions.error, domains: panels.domains.error, tags: panels.tags.error,
