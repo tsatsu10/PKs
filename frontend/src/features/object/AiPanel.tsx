@@ -1,43 +1,47 @@
 import { useEffect } from 'react';
-import { AI_PROVIDERS, aiProviderLabel } from '../constants';
-import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection, isServerSelection } from '../lib/aiProviders';
+import { AI_PROVIDERS, aiProviderLabel } from '../../constants';
+import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection, isServerSelection } from '../../lib/aiProviders';
+import type { useRunPrompt } from './hooks/useRunPrompt';
+import type { ObjectRow, PromptTemplate } from './types';
+
+type Run = ReturnType<typeof useRunPrompt>;
+
+/** The owner's "Synthesize" call to action in the read view: pick a template, open the run panel. */
+export function SynthesizeCta({ run }: { run: Run }) {
+  return (
+    <div className="detail-synthesize-cta">
+      <span className="detail-synthesize-label">Synthesize</span>
+      {run.applicableTemplates.length > 0 && (
+        <select value={run.runTemplateId} onChange={(e) => run.setRunTemplateId(e.target.value)} className="detail-synthesize-select">
+          <option value="">Select prompt template</option>
+          {run.applicableTemplates.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      )}
+      <button type="button" className="btn btn-primary detail-synthesize-btn" onClick={run.openRunPanel}>
+        Run prompt
+      </button>
+    </div>
+  );
+}
+
+type PanelProps = { object: ObjectRow; run: Run; promptTemplates: PromptTemplate[]; error: string };
 
 /**
  * Run prompt overlay: source, template, prompt, provider (default or user's API), model, context, generate, output.
  */
-export default function ObjectDetailRunPromptPanel({
-  object,
-  runPromptSource,
-  setRunPromptSource,
-  runTemplateId,
-  setRunTemplateId,
-  runPromptText,
-  setRunPromptText,
-  runPromptEditFromBank,
-  setRunPromptEditFromBank,
-  aiProviders = [],
-  runAiProviderId,
-  setRunAiProviderId,
-  runAiModel,
-  setRunAiModel,
-  promptTemplates,
-  applicableTemplates,
-  runContextOpen,
-  setRunContextOpen,
-  error,
-  generatingAI,
-  runOutput,
-  setRunOutput,
-  savingRun,
-  onGenerateWithAI,
-  onSaveRun,
-  onSaveOutputAsObject,
-  onClose,
-}) {
+export function RunPromptPanel({ object, run, promptTemplates, error }: PanelProps) {
+  const {
+    runPromptSource, setRunPromptSource, runTemplateId, setRunTemplateId, runPromptText, setRunPromptText,
+    runPromptEditFromBank, setRunPromptEditFromBank, aiProviders, runAiProviderId, setRunAiProviderId,
+    runAiModel, setRunAiModel, applicableTemplates, runContextOpen, setRunContextOpen, generatingAI,
+    runOutput, setRunOutput, savingRun, onGenerateWithAI, onSaveRun, onSaveOutputAsObject, closeRunPanel: onClose,
+  } = run;
   const { provider } = resolveRunSelection(runAiProviderId, aiProviders);
   const usingServerKey = isServerSelection(runAiProviderId);
-  const allowedModels = modelsForProvider(provider, usingServerKey);
-  const effectiveModel = modelForProvider(provider, runAiModel, usingServerKey);
+  const allowedModels = modelsForProvider(provider, usingServerKey) as Array<{ id: string; label: string }>;
+  const effectiveModel = modelForProvider(provider, runAiModel, usingServerKey) as string;
 
   useEffect(() => {
     if (effectiveModel && effectiveModel !== runAiModel) setRunAiModel(effectiveModel);
@@ -54,7 +58,7 @@ export default function ObjectDetailRunPromptPanel({
   const objectTitle = object?.title?.trim() || 'Untitled';
   const objectType = object?.type || 'note';
 
-  const handleProviderChange = (selection) => {
+  const handleProviderChange = (selection: string) => {
     const next = selection === '' ? null : selection;
     setRunAiProviderId(next);
     const nextProvider = resolveRunSelection(next, aiProviders).provider;
@@ -160,7 +164,7 @@ export default function ObjectDetailRunPromptPanel({
           <details
             className="run-prompt-context-details"
             open={runContextOpen}
-            onToggle={(e) => setRunContextOpen(e.target.open)}
+            onToggle={(e) => setRunContextOpen((e.target as HTMLDetailsElement).open)}
           >
             <summary className="run-prompt-context-summary">Content sent to AI (from this object)</summary>
             <div className="run-prompt-context-body">
@@ -184,7 +188,7 @@ export default function ObjectDetailRunPromptPanel({
               className="run-prompt-template-select"
               aria-label="AI provider"
             >
-              {AI_PROVIDERS.map((p, i) => (
+              {(AI_PROVIDERS as Array<{ id: string; label: string }>).map((p, i) => (
                 <option key={p.id} value={i === 0 ? '' : serverSelection(p.id)}>
                   Default (server {p.label} key)
                 </option>

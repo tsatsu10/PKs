@@ -97,7 +97,9 @@ beforeEach(() => {
   dl.downloadBlob.mockClear();
 });
 
-describe('ObjectPage', () => {
+// The first test also pays for jsdom warm-up (about 1 s alone); under a fully parallel `npm test`
+// it once ran past the 5 s default. Rendering commits only ~5 times, so this is load, not a loop.
+describe('ObjectPage', { timeout: 15_000 }, () => {
   it('owner sees pin, duplicate, share, edit, delete and link search', async () => {
     renderPage();
     await heading('First');

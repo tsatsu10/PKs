@@ -23,6 +23,7 @@ type Options = {
   setError: SetError;
 };
 type RunRow = { id: string; created_at: string };
+export type AiProvider = { id: string; name: string; provider_type: string };
 type FnErrorBody = { run?: RunRow; code?: string; retryAfter?: number; hint?: string; error?: string; detail?: string };
 
 const appliesTo = (t: PromptTemplate, type: string | undefined) =>
@@ -41,7 +42,7 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
   const { addToast } = useToast() as { addToast: (type: string, message: string) => void };
   const notifyError = useNotifyError();
   const providersQ = useAiProviders(userId ?? null);
-  const aiProviders = useMemo(() => (providersQ.data ?? []) as Array<{ id: string; provider_type: string }>, [providersQ.data]);
+  const aiProviders = useMemo(() => (providersQ.data ?? []) as AiProvider[], [providersQ.data]);
 
   const [runTemplateId, setRunTemplateId] = useState('');
   const [runPromptText, setRunPromptText] = useState('');

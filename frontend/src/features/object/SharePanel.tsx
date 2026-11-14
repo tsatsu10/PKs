@@ -1,34 +1,25 @@
-/**
- * Share panel for ObjectDetail: add share by email, list shares, revoke.
- */
-export default function ObjectDetailSharePanel({
-  shares,
-  shareEmail,
-  setShareEmail,
-  shareRole,
-  setShareRole,
-  sharing,
-  onAddShare,
-  onRevokeShare,
-  onClose,
-}) {
+import type { useShares, ShareRole } from './hooks/useShares';
+
+/** Share panel: add a share by email, list shares and pending invites, revoke. */
+export default function SharePanel({ shares, onClose }: { shares: ReturnType<typeof useShares>; onClose: () => void }) {
+  const { shares: rows, email, setEmail, role, setRole, sharing, add, revoke } = shares;
   return (
     <section className="share-panel">
       <h2>Share object</h2>
-      <form onSubmit={onAddShare} className="share-form">
+      <form onSubmit={add} className="share-form">
         <label>
           Email
           <input
             type="email"
-            value={shareEmail}
-            onChange={(e) => setShareEmail(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="collaborator@example.com"
             required
           />
         </label>
         <label>
           Role
-          <select value={shareRole} onChange={(e) => setShareRole(e.target.value)}>
+          <select value={role} onChange={(e) => setRole(e.target.value as ShareRole)}>
             <option value="viewer">Viewer (read only)</option>
             <option value="editor">Editor (can edit content)</option>
           </select>
@@ -38,16 +29,16 @@ export default function ObjectDetailSharePanel({
         </button>
       </form>
       <h3>Shared with</h3>
-      {shares.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="share-empty">Not shared with anyone yet.</p>
       ) : (
         <ul className="share-list">
-          {shares.map((s) => (
+          {rows.map((s) => (
             <li key={s.id}>
               <span className="share-email">{s.shared_with_email || '—'}</span>
               {s.pending && <span className="muted"> · pending</span>}
               <span className="share-role">{s.role}</span>
-              <button type="button" className="btn btn-danger btn-small" onClick={() => onRevokeShare(s.id)}>
+              <button type="button" className="btn btn-danger btn-small" onClick={() => revoke(s.id)}>
                 Revoke
               </button>
             </li>
