@@ -3,7 +3,8 @@
  * PKS design file) into CSS custom properties in src/styles/tokens.css.
  *
  *   npm run tokens          regenerate tokens.css
- *   npm run check:tokens    fail if tokens.css is out of date (for CI)
+ *
+ * src/test/buildTokens.test.js fails in CI if the committed tokens.css is stale.
  *
  * Output:
  *   :root                            core tokens (palette, space, radius, type, sizes)
@@ -14,9 +15,9 @@
  * variables in index.css while screens move over. Semantic tokens point at core
  * ones with var(), so a palette change flows through both themes.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const PREFIX = 'pks';
 const BASE_FONT_SIZE = 16;
@@ -24,13 +25,23 @@ const CORE = 'core';
 const DARK = 'mode/dark';
 const LIGHT = 'mode/light';
 
-const px = (v) => (Number(v) === 0 ? '0' : `${Number(v)}px`);
-const rem = (v) => `${Number(v) / BASE_FONT_SIZE}rem`;
+/** A bare number, as Penpot writes dimensions. '8px', '1.5rem' or '4 * 2' is an error, not NaN in the CSS. */
+function number(v, name) {
+  const s = String(v).trim();
+  if (!/^-?\d+(\.\d+)?$/.test(s)) throw new Error(`${name} has value "${v}", expected a plain number`);
+  return Number(s);
+}
+const px = (v, name) => (number(v, name) === 0 ? '0' : `${number(v, name)}px`);
+const rem = (v, name) => `${number(v, name) / BASE_FONT_SIZE}rem`;
 const plain = (v) => String(v);
 
 function fontStack(families, name) {
   const generic = /mono/i.test(name) ? 'ui-monospace, monospace' : 'system-ui, sans-serif';
-  return [...[].concat(families).map((f) => `"${f}"`), generic].join(', ');
+  // Penpot exports an array, but accept a comma-separated string too.
+  const list = (Array.isArray(families) ? families : String(families).split(','))
+    .map((f) => String(f).trim().replace(/^(["'])(.*)\1$/, '$2'))
+    .filter(Boolean);
+  return [...list.map((f) => `"${f.replace(/["\\]/g, '\\$&')}"`), generic].join(', ');
 }
 
 /** How each Penpot token type becomes a CSS value. Unknown types are an error, not a silent skip. */
@@ -100,8 +111,16 @@ export function buildTokensCss(tokens) {
   if (onlyLight.length || onlyDark.length) {
     throw new Error(`Themes differ. Only in light: ${onlyLight.join(', ') || 'none'}. Only in dark: ${onlyDark.join(', ') || 'none'}`);
   }
-  for (const n of darkNames) {
-    if (coreKnown.has(n)) throw new Error(`Theme token ${n} has the same name as a core token`);
+  // Different paths can map to one property (text.size.body and text.size-body are
+  // both --pks-text-size-body), and a later declaration would silently win.
+  for (const [setName, entries] of [['core + dark', [...core, ...dark]], ['core + light', [...core, ...light]]]) {
+    const seen = new Map();
+    for (const [path] of entries) {
+      const css = varName(path);
+      const dotted = path.join('.');
+      if (seen.has(css)) throw new Error(`${setName}: ${seen.get(css)} and ${dotted} both become ${css}`);
+      seen.set(css, dotted);
+    }
   }
 
   return [
@@ -128,26 +147,24 @@ export function buildTokensCss(tokens) {
   ].join('\n');
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
-if (isMain) {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const args = process.argv.slice(2);
-  const check = args.includes('--check');
-  const input = resolve(args.find((a) => !a.startsWith('--')) ?? join(root, 'design-tokens', 'tokens.json'));
-  const output = join(root, 'src', 'styles', 'tokens.css');
-
-  const css = buildTokensCss(JSON.parse(readFileSync(input, 'utf8')));
-  if (check) {
-    let current = '';
-    // Git may check the file out with CRLF on Windows; compare content, not line endings.
-    try { current = readFileSync(output, 'utf8').replace(/\r\n/g, '\n'); } catch { /* missing counts as stale */ }
-    if (current !== css) {
-      console.error('src/styles/tokens.css is out of date. Run `npm run tokens`.');
-      process.exit(1);
-    }
-    console.log('tokens.css is up to date.');
-  } else {
-    writeFileSync(output, css);
-    console.log(`Wrote ${output}`);
+/** True when node ran this file directly. Compares real paths, since drive-letter case, junctions and symlinks (OneDrive) can differ. */
+function ranDirectly() {
+  if (!process.argv[1]) return false;
+  const norm = (p) => {
+    const real = realpathSync(p);
+    return process.platform === 'win32' ? real.toLowerCase() : real;
+  };
+  try {
+    return norm(resolve(process.argv[1])) === norm(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
   }
+}
+
+if (ranDirectly()) {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const input = resolve(process.argv[2] ?? join(root, 'design-tokens', 'tokens.json'));
+  const output = join(root, 'src', 'styles', 'tokens.css');
+  writeFileSync(output, buildTokensCss(JSON.parse(readFileSync(input, 'utf8'))));
+  console.log(`Wrote ${output}`);
 }

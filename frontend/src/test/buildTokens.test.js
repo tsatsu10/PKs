@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildTokensCss } from '../../scripts/build-tokens.mjs';
+import { rgb, ratio } from './contrast.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const realTokens = JSON.parse(readFileSync(join(ROOT, 'design-tokens', 'tokens.json'), 'utf8'));
@@ -78,6 +79,28 @@ describe('buildTokensCss', () => {
     expect(() => buildTokensCss(bad)).toThrow(/boxShadow/);
   });
 
+  it.each([['8px'], ['1.5rem'], ['4 * 2'], ['']])('rejects the non-numeric dimension %j instead of writing NaN', (value) => {
+    const bad = sample();
+    bad.core.space[3] = tok(value, 'spacing');
+    expect(() => buildTokensCss(bad)).toThrow(/space\.3/);
+  });
+
+  it('accepts font families as a comma-separated string and escapes quotes', () => {
+    const s = sample();
+    s.core.font.sans = tok('Plus Jakarta Sans, "Inter"', 'fontFamilies');
+    s.core.font.mono = tok(['Odd "Mono"'], 'fontFamilies');
+    const out = block(buildTokensCss(s), ':root');
+    expect(out['--pks-font-sans']).toBe('"Plus Jakarta Sans", "Inter", system-ui, sans-serif');
+    expect(out['--pks-font-mono']).toBe('"Odd \\"Mono\\"", ui-monospace, monospace');
+  });
+
+  it('rejects two token paths that become the same CSS property', () => {
+    const bad = sample();
+    bad['mode/dark'].text = { 'size-body': tok('{color.white}', 'color') };
+    bad['mode/light'].text = { 'size-body': tok('{color.white}', 'color') };
+    expect(() => buildTokensCss(bad)).toThrow(/--pks-text-size-body/);
+  });
+
   it('rejects a light token with no dark counterpart', () => {
     const bad = sample();
     bad['mode/light'].bg.sidebar = tok('{color.white}', 'color');
@@ -93,19 +116,13 @@ describe('the committed tokens.css', () => {
 });
 
 // WCAG AA (4.5:1) for the design's text tokens on every surface they sit on.
-const hex = (v) => [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16));
-const lum = (c) => {
-  const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
 
 function resolved(mode) {
   const lookup = (path) => path.split('.').reduce((o, k) => o?.[k], realTokens[mode]) ?? path.split('.').reduce((o, k) => o?.[k], realTokens.core);
   return (path) => {
     let v = lookup(path).$value;
     while (v.startsWith('{')) v = lookup(v.slice(1, -1)).$value;
-    return hex(v);
+    return rgb(v);
   };
 }
 
