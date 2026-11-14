@@ -10,7 +10,6 @@ import {
   getExportIncludeFromTemplate, EXPORT_FORMAT_LABELS, safeFileBase,
   buildObjectExportText, buildObjectExportHtml, buildObjectExportJson, buildObjectExportDocxBlob,
 } from '../lib/export';
-import { FILES_BUCKET, getStoragePath } from '../lib/storage';
 import { objectToEditForm, buildObjectPatch, draftFromForm, formFromDraft } from '../lib/objectForm';
 import { setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { useToast } from '../context/ToastContext';
@@ -23,13 +22,16 @@ import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { resolveRunSelection, modelForProvider, isServerSelection } from '../lib/aiProviders';
 import { getErrorMessage } from '../lib/errors';
-import { reportError } from '../lib/reportError';
 import { useNotifyError } from '../lib/useNotifyError';
 import { downloadBlob, printHtml } from '../lib/download';
 import { markdownToHtml } from '../lib/markdown';
 import { touchObjectView } from '../lib/objectView';
-import { useObjectDetail } from '../hooks/useObjectDetail';
-import { fetchObjectRow, fetchVersionSnapshot, fetchShares, searchLinkTargets, invalidateObjectVersions, invalidateObject } from '../data/objectDetail';
+import { useObjectPage } from '../features/object/useObjectPage';
+import { useTaxonomyActions } from '../features/object/hooks/useTaxonomyActions';
+import { useLinks } from '../features/object/hooks/useLinks';
+import { useAttachments } from '../features/object/hooks/useAttachments';
+import { useShares } from '../features/object/hooks/useShares';
+import { fetchObjectRow, fetchVersionSnapshot, invalidateObjectVersions } from '../data/objectDetail';
 import { setObjectInLists, invalidateObjectLists } from '../data/objects';
 import { useAiProviders } from '../data/settings';
 import { usePrefetchObject } from '../data/usePrefetchObject';
@@ -76,11 +78,20 @@ export default function ObjectDetail() {
     myShare,
     panelErrors,
     retryPanel,
-  } = useObjectDetail({ id, userId: user?.id ?? undefined });
+  } = useObjectPage({ id, userId: user?.id ?? undefined });
   const notifyError = useNotifyError();
   const prefetch = usePrefetchObject();
+  const { addDomain, removeDomain, addTag, removeTag } = useTaxonomyActions({ object, allDomains, allTags, setObjectDomains, setObjectTags, setError });
+  const {
+    addLink, removeLink,
+    search: { query: linkSearchQuery, setQuery: setLinkSearchQuery, results: linkSearchResults, open: linkSearchOpen, setOpen: setLinkSearchOpen, containerRef: linkSearchRef },
+  } = useLinks({ object, userId: user?.id, otherObjects, outgoingLinks, incomingLinks, setOutgoingLinks, setIncomingLinks, setError });
+  const { uploading, attach: handleFileAttach, download: handleDownload, detach: handleDetachFile } = useAttachments({ object, userId: user?.id, setAttachedFiles, setError });
+  const {
+    shares, email: shareEmail, setEmail: setShareEmail, role: shareRole, setRole: setShareRole, sharing,
+    load: loadShares, add: handleAddShare, revoke: handleRevokeShare,
+  } = useShares({ object, userId: user?.id, setError });
 
-  const [uploading, setUploading] = useState(false);
   const [runTemplateId, setRunTemplateId] = useState('');
   const [runPromptText, setRunPromptText] = useState('');
   const [runAiModel, setRunAiModel] = useState(DEFAULT_AI_MODEL);
@@ -107,17 +118,9 @@ export default function ObjectDetail() {
   const [restoringVersion, setRestoringVersion] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', content: '', summary: '', source: '', status: 'active', due_at: '', remind_at: '', cover_url: '' });
   const [showSharePanel, setShowSharePanel] = useState(false);
-  const [shares, setShares] = useState([]);
-  const [shareEmail, setShareEmail] = useState('');
-  const [shareRole, setShareRole] = useState('viewer');
-  const [sharing, setSharing] = useState(false);
-  const [linkSearchQuery, setLinkSearchQuery] = useState('');
-  const [linkSearchResults, setLinkSearchResults] = useState([]);
-  const [linkSearchOpen, setLinkSearchOpen] = useState(false);
   const editInitialContentRef = useRef('');
   // Revision the current edit is based on; used for the optimistic-concurrency check on save.
   const editBaseRevisionRef = useRef(null);
-  const linkSearchRef = useRef(null);
 
   useEffect(() => {
     if (!object?.id || !user?.id || object.user_id !== user.id) return;
@@ -221,39 +224,6 @@ export default function ObjectDetail() {
       return prev;
     }, { replace: true });
   }, [runPromptFromUrl, object, promptTemplates, setSearchParams]);
-
-  useEffect(() => {
-    if (!linkSearchQuery.trim() || !user?.id || !object?.id) {
-      setLinkSearchResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const list = (await searchLinkTargets(linkSearchQuery.trim())).filter((o) => o.id !== object.id);
-        setLinkSearchResults(list);
-      } catch {
-        setLinkSearchResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [linkSearchQuery, user?.id, object?.id]);
-
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === 'Escape') setLinkSearchOpen(false);
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (linkSearchRef.current && !linkSearchRef.current.contains(e.target)) setLinkSearchOpen(false);
-    }
-    if (!linkSearchOpen) return;
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [linkSearchOpen]);
 
   const handleContentChange = useCallback((val) => {
     setEditForm((f) => ({ ...f, content: val ?? '' }));
@@ -427,153 +397,6 @@ export default function ObjectDetail() {
       setError(notifyError(err, 'Failed to update pin'));
     } finally {
       setPinning(false);
-    }
-  }
-
-  async function addDomain(domainId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('knowledge_object_domains').insert({ knowledge_object_id: object.id, domain_id: domainId });
-      if (err) throw err;
-      const d = allDomains.find((x) => x.id === domainId);
-      if (d) setObjectDomains((prev) => [...prev, d].sort((a, b) => a.name.localeCompare(b.name)));
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to add domain'));
-    }
-  }
-
-  async function removeDomain(domainId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('knowledge_object_domains').delete().eq('knowledge_object_id', object.id).eq('domain_id', domainId);
-      if (err) throw err;
-      setObjectDomains((prev) => prev.filter((d) => d.id !== domainId));
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to remove domain'));
-    }
-  }
-
-  async function addTag(tagId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('knowledge_object_tags').insert({ knowledge_object_id: object.id, tag_id: tagId });
-      if (err) throw err;
-      const t = allTags.find((x) => x.id === tagId);
-      if (t) setObjectTags((prev) => [...prev, t].sort((a, b) => a.name.localeCompare(b.name)));
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to add tag'));
-    }
-  }
-
-  async function removeTag(tagId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('knowledge_object_tags').delete().eq('knowledge_object_id', object.id).eq('tag_id', tagId);
-      if (err) throw err;
-      setObjectTags((prev) => prev.filter((t) => t.id !== tagId));
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to remove tag'));
-    }
-  }
-
-  async function addLink(toObjectId, relationshipType = 'references') {
-    if (!object || !toObjectId) return;
-    setError('');
-    try {
-      const { data, error: err } = await supabase.from('link_edges').insert({
-        from_object_id: object.id,
-        to_object_id: toObjectId,
-        relationship_type: relationshipType,
-      }).select('id, to_object_id, relationship_type').single();
-      if (err) throw err;
-      const target = otherObjects.find((o) => o.id === toObjectId);
-      setOutgoingLinks((prev) => [...prev, { id: data.id, to_object_id: data.to_object_id, relationship_type: data.relationship_type, target: target || { id: toObjectId, title: '…', type: '' } }]);
-      invalidateObject(toObjectId);
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to add link'));
-    }
-  }
-
-  async function removeLink(edgeId, isOutgoing) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('link_edges').delete().eq('id', edgeId);
-      if (err) throw err;
-      const edge = (isOutgoing ? outgoingLinks : incomingLinks).find((l) => l.id === edgeId);
-      const otherId = isOutgoing ? edge?.to_object_id : edge?.from_object_id;
-      if (isOutgoing) setOutgoingLinks((prev) => prev.filter((l) => l.id !== edgeId));
-      else setIncomingLinks((prev) => prev.filter((l) => l.id !== edgeId));
-      if (otherId) invalidateObject(otherId);
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to remove link'));
-    }
-  }
-
-  async function handleFileAttach(e) {
-    const file = e.target.files?.[0];
-    if (!file || !object) return;
-    e.target.value = '';
-    setError('');
-    setUploading(true);
-    try {
-      const { data: fileRow, error: insertErr } = await supabase.from('files').insert({
-        user_id: user.id,
-        filename: file.name,
-        mime_type: file.type || null,
-        size_bytes: file.size,
-      }).select('id').single();
-      if (insertErr) throw insertErr;
-      const path = getStoragePath(user.id, fileRow.id, file.name);
-      const { error: uploadErr } = await supabase.storage.from(FILES_BUCKET).upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-      if (uploadErr) {
-        await supabase.from('files').delete().eq('id', fileRow.id);
-        throw uploadErr;
-      }
-      await supabase.from('files').update({ storage_key: path }).eq('id', fileRow.id);
-      const { error: linkErr } = await supabase.from('knowledge_object_files').insert({ knowledge_object_id: object.id, file_id: fileRow.id });
-      if (linkErr) throw linkErr;
-      setAttachedFiles((prev) => [...prev, { id: fileRow.id, filename: file.name, mime_type: file.type, size_bytes: file.size }]);
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Upload failed'));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function handleDownload(f) {
-    setError('');
-    try {
-      const path = f.storage_key || getStoragePath(user.id, f.id, f.filename);
-      const { data, error: err } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60);
-      if (err) throw err;
-      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-    } catch (err) {
-      setError(getErrorMessage(err, 'Download failed'));
-    }
-  }
-
-  async function handleDetachFile(fileId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = await supabase.from('knowledge_object_files').delete().eq('knowledge_object_id', object.id).eq('file_id', fileId);
-      if (err) throw err;
-      setAttachedFiles((prev) => prev.filter((x) => x.id !== fileId));
-      invalidateObjectLists();
-    } catch (err) {
-      setError(notifyError(err, 'Failed to remove attachment'));
     }
   }
 
@@ -780,65 +603,6 @@ export default function ObjectDetail() {
 
   const isOwner = object?.user_id === user?.id;
   const canEdit = isOwner || myShare?.role === 'editor';
-
-  async function loadShares() {
-    if (!object?.id || !user?.id) return;
-    try {
-      setShares(await fetchShares(object.id));
-    } catch (e) {
-      reportError(e);
-      setShares([]);
-      setError(getErrorMessage(e, 'Failed to load shares'));
-    }
-  }
-
-  function isValidEmail(str) {
-    const s = typeof str === 'string' ? str.trim() : '';
-    if (!s) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-  }
-
-  async function handleAddShare(e) {
-    e.preventDefault();
-    if (!object || !shareEmail.trim()) return;
-    if (!isValidEmail(shareEmail.trim())) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    setSharing(true);
-    setError('');
-    try {
-      const email = shareEmail.trim();
-      const { error: rpcErr } = await supabase.rpc('share_object_by_email', {
-        p_object_id: object.id,
-        p_email: email,
-        p_role: shareRole,
-      });
-      if (rpcErr) throw rpcErr;
-      await loadShares();
-      setShareEmail('');
-      addToast('success', `Shared with ${email}. If they don't have a verified PKS account yet, they'll get access when they sign up.`);
-    } catch (err) {
-      const msg = notifyError(err, 'Failed to share');
-      setError(msg);
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function handleRevokeShare(shareId) {
-    if (!object) return;
-    setError('');
-    try {
-      const { error: err } = shareId.startsWith('invite:')
-        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length)).eq('knowledge_object_id', object.id)
-        : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
-      if (err) throw err;
-      setShares((prev) => prev.filter((s) => s.id !== shareId));
-    } catch (err) {
-      setError(notifyError(err, 'Failed to revoke'));
-    }
-  }
 
   if (loading) return <div className="object-detail loading" ><p className="sr-only" role="status" aria-live="polite">Loading…</p><SkeletonDetail /></div>;
   if (error && !object) return <div className="object-detail" ><p className="detail-error" role="alert">{error}</p><Link to="/">Back to Dashboard</Link></div>;
