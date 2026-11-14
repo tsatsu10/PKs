@@ -88,7 +88,7 @@ export default function ObjectPage() {
         object={object}
         isOwner={isOwner}
         canEdit={canEdit}
-        canLink={canEdit}
+        canLink={isOwner}
         linkSearch={<LinkSearch links={links} outgoingLinks={outgoingLinks} prefetch={prefetch} />}
         editing={edit.editing}
         saving={edit.saving}

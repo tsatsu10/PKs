@@ -120,6 +120,19 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
     }
   });
 
+  it('editor does not see link search or related Link buttons', async () => {
+    auth.currentUser = 'ed';
+    myShare = { id: 's', role: 'editor' };
+    sb.current!.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === 'suggest_linked_objects' ? { data: [{ id: 'o9', title: 'Nine', type: 'note' }], error: null } : { data: [], error: null },
+    ));
+    renderPage();
+    await heading('First');
+    expect(await screen.findByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox', { name: 'Search objects to link' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Link' })).not.toBeInTheDocument();
+  });
+
   it('viewer sees no edit controls', async () => {
     auth.currentUser = 'v';
     myShare = { id: 's', role: 'viewer' };

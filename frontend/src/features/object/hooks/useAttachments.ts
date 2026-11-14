@@ -6,6 +6,8 @@ import { FILES_BUCKET, getStoragePath } from '../../../lib/storage';
 import { invalidateObjectLists } from '../../../data/objects';
 import type { ObjectRow, FileRow, ListSetter, SetError } from '../types';
 
+const POPUP_BLOCKED = 'Your browser blocked the download window. Allow pop-ups for this site, then try again.';
+
 type Options = { object: ObjectRow | null; userId: string | undefined; setAttachedFiles: ListSetter<FileRow>; setError: SetError };
 
 /** Attach a file (upload + link), download it through a signed URL, or detach it. */
@@ -45,14 +47,26 @@ export function useAttachments({ object, userId, setAttachedFiles, setError }: O
     }
   }
 
+  /**
+   * Opens the tab synchronously, inside the click, then points it at the signed URL once it arrives.
+   * A window opened after an await is no longer tied to the click, and browsers block it (R16).
+   */
   async function download(f: FileRow) {
     setError('');
+    const win = window.open('', '_blank');
+    if (!win) {
+      setError(POPUP_BLOCKED);
+      return;
+    }
+    win.opener = null;
     try {
       const path = f.storage_key || getStoragePath(userId as string, f.id, f.filename);
       const { data, error: err } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60);
       if (err) throw err;
-      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+      if (!data?.signedUrl) throw new Error('Download failed');
+      win.location.href = data.signedUrl;
     } catch (err) {
+      win.close();
       setError(getErrorMessage(err, 'Download failed'));
     }
   }

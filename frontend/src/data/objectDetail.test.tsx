@@ -65,4 +65,25 @@ describe('useObjectPage', () => {
     await act(async () => { result.current.setObjectTags((prev) => [...prev, { id: 't1', name: 'x' }]); });
     await waitFor(() => expect(result.current.objectTags).toEqual([{ id: 't1', name: 'x' }]));
   });
+
+  it('links to trashed objects are hidden', async () => {
+    respondAll();
+    sb.current!.respond = (call) => {
+      const eq = (col: string) => call.ops.some(([m, a]) => m === 'eq' && a[0] === col);
+      if (call.table === 'knowledge_objects' && call.ops.some(([m]) => m === 'maybeSingle')) return { data: OBJ, error: null };
+      if (call.table === 'link_edges' && eq('from_object_id')) return { data: [{ id: 'e1', to_object_id: 'a', relationship_type: 'references' }, { id: 'e2', to_object_id: 'b', relationship_type: 'references' }, { id: 'e4', to_object_id: 'x', relationship_type: 'references' }], error: null };
+      if (call.table === 'link_edges' && eq('to_object_id')) return { data: [{ id: 'e3', from_object_id: 'b', relationship_type: 'references' }], error: null };
+      if (call.table === 'knowledge_objects' && call.ops.some(([m]) => m === 'in')) {
+        return { data: [{ id: 'a', title: 'A', type: 'note', is_deleted: false }, { id: 'b', title: 'B', type: 'note', is_deleted: true }], error: null };
+      }
+      if (call.table === 'share_permissions') return { data: null, error: null };
+      return { data: [], error: null };
+    };
+    const { result } = renderHook(() => useObjectPage({ id: 'o1', userId: 'u1' }), { wrapper: wrapperFor(createTestQueryClient()) });
+    await waitFor(() => expect(result.current.outgoingLinks.length).toBeGreaterThan(0));
+    // 'x' wasn't returned (RLS hides it): it keeps the 'Unknown' placeholder, as before.
+    expect(result.current.outgoingLinks.map((l) => l.to_object_id)).toEqual(['a', 'x']);
+    expect(result.current.outgoingLinks[1].target.title).toBe('Unknown');
+    expect(result.current.incomingLinks).toEqual([]);
+  });
 });

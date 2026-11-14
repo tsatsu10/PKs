@@ -7,7 +7,7 @@ type Props = {
   object: ObjectRow;
   isOwner: boolean;
   canEdit: boolean;
-  /** Shows the link-search slot. */
+  /** Shows the link-search slot. Creating links is owner-only under RLS (B13). */
   canLink: boolean;
   linkSearch: ReactNode;
   editing: boolean;

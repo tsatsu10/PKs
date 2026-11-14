@@ -42,14 +42,19 @@ async function fetchLinks(id: string) {
   const inRows = (unwrap(inc) ?? []) as Array<{ id: string; from_object_id: string; relationship_type: string | null }>;
   const ids = [...new Set([...outRows.map((r) => r.to_object_id), ...inRows.map((r) => r.from_object_id)])];
   const targets: Record<string, LinkTarget> = {};
+  const trashed = new Set<string>();
   if (ids.length) {
-    const rows = (unwrap(await db.from('knowledge_objects').select('id, title, type').in('id', ids)) ?? []) as LinkTarget[];
-    for (const o of rows) targets[o.id] = o;
+    const rows = (unwrap(await db.from('knowledge_objects').select('id, title, type, is_deleted').in('id', ids)) ?? []) as Array<LinkTarget & { is_deleted: boolean }>;
+    for (const { is_deleted, ...o } of rows) {
+      if (is_deleted) trashed.add(o.id);
+      else targets[o.id] = o;
+    }
   }
+  // Links to objects in Trash are hidden (D7). Targets RLS doesn't return keep the 'Unknown' placeholder.
   const target = (oid: string) => targets[oid] ?? { id: oid, title: 'Unknown', type: '' };
   return {
-    outgoing: outRows.map((r) => ({ id: r.id, to_object_id: r.to_object_id, relationship_type: r.relationship_type || 'references', target: target(r.to_object_id) })),
-    incoming: inRows.map((r) => ({ id: r.id, from_object_id: r.from_object_id, relationship_type: r.relationship_type || 'references', source: target(r.from_object_id) })),
+    outgoing: outRows.filter((r) => !trashed.has(r.to_object_id)).map((r) => ({ id: r.id, to_object_id: r.to_object_id, relationship_type: r.relationship_type || 'references', target: target(r.to_object_id) })),
+    incoming: inRows.filter((r) => !trashed.has(r.from_object_id)).map((r) => ({ id: r.id, from_object_id: r.from_object_id, relationship_type: r.relationship_type || 'references', source: target(r.from_object_id) })),
   };
 }
 
