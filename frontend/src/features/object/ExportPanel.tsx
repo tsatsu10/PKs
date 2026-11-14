@@ -1,24 +1,18 @@
-/**
- * Export panel for ObjectDetail: format, template, include toggles, recent jobs, actions.
- */
-export default function ObjectDetailExportPanel({
-  exportFormat,
-  setExportFormat,
-  exportTemplate,
-  setExportTemplate,
-  exportInclude,
-  setExportInclude,
-  applyExportTemplate,
-  onExport,
-  onClose,
-}) {
+import type { useObjectExport, ExportFormat } from './hooks/useObjectExport';
+import type { ExportInclude } from './types';
+
+const INCLUDE_KEYS: Array<keyof ExportInclude> = ['content', 'summary', 'key_points', 'tags', 'domains', 'links'];
+
+/** Export panel: format, template, include toggles, actions. */
+export default function ExportPanel({ exportState }: { exportState: ReturnType<typeof useObjectExport> }) {
+  const { format, setFormat, template, setTemplate, include, setInclude, applyTemplate, run, setShow } = exportState;
   return (
     <section className="export-panel">
       <h2>Export object</h2>
       <div className="export-options">
         <label>
           Format{' '}
-          <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>
+          <select value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)}>
             <option value="txt">TXT</option>
             <option value="md">Markdown</option>
             <option value="html">HTML</option>
@@ -30,11 +24,11 @@ export default function ObjectDetailExportPanel({
         <label>
           Template{' '}
           <select
-            value={exportTemplate}
+            value={template}
             onChange={(e) => {
               const v = e.target.value;
-              setExportTemplate(v);
-              applyExportTemplate(v);
+              setTemplate(v);
+              applyTemplate(v);
             }}
           >
             <option value="raw">Raw (content only)</option>
@@ -46,22 +40,22 @@ export default function ObjectDetailExportPanel({
       </div>
       <div className="export-include">
         <span className="export-include-label">Include:</span>
-        {['content', 'summary', 'key_points', 'tags', 'domains', 'links'].map((k) => (
+        {INCLUDE_KEYS.map((k) => (
           <label key={k} className="checkbox-label">
             <input
               type="checkbox"
-              checked={exportInclude[k]}
-              onChange={(e) => setExportInclude((prev) => ({ ...prev, [k]: e.target.checked }))}
+              checked={include[k]}
+              onChange={(e) => setInclude((prev) => ({ ...prev, [k]: e.target.checked }))}
             />
             {k.replace('_', ' ')}
           </label>
         ))}
       </div>
       <div className="export-actions">
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={() => setShow(false)}>
           Cancel
         </button>
-        <button type="button" className="btn btn-primary" onClick={onExport}>
+        <button type="button" className="btn btn-primary" onClick={() => run()}>
           Export
         </button>
       </div>

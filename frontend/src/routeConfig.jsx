@@ -16,7 +16,7 @@ const withErrorBoundary = (children) => <ErrorBoundary>{children}</ErrorBoundary
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ObjectNew = lazy(() => import('./pages/ObjectNew'));
 const QuickCapture = lazy(() => import('./pages/QuickCapture'));
-const ObjectDetail = lazy(() => import('./pages/ObjectDetail'));
+const ObjectPage = lazy(() => import('./features/object/ObjectPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 const PromptBank = lazy(() => import('./pages/PromptBank'));
 const Templates = lazy(() => import('./pages/Templates'));
@@ -50,10 +50,10 @@ export const publicRoutes = [
   { path: '/reset-password', element: withErrorBoundary(<ResetPassword />) },
 ];
 
-/** Remount ObjectDetail per object so edit state never carries over to another object. */
+/** Remount ObjectPage per object so edit state never carries over to another object. */
 function ObjectDetailRoute() {
   const { id } = useParams();
-  return <ObjectDetail key={id} />;
+  return <ObjectPage key={id} />;
 }
 
 /**

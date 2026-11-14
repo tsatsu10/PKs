@@ -29,12 +29,19 @@ export function mockSupabase() {
       Promise.resolve(state.respond(call)).then(ok, fail);
     return chain;
   }
-  const client = { from: vi.fn(from), rpc: (name: string, args?: unknown) => state.rpc(name, args) };
+  // Storage: `storage.from(bucket)` returns the same bucket stub; override its fns per test.
+  const bucket = {
+    createSignedUrl: vi.fn((_path: string, _expiresIn: number): Promise<Result> => Promise.resolve({ data: { signedUrl: 'https://signed.example/file' }, error: null })),
+    upload: vi.fn((_path: string, _file: unknown, _opts?: unknown): Promise<Result> => Promise.resolve({ data: null, error: null })),
+  };
+  const storage = { from: vi.fn((_bucket: string) => bucket) };
+  const client = { from: vi.fn(from), rpc: (name: string, args?: unknown) => state.rpc(name, args), storage };
   return {
     client,
     calls,
     get respond() { return state.respond; },
     set respond(fn) { state.respond = fn; },
     rpc: state.rpc,
+    bucket,
   };
 }
