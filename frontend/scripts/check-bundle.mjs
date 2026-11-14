@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path';
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const assets = join(dist, 'assets');
-const EDITOR_PAGES = ['BlockNoteEditor-', 'ObjectDetail-', 'ObjectNew-', 'QuickCapture-'];
+const EDITOR_PAGES = ['BlockNoteEditor-', 'ObjectDetail-', 'ObjectPage-', 'ObjectNew-', 'QuickCapture-'];
 const STATIC_EDITOR_IMPORT = /(from\s*|import\s*)["']\.\/blocknote-/;
 const failures = [];
 
