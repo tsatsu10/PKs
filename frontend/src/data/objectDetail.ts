@@ -5,8 +5,9 @@ import { unwrap } from './unwrap';
 import { qk } from './keys';
 import { queryClient as defaultClient } from './queryClient';
 import { promptsQuery } from './prompts';
+import { LIST_COLS } from './objects';
 
-export const OBJECT_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, revision';
+export const OBJECT_COLS = `${LIST_COLS}, content_json`;
 export type ObjectRow = Record<string, unknown> & { id: string; user_id: string; is_deleted: boolean; revision: number };
 type Named = { id: string; name: string };
 type LinkTarget = { id: string; title: string; type: string };
@@ -15,14 +16,32 @@ export async function fetchObjectRow(id: string): Promise<ObjectRow | null> {
   return (unwrap(await db.from('knowledge_objects').select(OBJECT_COLS).eq('id', id).maybeSingle()) as ObjectRow | null);
 }
 
-export type VersionSnapshot = { title: string; content: string | null; summary: string | null; key_points: unknown };
+export type VersionSnapshot = { title: string; content: string | null; content_json: unknown[] | null; summary: string | null; key_points: unknown };
 
 /** One version snapshot, read fresh so a partially-loaded version list can never restore blanks. */
 export async function fetchVersionSnapshot(versionId: string): Promise<VersionSnapshot> {
-  const row = unwrap(await db.from('knowledge_object_versions').select('title, content, summary, key_points')
+  const row = unwrap(await db.from('knowledge_object_versions').select('title, content, content_json, summary, key_points')
     .eq('id', versionId).maybeSingle()) as VersionSnapshot | null;
   if (!row) throw new Error("That version doesn't exist or was deleted.");
   return row;
+}
+
+export type SaveCheck = {
+  row: { revision: number; user_id: string; is_deleted: boolean } | null;
+  shareRole: 'viewer' | 'editor' | null;
+};
+
+/** After a save matched zero rows (R7): is the object gone, moved on, or no longer mine to edit? */
+export async function fetchSaveCheck(id: string, userId: string): Promise<SaveCheck> {
+  const [row, share] = await Promise.all([
+    db.from('knowledge_objects').select('revision, user_id, is_deleted').eq('id', id).maybeSingle(),
+    db.from('share_permissions').select('role').eq('knowledge_object_id', id).eq('shared_with_user_id', userId).maybeSingle(),
+  ]);
+  const role = (unwrap(share) as { role: string } | null)?.role;
+  return {
+    row: (unwrap(row) as SaveCheck['row']) ?? null,
+    shareRole: role === 'editor' || role === 'viewer' ? role : null,
+  };
 }
 
 export const objectDetailQuery = (id: string) => queryOptions({
@@ -91,7 +110,7 @@ export function useObjectPanels(id: string | undefined, userId: string | undefin
       return (unwrap(await supabase.rpc('suggest_tags_for_object_fallback', { p_object_id: oid })) as unknown[] | null) ?? [];
     } }),
     suggestedLinks: useQuery({ queryKey: qk.suggestions.links(oid), enabled: on, queryFn: async () =>
-      (unwrap(await supabase.rpc('suggest_linked_objects', { p_object_id: oid, limit_n: 10 })) as unknown[] | null) ?? [] }),
+      (unwrap(await supabase.rpc('suggest_linked_objects', { p_object_id: oid, limit_n: 10 }).select(LIST_COLS)) as unknown[] | null) ?? [] }),
   };
 }
 
@@ -108,7 +127,7 @@ export async function fetchShares(objectId: string): Promise<ShareRow[]> {
 }
 
 export async function searchLinkTargets(query: string) {
-  return ((unwrap(await supabase.rpc('search_knowledge_objects', { search_query: query, limit_n: 8, offset_n: 0 })) ?? []) as Array<LinkTarget & { user_id: string }>);
+  return ((unwrap(await supabase.rpc('search_knowledge_objects', { search_query: query, limit_n: 8, offset_n: 0 }).select(LIST_COLS)) ?? []) as Array<LinkTarget & { user_id: string }>);
 }
 
 export const invalidateObject = (id: string, client: QueryClient = defaultClient) =>

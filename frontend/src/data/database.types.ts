@@ -443,6 +443,7 @@ export type Database = {
         Row: {
           change_reason: string | null
           content: string | null
+          content_json: Json | null
           created_at: string
           edited_by: string | null
           id: string
@@ -455,6 +456,7 @@ export type Database = {
         Insert: {
           change_reason?: string | null
           content?: string | null
+          content_json?: Json | null
           created_at?: string
           edited_by?: string | null
           id?: string
@@ -467,6 +469,7 @@ export type Database = {
         Update: {
           change_reason?: string | null
           content?: string | null
+          content_json?: Json | null
           created_at?: string
           edited_by?: string | null
           id?: string
@@ -489,6 +492,8 @@ export type Database = {
       knowledge_objects: {
         Row: {
           content: string | null
+          content_json: Json | null
+          content_text: string | null
           cover_url: string | null
           created_at: string
           current_version: number
@@ -512,6 +517,8 @@ export type Database = {
         }
         Insert: {
           content?: string | null
+          content_json?: Json | null
+          content_text?: string | null
           cover_url?: string | null
           created_at?: string
           current_version?: number
@@ -535,6 +542,8 @@ export type Database = {
         }
         Update: {
           content?: string | null
+          content_json?: Json | null
+          content_text?: string | null
           cover_url?: string | null
           created_at?: string
           current_version?: number
@@ -1042,6 +1051,11 @@ export type Database = {
         }
         Returns: Json
       }
+      backfill_object_content_json: {
+        Args: { p_content_json: Json; p_id: string; p_revision: number }
+        Returns: boolean
+      }
+      blocknote_plain_text: { Args: { p_blocks: Json }; Returns: string }
       can_edit_object: { Args: { obj_id: string }; Returns: boolean }
       can_read_object: { Args: { obj_id: string }; Returns: boolean }
       consume_global_usage: {
@@ -1093,6 +1107,7 @@ export type Database = {
       }
       merge_case_duplicate_taxonomy: { Args: never; Returns: undefined }
       owns_knowledge_object: { Args: { obj_id: string }; Returns: boolean }
+      markdown_plain_text: { Args: { p_md: string }; Returns: string }
       report_client_error: {
         Args: {
           p_app_version: string
@@ -1129,6 +1144,8 @@ export type Database = {
         }
         Returns: {
           content: string | null
+          content_json: Json | null
+          content_text: string | null
           cover_url: string | null
           created_at: string
           current_version: number
@@ -1181,10 +1198,16 @@ export type Database = {
         }
         Returns: Json
       }
+      snapshot_knowledge_object: {
+        Args: { p_fields?: Json; p_object_id: string; p_reason?: string }
+        Returns: number
+      }
       suggest_linked_objects: {
         Args: { limit_n?: number; p_object_id: string }
         Returns: {
           content: string | null
+          content_json: Json | null
+          content_text: string | null
           cover_url: string | null
           created_at: string
           current_version: number

@@ -76,7 +76,10 @@ export async function fetchFilteredObjectIds(payload: SearchPayload): Promise<st
   const rpc = payload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
   const ids: string[] = [];
   for (let offset = 0; ; offset += PAGE) {
-    const rows = (unwrap(await supabase.rpc(rpc, { ...payload, limit_n: PAGE, offset_n: offset })) ?? []) as { id: string }[];
+    const args = { ...payload, limit_n: PAGE, offset_n: offset };
+    const rows = ((rpc === 'search_knowledge_objects'
+      ? unwrap(await supabase.rpc(rpc, args).select('id'))
+      : unwrap(await supabase.rpc(rpc, args))) ?? []) as { id: string }[];
     ids.push(...rows.map((r) => r.id));
     if (rows.length < PAGE) return ids;
   }

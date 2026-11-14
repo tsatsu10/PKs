@@ -22,5 +22,5 @@ export function hookWrapper() {
 export const TEST_OBJECT: ObjectRow = {
   id: 'o1', user_id: 'owner', type: 'note', title: 'First', content: 'body', source: null, summary: 'S', key_points: [],
   is_deleted: false, revision: 3, current_version: 2, status: 'active', slug: 'first', cover_url: null, due_at: null,
-  remind_at: null, updated_at: '2026-11-01T00:00:00Z', created_at: '2026-11-01T00:00:00Z', is_pinned: false,
+  remind_at: null, updated_at: '2026-11-01T00:00:00Z', created_at: '2026-11-01T00:00:00Z', is_pinned: false, content_json: null,
 };

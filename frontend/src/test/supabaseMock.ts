@@ -35,13 +35,24 @@ export function mockSupabase() {
     upload: vi.fn((_path: string, _file: unknown, _opts?: unknown): Promise<Result> => Promise.resolve({ data: null, error: null })),
   };
   const storage = { from: vi.fn((_bucket: string) => bucket) };
-  const client = { from: vi.fn(from), rpc: (name: string, args?: unknown) => state.rpc(name, args), storage };
+  // rpc() resolves like a promise and also chains `.select(cols)` (recorded in rpcSelects).
+  const rpcSelects: Array<[string, string]> = [];
+  const rpc = (name: string, args?: unknown) => {
+    const result = state.rpc(name, args);
+    const chain = {
+      select: (cols: string) => { rpcSelects.push([name, cols]); return chain; },
+      then: (ok: (r: Result) => unknown, fail?: (e: unknown) => unknown) => Promise.resolve(result).then(ok, fail),
+    };
+    return chain;
+  };
+  const client = { from: vi.fn(from), rpc, storage };
   return {
     client,
     calls,
     get respond() { return state.respond; },
     set respond(fn) { state.respond = fn; },
     rpc: state.rpc,
+    rpcSelects,
     bucket,
   };
 }

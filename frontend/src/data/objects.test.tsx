@@ -48,6 +48,15 @@ describe('dashboard object list', () => {
     await waitFor(() => expect(result.current.data).toEqual([{ id: 'new' }]));
   });
 
+  it('the dashboard page never asks for content_json', async () => {
+    sb.current!.rpc.mockImplementation(() => Promise.resolve({ data: [{ id: '1' }], error: null }));
+    const { result } = renderHook(() => useObjectsPage({ ...empty, type_filter: 'idea' }, 0), { wrapper: wrapperFor(createTestQueryClient()) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const selects = sb.current!.rpcSelects.filter(([n]) => n === 'search_knowledge_objects');
+    expect(selects.length).toBeGreaterThan(0);
+    for (const [, cols] of selects) expect(cols).not.toMatch(/content_json|content_text/);
+  });
+
   it('a failing count returns null instead of failing the list', async () => {
     sb.current!.rpc.mockImplementation(() => Promise.resolve({ data: null, error: { code: 'PGRST000', message: 'x' } }));
     const { result } = renderHook(() => useObjectsCount(empty), { wrapper: wrapperFor(createTestQueryClient()) });

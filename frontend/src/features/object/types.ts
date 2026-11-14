@@ -6,7 +6,7 @@ type ObjectColumns =
   | 'due_at' | 'remind_at' | 'revision';
 
 /** A knowledge object as the page reads it (`OBJECT_COLS` in data/objectDetail). */
-export type ObjectRow = Pick<Tables<'knowledge_objects'>, ObjectColumns> & { type: string };
+export type ObjectRow = Pick<Tables<'knowledge_objects'>, ObjectColumns> & { type: string; content_json: unknown[] | null };
 
 export type Named = { id: string; name: string };
 export type LinkTarget = { id: string; title: string; type: string };

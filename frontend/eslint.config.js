@@ -55,7 +55,7 @@ export default defineConfig([
         },
         {
           // supabase.rpc('name') for anything that isn't a known write.
-          selector: "CallExpression[callee.object.name='supabase'][callee.property.name='rpc'][arguments.0.value!=/^(create_domain|create_tag|touch_object_view|delete_object_permanently|share_object_by_email|save_prompt_output_as_object|report_client_error)$/]",
+          selector: "CallExpression[callee.object.name='supabase'][callee.property.name='rpc'][arguments.0.value!=/^(create_domain|create_tag|touch_object_view|delete_object_permanently|share_object_by_email|save_prompt_output_as_object|report_client_error|snapshot_knowledge_object)$/]",
           message: 'Supabase read RPCs belong in src/data. If this RPC writes, add it to the allow-list in eslint.config.js.',
         },
       ],

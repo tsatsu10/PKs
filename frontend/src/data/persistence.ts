@@ -8,7 +8,7 @@ import { registerUserDataHooks } from '../lib/userStorage';
 export const PERSISTED_ROOTS = ['objects', 'object', 'taxonomy', 'templates', 'prompts'] as const;
 export const CACHE_PREFIX = 'pks-query-cache:';
 /** Bump when a persisted data shape changes; old caches are then ignored. */
-export const CACHE_SCHEMA_VERSION = '1';
+export const CACHE_SCHEMA_VERSION = '2';
 export const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 export const cacheKey = (userId: string) => `${CACHE_PREFIX}${userId}`;

@@ -11,6 +11,7 @@ vi.mock('../lib/supabase', async () => {
 });
 
 import { useObjectPage } from '../features/object/useObjectPage';
+import { fetchSaveCheck } from './objectDetail';
 
 const OBJ = { id: 'o1', user_id: 'u1', type: 'note', title: 'T', content: 'body', is_deleted: false, revision: 1 };
 
@@ -85,5 +86,25 @@ describe('useObjectPage', () => {
     expect(result.current.outgoingLinks.map((l) => l.to_object_id)).toEqual(['a', 'x']);
     expect(result.current.outgoingLinks[1].target.title).toBe('Unknown');
     expect(result.current.incomingLinks).toEqual([]);
+  });
+});
+
+describe('objectDetail', () => {
+  it('fetchSaveCheck returns the row and my share role', async () => {
+    sb.current!.respond = (call) => {
+      if (call.table === 'knowledge_objects') return { data: { revision: 4, user_id: 'owner', is_deleted: false }, error: null };
+      if (call.table === 'share_permissions') return { data: { role: 'editor' }, error: null };
+      return { data: null, error: null };
+    };
+    await expect(fetchSaveCheck('o1', 'u2')).resolves.toEqual({
+      row: { revision: 4, user_id: 'owner', is_deleted: false }, shareRole: 'editor',
+    });
+    const share = sb.current!.calls.filter((c) => c.table === 'share_permissions').at(-1)!;
+    expect(share.ops).toContainEqual(['eq', ['shared_with_user_id', 'u2']]);
+  });
+
+  it('fetchSaveCheck returns row null when RLS hides it', async () => {
+    sb.current!.respond = () => ({ data: null, error: null });
+    await expect(fetchSaveCheck('o1', 'u2')).resolves.toEqual({ row: null, shareRole: null });
   });
 });

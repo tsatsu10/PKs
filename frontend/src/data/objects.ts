@@ -7,12 +7,20 @@ import { qk, type SearchPayload } from './keys';
 import { queryClient as defaultClient } from './queryClient';
 
 export const DASHBOARD_PAGE_SIZE = 20;
+/**
+ * Columns for list and dashboard rows: the detail columns minus content_json (and never
+ * content_text), which can be megabytes per row. Applied to RPCs returning SETOF knowledge_objects.
+ */
+export const LIST_COLS = 'id, user_id, type, title, content, source, summary, key_points, is_deleted, current_version, created_at, updated_at, is_pinned, status, slug, cover_url, due_at, remind_at, revision';
 export type ObjectRow = { id: string } & Record<string, unknown>;
 
 // The search RPCs return computed rows (snippets, rank), so they use the untyped client.
+// The snippets RPC builds its rows with a fixed column list; the other returns whole rows.
 async function searchPage(p: SearchPayload, offset: number): Promise<ObjectRow[]> {
-  const rpc = p.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
-  return unwrap(await supabase.rpc(rpc, { ...p, limit_n: DASHBOARD_PAGE_SIZE, offset_n: offset })) ?? [];
+  const args = { ...p, limit_n: DASHBOARD_PAGE_SIZE, offset_n: offset };
+  return (p.search_query
+    ? unwrap(await supabase.rpc('search_knowledge_objects_with_snippets', args))
+    : unwrap(await supabase.rpc('search_knowledge_objects', args).select(LIST_COLS))) ?? [];
 }
 
 export function useObjectsPage(payload: SearchPayload | null, offset: number) {
