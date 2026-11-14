@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import BlockNoteViewer from '../../components/BlockNoteViewer';
+import ContentView from './ContentView';
 import type { ObjectRow } from './types';
 
 /** The read view: title, cover, source, summary, the owner's Synthesize slot, and the content. */
@@ -32,7 +32,7 @@ export default function ReadOnlyBody({ object, synthesize }: { object: ObjectRow
       )}
       {object.summary && <p className="detail-summary">{object.summary}</p>}
       {synthesize}
-      {object.content && <BlockNoteViewer content={object.content} className="detail-content" />}
+      <ContentView key={`${object.id}:${object.revision}`} json={object.content_json} markdown={object.content} />
     </>
   );
 }

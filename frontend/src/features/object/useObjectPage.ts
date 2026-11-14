@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getDraft, DRAFT_KEYS } from '../../lib/draftStorage';
 import { getErrorMessage } from '../../lib/errors';
 import { objectDetailQuery, useObjectPanels, invalidateObject } from '../../data/objectDetail';
 import { useTaxonomy } from '../../data/taxonomy';
@@ -13,8 +12,6 @@ import type {
 type Panels = ReturnType<typeof useObjectPanels>;
 export type PanelName = keyof Panels | 'taxonomy';
 type ObjectSetter = (next: ObjectRow | null | ((prev: ObjectRow) => ObjectRow)) => void;
-/** A stored edit draft: any subset of the edit form, plus the revision the edit started from. */
-export type ObjectDraft = Record<string, unknown> & { _baseRevision?: number | null };
 
 /**
  * Loads a knowledge object and its panels through the query cache.
@@ -52,9 +49,6 @@ export function useObjectPage({ id, userId }: { id?: string; userId?: string }) 
   const oid = id ?? '';
   const setObject = useMemo(() => setter(qk.object.detail(oid)) as unknown as ObjectSetter, [setter, oid]);
   const reload = useCallback(() => invalidateObject(oid, client), [oid, client]);
-  // Read once per mount (the page remounts per id). Re-reading every render would see this
-  // session's own draft writes and "restore" them over what the user is typing.
-  const [draft] = useState(() => (id ? getDraft(DRAFT_KEYS.object(id)) : null) as ObjectDraft | null);
 
   const panelErrors: Partial<Record<PanelName, unknown>> = {
     versions: panels.versions.error, domains: panels.domains.error, tags: panels.tags.error,
@@ -73,7 +67,6 @@ export function useObjectPage({ id, userId }: { id?: string; userId?: string }) 
     error: actionError || loadError,
     setError,
     reload,
-    draft,
     versions: (panels.versions.data ?? []) as VersionRow[],
     setVersions: setter<VersionRow>(qk.object.versions(oid)),
     objectDomains: (panels.domains.data ?? []) as Named[],

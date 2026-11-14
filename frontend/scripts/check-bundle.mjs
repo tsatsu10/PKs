@@ -19,11 +19,35 @@ const failures = [];
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 if (/href="\/assets\/blocknote-[^"]+\.js"/.test(html)) failures.push('index.html preloads the editor chunk');
 
-for (const file of readdirSync(assets).filter((f) => f.endsWith('.js'))) {
+const jsFiles = readdirSync(assets).filter((f) => f.endsWith('.js'));
+const sources = new Map(jsFiles.map((f) => [f, readFileSync(join(assets, f), 'utf8')]));
+const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const staticImporters = (file) => {
+  const re = new RegExp(`(from\\s*|import\\s*)["']\\./${escape(file)}["']`);
+  return jsFiles.filter((f) => f !== file && re.test(sources.get(f)));
+};
+
+// Editor-side chunks: the editor pages, plus shared chunks (e.g. the app's BlockNote wrappers,
+// split out because several editor pages use them) that only editor-side chunks import statically.
+const editorSide = new Set(jsFiles.filter((f) => f.startsWith('blocknote-') || EDITOR_PAGES.some((p) => f.startsWith(p))));
+const loadsEditor = jsFiles.filter((f) => !editorSide.has(f) && STATIC_EDITOR_IMPORT.test(sources.get(f)));
+for (let grew = true; grew;) {
+  grew = false;
+  for (const file of loadsEditor) {
+    if (editorSide.has(file)) continue;
+    const importers = staticImporters(file);
+    if (importers.length && importers.every((f) => editorSide.has(f))) { editorSide.add(file); grew = true; }
+  }
+}
+for (const file of loadsEditor) {
+  if (!editorSide.has(file)) failures.push(`${file} statically imports the editor chunk`);
+}
+// Nothing else may reach the editor through an editor-side chunk either.
+for (const file of editorSide) {
   if (file.startsWith('blocknote-')) continue;
-  if (EDITOR_PAGES.some((p) => file.startsWith(p))) continue;
-  const src = readFileSync(join(assets, file), 'utf8');
-  if (STATIC_EDITOR_IMPORT.test(src)) failures.push(`${file} statically imports the editor chunk`);
+  for (const importer of staticImporters(file)) {
+    if (!editorSide.has(importer)) failures.push(`${importer} statically imports ${file}, which loads the editor`);
+  }
 }
 
 const sw = readFileSync(join(dist, 'sw.js'), 'utf8');

@@ -1,4 +1,5 @@
 import QueryError from '../../components/QueryError';
+import { HISTORY_ANCHOR } from './ConflictBar';
 import type { VersionRow, PromptRun, PromptTemplate } from './types';
 
 type Props = {
@@ -28,7 +29,7 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
   return (
     <>
       {(versions.length > 0 || versionsError) && (
-        <div className="detail-section-card">
+        <div className="detail-section-card" id={HISTORY_ANCHOR}>
           <h3 className="detail-section-card-title">Version history</h3>
           {versionsError ? (
             <QueryError what="version history" error={versionsError} onRetry={onRetryVersions} />
@@ -71,7 +72,7 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
 function ReadonlyHistory({ isOwner, versions, versionsError, onRetryVersions }: Props) {
   if (isOwner && versions.length > 0) return null;
   return (
-    <div className="detail-section-card">
+    <div className="detail-section-card" id={HISTORY_ANCHOR}>
       <h3 className="detail-section-card-title">Version history</h3>
       {versionsError ? (
         <QueryError what="version history" error={versionsError} onRetry={onRetryVersions} />

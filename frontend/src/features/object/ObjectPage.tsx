@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { touchObjectView } from '../../lib/objectView';
 import { usePrefetchObject } from '../../data/usePrefetchObject';
 import { SkeletonDetail } from '../../components/Skeleton';
 import { useObjectPage } from './useObjectPage';
-import { useEditSession } from './hooks/useEditSession';
 import { useObjectActions } from './hooks/useObjectActions';
 import { useTaxonomyActions } from './hooks/useTaxonomyActions';
 import { useLinks } from './hooks/useLinks';
@@ -17,7 +16,15 @@ import Header from './Header';
 import LinkSearch from './LinkSearch';
 import MetaLine from './MetaLine';
 import ReadOnlyBody from './ReadOnlyBody';
-import EditForm from './EditForm';
+import Editor, { type EditorHandle } from './Editor';
+import InPlaceFields from './InPlaceFields';
+import Properties from './Properties';
+import SaveIndicator from './SaveIndicator';
+import ConflictBar from './ConflictBar';
+import { useSaveQueue } from './save/useSaveQueue';
+import type { SaveFields } from './save/saveQueue';
+import { adoptLegacyDraft } from './legacyDraft';
+import type { ObjectRow } from './types';
 import { SynthesizeCta, RunPromptPanel } from './AiPanel';
 import Taxonomy from './Taxonomy';
 import Attachments from './Attachments';
@@ -34,7 +41,7 @@ export default function ObjectPage() {
   const userId = user?.id ?? undefined;
   const page = useObjectPage({ id, userId });
   const {
-    object, setObject, loading, error, setError, reload, draft, versions, objectDomains, setObjectDomains,
+    object, setObject, loading, error, setError, versions, objectDomains, setObjectDomains,
     objectTags, setObjectTags, allDomains, allTags, outgoingLinks, setOutgoingLinks, incomingLinks, setIncomingLinks,
     otherObjects, attachedFiles, setAttachedFiles, promptTemplates, promptRuns, setPromptRuns, suggestedTags,
     suggestedLinkedObjects, myShare, panelErrors, retryPanel,
@@ -43,8 +50,44 @@ export default function ObjectPage() {
   const isOwner = !!object && object.user_id === userId;
   const canEdit = isOwner || myShare?.role === 'editor';
 
-  const edit = useEditSession({ id, object, isOwner, draft, setObject, setError, userId });
-  const actions = useObjectActions({ object, userId, objectDomains, objectTags, reload, setObject, setError });
+  // A pre-2b edit draft (sessionStorage) is read once, removed, and moved into the save queue.
+  const [legacy] = useState(() => (id ? adoptLegacyDraft(id) : null));
+  const save = useSaveQueue({
+    objectId: canEdit ? object?.id : undefined,
+    userId,
+    isOwner,
+    baseRevision: object ? (legacy?.baseRevision ?? object.revision) : undefined,
+  });
+  const { queue } = save;
+  const adoptedRef = useRef(false);
+  useEffect(() => {
+    if (!queue || !legacy || adoptedRef.current) return;
+    adoptedRef.current = true;
+    // A local copy in IndexedDB is newer than any old-form draft.
+    if (!save.restored) queue.change(legacy.fields);
+  }, [queue, legacy, save.restored]);
+
+  // Fields and the editor seed once per object and per reload (Load theirs, restore): the server
+  // row with any unsent edits on top. Background refetches never replace what is being typed.
+  const seedKey = `${id}:${save.seed}`;
+  const [seeded, setSeeded] = useState<{ key: string; value: ObjectRow } | null>(null);
+  if (object && queue && seeded?.key !== seedKey) {
+    const legacyFields = !save.restored && legacy && save.seed === 0 ? legacy.fields : {};
+    setSeeded({ key: seedKey, value: { ...object, ...legacyFields, ...queue.pending() } as ObjectRow });
+  }
+  const initial = seeded?.key === seedKey ? seeded.value : null;
+  const change = useCallback((fields: SaveFields) => { queue?.change(fields); }, [queue]);
+
+  // A click on the empty area around the content puts the cursor at the end of it.
+  const editorRef = useRef<EditorHandle>(null);
+  const onMainClick = (e: MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target === e.currentTarget || target.classList.contains('detail-hero') || target.classList.contains('detail-editor-area')) {
+      editorRef.current?.focusEnd();
+    }
+  };
+
+  const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setObject, setError });
   const taxonomy = useTaxonomyActions({ object, allDomains, allTags, setObjectDomains, setObjectTags, setError });
   const links = useLinks({ object, userId, otherObjects, outgoingLinks, incomingLinks, setOutgoingLinks, setIncomingLinks, setError });
   const attachments = useAttachments({ object, userId, setAttachedFiles, setError });
@@ -90,14 +133,9 @@ export default function ObjectPage() {
         canEdit={canEdit}
         canLink={canEdit}
         linkSearch={<LinkSearch links={links} outgoingLinks={outgoingLinks} prefetch={prefetch} />}
-        editing={edit.editing}
-        saving={edit.saving}
         actions={actions}
         onToggleExport={() => exportState.setShow((v) => !v)}
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
-        onEdit={edit.start}
-        onCancel={edit.cancel}
-        onSave={edit.save}
       />
       {error && <div className="form-error" role="alert">{error}</div>}
 
@@ -105,14 +143,39 @@ export default function ObjectPage() {
       {exportState.show && <ExportPanel exportState={exportState} />}
 
       <div className="detail-layout">
-        <div className="detail-main" aria-label="Object content">
+        <div className="detail-main" aria-label="Object content" onClick={canEdit ? onMainClick : undefined}>
           <div className="detail-hero">
-            <MetaLine object={object} />
-            {edit.editing ? (
-              <EditForm object={object} isOwner={isOwner} edit={edit} />
-            ) : (
-              <ReadOnlyBody object={object} synthesize={isOwner ? <SynthesizeCta run={run} /> : null} />
+            {canEdit && queue && save.state.status === 'conflict' && <ConflictBar queue={queue} />}
+            {canEdit && (save.restored || legacy) && (
+              <p className="detail-restored-notice" role="status">Restored unsaved changes</p>
             )}
+            <MetaLine object={object} />
+            {!canEdit ? (
+              <ReadOnlyBody object={object} synthesize={isOwner ? <SynthesizeCta run={run} /> : null} />
+            ) : initial ? (
+              <>
+                <InPlaceFields
+                  key={`fields:${seedKey}`}
+                  object={object}
+                  initial={initial}
+                  editable
+                  onChange={change}
+                  autoFocusTitle={object.title === '' && !object.content && !object.content_json?.length}
+                  titleAddon={<SaveIndicator state={save.state} />}
+                />
+                <Properties key={`props:${seedKey}`} object={object} initial={initial} isOwner={isOwner} onChange={change} />
+                {isOwner && <SynthesizeCta run={run} />}
+                <div className="detail-editor-area">
+                  <Editor
+                    key={`editor:${seedKey}`}
+                    ref={editorRef}
+                    initialJson={initial.content_json}
+                    initialMarkdown={initial.content ?? ''}
+                    onChange={change}
+                  />
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
         <aside className="detail-sidebar">

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
@@ -19,12 +19,15 @@ type Props = {
 
 const MIN_HEIGHT = 280;
 
+/** What the page can do with the editor: put the cursor at the end (a click below the content). */
+export type EditorHandle = { focusEnd: () => void };
+
 /**
  * The content editor. It seeds once (remount it with a new key to reload) and reports both
  * content columns through `onChange`; it never sets state per keystroke, so typing doesn't
  * re-render the page (P3).
  */
-function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }: Props) {
+const Editor = forwardRef<EditorHandle, Props>(function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }, ref) {
   const hasJson = Array.isArray(initialJson) && initialJson.length > 0;
   // Seeded once per mount: later prop changes never replace what the user is typing.
   const options = useMemo(() => ({
@@ -64,6 +67,15 @@ function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }: P
     if (ready && autoFocus) editor.focus();
   }, [ready, autoFocus, editor]);
 
+  useImperativeHandle(ref, () => ({
+    focusEnd() {
+      const blocks = editor.document;
+      const last = blocks[blocks.length - 1];
+      if (last) editor.setTextCursorPosition(last, 'end');
+      editor.focus();
+    },
+  }), [editor]);
+
   const handleChange = useCallback(async () => {
     if (initializing.current) return;
     try {
@@ -90,6 +102,6 @@ function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }: P
       </div>
     </BlockNoteMantineProvider>
   );
-}
+});
 
 export default memo(Editor);

@@ -10,19 +10,14 @@ type Props = {
   /** Shows the link-search slot (anyone who can edit; useLinks offers only the user's own objects, B13). */
   canLink: boolean;
   linkSearch: ReactNode;
-  editing: boolean;
-  saving: boolean;
   actions: ReturnType<typeof useObjectActions>;
   onToggleExport: () => void;
   onToggleShare: () => void;
-  onEdit: () => void;
-  onCancel: () => void;
-  onSave: () => void;
 };
 
-/** Breadcrumbs, the link-search slot and the action buttons. */
-export default function Header({ object, isOwner, canEdit, canLink, linkSearch, editing, saving, actions, onToggleExport, onToggleShare, onEdit, onCancel, onSave }: Props) {
-  const { togglePin, pinning, duplicate, duplicating, remove, deleting } = actions;
+/** Breadcrumbs, the link-search slot and the action buttons. Editing happens in place (no Edit/Save). */
+export default function Header({ object, isOwner, canEdit, canLink, linkSearch, actions, onToggleExport, onToggleShare }: Props) {
+  const { togglePin, pinning, duplicate, duplicating, remove, deleting, saveVersion, savingVersion } = actions;
   return (
     <header className="object-detail-header">
       <div className="object-detail-header-left">
@@ -42,17 +37,12 @@ export default function Header({ object, isOwner, canEdit, canLink, linkSearch, 
         {isOwner && (
           <button type="button" className="btn btn-secondary" onClick={onToggleShare}>Share</button>
         )}
-        {!editing ? (
-          <>
-            {canEdit && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
-            {isOwner && <button type="button" className="btn btn-danger" onClick={remove} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>}
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-            <button type="button" className="btn btn-primary" onClick={onSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-          </>
+        {canEdit && (
+          <button type="button" className="btn btn-secondary" onClick={saveVersion} disabled={savingVersion} title="Keep the current text in version history">
+            {savingVersion ? 'Saving version…' : 'Save version'}
+          </button>
         )}
+        {isOwner && <button type="button" className="btn btn-danger" onClick={remove} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>}
       </div>
     </header>
   );

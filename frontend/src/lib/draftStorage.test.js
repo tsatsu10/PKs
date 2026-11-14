@@ -23,11 +23,12 @@ describe('setDraft', () => {
 describe('clearAllDrafts', () => {
   it('removes every PKS draft and leaves other session keys alone', () => {
     setDraft(DRAFT_KEYS.new, { form: { title: 'a' } });
-    setDraft(DRAFT_KEYS.object('123'), { title: 'b' });
+    // A pre-2b object edit draft (now adopted by features/object/legacyDraft).
+    sessionStorage.setItem('pks-draft-123', JSON.stringify({ title: 'b' }));
     sessionStorage.setItem('other-app-key', 'keep');
     clearAllDrafts();
     expect(getDraft(DRAFT_KEYS.new)).toBeNull();
-    expect(getDraft(DRAFT_KEYS.object('123'))).toBeNull();
+    expect(getDraft('pks-draft-123')).toBeNull();
     expect(sessionStorage.getItem('other-app-key')).toBe('keep');
   });
 });

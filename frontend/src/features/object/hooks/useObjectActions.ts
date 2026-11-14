@@ -7,6 +7,7 @@ import { useToast } from '../../../context/ToastContext';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import { fetchVersionSnapshot } from '../../../data/objectDetail';
 import { setObjectInLists, invalidateObjectLists } from '../../../data/objects';
+import type { SaveQueue } from '../save/saveQueue';
 import type { ObjectRow, Named, SetError } from '../types';
 
 type Options = {
@@ -14,13 +15,14 @@ type Options = {
   userId: string | undefined;
   objectDomains: Named[];
   objectTags: Named[];
-  reload: () => unknown;
+  /** The object's save queue (editable objects only): restore and Save version go through it. */
+  queue: SaveQueue | null;
   setObject: (next: (prev: ObjectRow) => ObjectRow) => void;
   setError: SetError;
 };
 
-/** Restore a version, duplicate, move to Trash, and pin/unpin. */
-export function useObjectActions({ object, userId, objectDomains, objectTags, reload, setObject, setError }: Options) {
+/** Restore a version, save a version, duplicate, move to Trash, and pin/unpin. */
+export function useObjectActions({ object, userId, objectDomains, objectTags, queue, setObject, setError }: Options) {
   const navigate = useNavigate();
   const { addToast } = useToast() as { addToast: (type: string, message: string) => void };
   const notifyError = useNotifyError();
@@ -28,37 +30,43 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, re
   const [duplicating, setDuplicating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pinning, setPinning] = useState(false);
+  const [savingVersion, setSavingVersion] = useState(false);
 
+  /** Unsent edits are saved first, the current text is snapshotted, then the version is saved over it. */
   async function restoreVersion(ver: { id: string; version: number }) {
-    if (!object || !userId || !ver?.id) return;
+    if (!object || !userId || !ver?.id || !queue) return;
     setRestoringVersion(ver.id);
     setError('');
     try {
       // Read the snapshot fresh so a partially-loaded version list can never restore blanks.
       const snap = await fetchVersionSnapshot(ver.id);
-      const { data: restoredRows, error: err } = await supabase
-        .from('knowledge_objects')
-        .update({
-          title: snap.title,
-          content: snap.content ?? null,
-          summary: snap.summary ?? null,
-          key_points: snap.key_points ?? [],
-        })
-        .eq('id', object.id)
-        .eq('user_id', userId)
-        .eq('current_version', object.current_version)
-        .select('id');
-      if (err) throw err;
-      if (!restoredRows || restoredRows.length === 0) {
-        throw new Error('This object was changed elsewhere. Reload to get the latest version, then restore again.');
-      }
+      await queue.applyVersion({
+        version: ver.version,
+        title: snap.title,
+        content: snap.content ?? null,
+        content_json: snap.content_json ?? null,
+        summary: snap.summary ?? null,
+        key_points: snap.key_points ?? [],
+      });
       addToast('success', `Restored to v${ver.version}`);
-      reload();
-      invalidateObjectLists();
     } catch (err) {
       setError(notifyError(err, 'Restore failed'));
     } finally {
       setRestoringVersion(null);
+    }
+  }
+
+  async function saveVersion() {
+    if (!queue) return;
+    setSavingVersion(true);
+    setError('');
+    try {
+      await queue.snapshot();
+      addToast('success', 'Version saved');
+    } catch (err) {
+      setError(notifyError(err, 'Could not save a version'));
+    } finally {
+      setSavingVersion(false);
     }
   }
 
@@ -76,6 +84,7 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, re
           title,
           source: object.source || null,
           content: object.content || null,
+          content_json: object.content_json ?? null,
           summary: object.summary || null,
           key_points: object.key_points ?? [],
           status: object.status || 'active',
@@ -151,5 +160,5 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, re
     }
   }
 
-  return { restoreVersion, restoringVersion, duplicate, duplicating, remove, deleting, togglePin, pinning };
+  return { restoreVersion, restoringVersion, saveVersion, savingVersion, duplicate, duplicating, remove, deleting, togglePin, pinning };
 }

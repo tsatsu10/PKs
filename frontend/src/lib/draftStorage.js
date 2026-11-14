@@ -1,6 +1,7 @@
 /**
  * Draft persistence so content survives page refresh (sessionStorage).
- * Keys: pks-draft-new, pks-draft-quick, pks-draft-{objectId}
+ * Keys: pks-draft-new, pks-draft-quick. Objects autosave instead (features/object/save); an old
+ * pks-draft-{objectId} left by a pre-autosave bundle is adopted once by features/object/legacyDraft.
  */
 
 const PREFIX = 'pks-draft-';
@@ -16,7 +17,6 @@ export const DRAFT_OWNER_KEY = 'pks-drafts-owner';
 export const DRAFT_KEYS = {
   new: PREFIX + 'new',
   quick: PREFIX + 'quick',
-  object: (id) => PREFIX + id,
 };
 
 export function getDraft(key) {

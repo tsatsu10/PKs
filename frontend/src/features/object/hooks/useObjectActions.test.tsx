@@ -15,7 +15,7 @@ import { useObjectActions } from './useObjectActions';
 function setup() {
   const setObject = vi.fn();
   const r = renderHook(() => useObjectActions({
-    object: TEST_OBJECT, userId: 'owner', objectDomains: [], objectTags: [], reload: vi.fn(), setObject, setError: vi.fn(),
+    object: TEST_OBJECT, userId: 'owner', objectDomains: [], objectTags: [], queue: null, setObject, setError: vi.fn(),
   }), { wrapper: hookWrapper() });
   return { ...r, setObject };
 }
