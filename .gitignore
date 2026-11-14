@@ -36,3 +36,6 @@ pnpm-debug.log*
 # Supabase CLI scratch
 **/supabase/.temp/
 supabase/backups/
+
+# Penpot export (145 MB); the source is the Penpot file. Tokens live in frontend/design-tokens/.
+design/

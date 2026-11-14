@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:bundle": "node scripts/check-bundle.mjs"
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "tokens": "node scripts/build-tokens.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.55.0",

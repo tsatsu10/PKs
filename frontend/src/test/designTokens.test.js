@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rgb, ratio, blend } from './contrast.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const indexCss = readFileSync(join(SRC, 'index.css'), 'utf8');
@@ -24,13 +25,6 @@ function tokenBlock(re) {
 const dark = tokenBlock(/:root,\s*\[data-theme="dark"\]\s*\{([^}]*)\}/);
 const light = { ...dark, ...tokenBlock(/\[data-theme="light"\]\s*\{([^}]*)\}/) };
 
-const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.replace('#', '').padEnd(6, '0').slice(i - 1, i + 1), 16));
-const lum = (c) => {
-  const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
-const blend = (fg, alpha, bg) => fg.map((v, i) => Math.round(v * alpha + bg[i] * (1 - alpha)));
 const t = (theme, name) => rgb(theme[name]);
 
 describe('text contrast meets WCAG AA (4.5:1)', () => {
