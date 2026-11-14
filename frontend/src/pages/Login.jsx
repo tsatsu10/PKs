@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { fetchProfile } from '../data/profile';
 import AuthLayout from '../components/AuthLayout';
 import Turnstile from '../components/Turnstile';
 import './Auth.css';
@@ -67,13 +68,7 @@ export default function Login() {
         throw new Error('Sign-in did not create a session. Please try again.');
       }
 
-      const profileFetch = supabase
-        .from('users')
-        .select('email, display_name, timezone, created_at')
-        .eq('id', data.user.id)
-        .single()
-        .then((r) => (r.error ? null : r.data))
-        .catch(() => null);
+      const profileFetch = fetchProfile(data.user.id).catch(() => null);
       const profile = await Promise.race([
         profileFetch,
         new Promise((r) => setTimeout(() => r(null), 4000)),

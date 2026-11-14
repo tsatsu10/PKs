@@ -13,6 +13,6 @@ marked.setOptions({ gfm: true });
  */
 export function markdownToHtml(content) {
   if (content == null || content === '') return '';
-  const raw = marked.parse(content);
+  const raw = /** @type {string} */ (marked.parse(content));
   return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(raw, { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'] }) : raw;
 }

@@ -7,6 +7,9 @@
  *   owner recorded; when a user next signs in, it is cleared only if that user
  *   is someone else ({@link claimUserData}).
  *
+ * Per-user data also includes the TanStack Query cache (memory + IndexedDB, via
+ * {@link registerUserDataHooks}); it follows the same expiry rule as drafts.
+ *
  * Device preferences stay: pks-theme, pks-sidebar-collapsed,
  * pks-dashboard-density, pks-dashboard-view, pks-onboarding-dismissed.
  */
@@ -25,6 +28,19 @@ export { DRAFT_OWNER_KEY };
 
 /** localStorage: id of the user who owns the per-user localStorage keys (shared by all tabs). */
 export const DATA_OWNER_KEY = 'pks-data-owner';
+
+/**
+ * Per-user stores outside this module (the TanStack Query cache) register here, so this
+ * file stays free of data-layer imports. Hooks must never throw.
+ * @type {{ onClear: (ownerId: string | null) => void, onClaim: (userId: string) => void }[]}
+ */
+const userDataHooks = [];
+
+/** @param {{ onClear: (ownerId: string | null) => void, onClaim: (userId: string) => void }} hooks */
+export function registerUserDataHooks(hooks) {
+  userDataHooks.push(hooks);
+  return () => { userDataHooks.splice(userDataHooks.indexOf(hooks), 1); };
+}
 
 function removeLocal(keys) {
   keys.forEach((key) => {
@@ -60,10 +76,12 @@ export function clearOrphanedLocalData() {
  * the pending "run prompt" hand-off, per-user localStorage) and the owner markers.
  */
 export function clearUserData() {
+  const owner = readItem(localStorage, DATA_OWNER_KEY);
   clearTabUserData();
   clearUserLocalData();
   try { sessionStorage.removeItem(DRAFT_OWNER_KEY); } catch (_e) { void _e; }
   removeLocal([DATA_OWNER_KEY]);
+  userDataHooks.forEach((h) => h.onClear(owner));
 }
 
 /**
@@ -90,4 +108,5 @@ export function claimUserData(userId) {
   writeItem(sessionStorage, DRAFT_OWNER_KEY, userId);
   if (shouldClearForOwner(readItem(localStorage, DATA_OWNER_KEY), userId)) clearUserLocalData();
   writeItem(localStorage, DATA_OWNER_KEY, userId);
+  userDataHooks.forEach((h) => h.onClaim(userId));
 }

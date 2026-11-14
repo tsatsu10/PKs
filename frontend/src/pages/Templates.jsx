@@ -1,11 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
+import { useNotifyError } from '../lib/useNotifyError';
 import { useToast } from '../context/ToastContext';
+import QueryError from '../components/QueryError';
 import OptionsInput from '../components/OptionsInput';
+import { useTemplatesList, invalidateTemplates } from '../data/templates';
 import './Templates.css';
 
 const FIELD_TYPES = [
@@ -32,8 +35,11 @@ function getFieldCount(template) {
 export default function Templates() {
   const { user } = useAuth();
   const { addToast } = useToast();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
+  const listQ = useTemplatesList(user?.id ?? null);
+  const list = useMemo(() => listQ.data ?? [], [listQ.data]);
+  const loading = listQ.isPending;
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(undefined);
   const [form, setForm] = useState({ name: '', description: '', schema: defaultSchema });
@@ -50,19 +56,6 @@ export default function Templates() {
         (t.description || '').toLowerCase().includes(q)
     );
   }, [list, searchQuery]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const { data, error: e } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
-      setList(e ? [] : (data || []));
-      setLoading(false);
-    })();
-  }, [user?.id]);
 
   function openNew() {
     setEditingId('new');
@@ -203,24 +196,20 @@ export default function Templates() {
           .eq('id', editingId)
           .eq('user_id', user.id);
         if (err) throw err;
-        setList((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...payload } : t)));
         addToast('success', 'Template updated');
       } else {
-        const { data, error: err } = await supabase
+        const { error: err } = await supabase
           .from('templates')
-          .insert({ user_id: user.id, ...payload })
-          .select()
-          .single();
+          .insert({ user_id: user.id, ...payload });
         if (err) throw err;
-        setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
         addToast('success', 'Template created');
       }
+      await invalidateTemplates(queryClient);
       closeEditor();
     } catch (e) {
       if (import.meta.env.DEV) console.error('Template save failed:', e);
-      const msg = getErrorMessage(e, 'Save failed');
+      const msg = notifyError(e, 'Save failed');
       setError(msg);
-      addToast('error', msg);
     } finally {
       setSaving(false);
     }
@@ -245,11 +234,11 @@ export default function Templates() {
         .select()
         .single();
       if (err) throw err;
-      setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      await invalidateTemplates(queryClient);
       openEdit(data);
       addToast('success', 'Template duplicated');
     } catch (e) {
-      const msg = getErrorMessage(e, 'Duplicate failed');
+      const msg = notifyError(e, 'Duplicate failed');
       setError(msg);
       addToast('error', msg);
     }
@@ -264,12 +253,12 @@ export default function Templates() {
         .eq('id', id)
         .eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.filter((t) => t.id !== id));
+      await invalidateTemplates(queryClient);
       if (editingId === id) closeEditor();
       setDeleteConfirmId(null);
       addToast('success', 'Template deleted');
     } catch (e) {
-      const msg = getErrorMessage(e, 'Delete failed');
+      const msg = notifyError(e, 'Delete failed');
       setError(msg);
       addToast('error', msg);
     }
@@ -329,7 +318,9 @@ export default function Templates() {
             )}
           </div>
 
-          {list.length === 0 ? (
+          {listQ.error ? (
+            <QueryError what="templates" error={listQ.error} onRetry={() => listQ.refetch()} />
+          ) : list.length === 0 ? (
             <section className="templates-empty-state empty-state" aria-label="No templates">
               <div className="templates-empty-icon" aria-hidden="true">
                 📋

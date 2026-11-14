@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { createTestQueryClient, wrapperFor } from '../test/queryTestUtils';
 import { useDashboardSearch } from './useDashboardSearch';
 
 const mockRpc = vi.fn();
@@ -21,19 +22,18 @@ function mockFromChain(resolvedData = []) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
-    order: vi.fn(),
+    order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({ data: resolvedData, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  chain.order.mockImplementation((col) => {
-    if (col === 'name') {
-      return Promise.resolve({ data: resolvedData, error: null });
-    }
-    return chain;
-  });
   mockFrom.mockReturnValue(chain);
   return chain;
 }
+
+const wrapper = () => wrapperFor(createTestQueryClient());
+
+const searchCalls = () => mockRpc.mock.calls.filter(([n]) => n === 'search_knowledge_objects');
 
 describe('useDashboardSearch (integration)', () => {
   beforeEach(() => {
@@ -48,30 +48,26 @@ describe('useDashboardSearch (integration)', () => {
   });
 
   it('calls search_knowledge_objects with pagination when no query', async () => {
-    renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
-    await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalled();
+    await act(async () => {
+      result.current.runSearch(0);
     });
 
-    expect(mockRpc).toHaveBeenCalledWith(
-      'search_knowledge_objects',
-      expect.objectContaining({
-        search_query: null,
-        limit_n: 20,
-        offset_n: 0,
-      })
-    );
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'search_knowledge_objects',
+        expect.objectContaining({
+          search_query: null,
+          limit_n: 20,
+          offset_n: 0,
+        })
+      );
+    });
   });
 
   it('calls search_knowledge_objects_with_snippets when query is set and runSearch called', async () => {
-    mockRpc.mockResolvedValue({ data: [], error: null });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
-
-    await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalled();
-    });
-    mockRpc.mockClear();
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await act(async () => {
       result.current.setSearchQuery('test');
@@ -80,24 +76,20 @@ describe('useDashboardSearch (integration)', () => {
       result.current.runSearch(0);
     });
 
-    expect(mockRpc).toHaveBeenCalledWith(
-      'search_knowledge_objects_with_snippets',
-      expect.objectContaining({
-        search_query: 'test',
-        limit_n: 20,
-        offset_n: 0,
-      })
-    );
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'search_knowledge_objects_with_snippets',
+        expect.objectContaining({
+          search_query: 'test',
+          limit_n: 20,
+          offset_n: 0,
+        })
+      );
+    });
   });
 
   it('passes type and domain filters to RPC', async () => {
-    mockRpc.mockResolvedValue({ data: [], error: null });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
-
-    await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalled();
-    });
-    mockRpc.mockClear();
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
 
     await act(async () => {
       result.current.setTypeFilter('note');
@@ -105,13 +97,15 @@ describe('useDashboardSearch (integration)', () => {
       result.current.runSearch(0, null, { typeFilter: 'note', domainFilter: 'domain-uuid' });
     });
 
-    expect(mockRpc).toHaveBeenCalledWith(
-      'search_knowledge_objects',
-      expect.objectContaining({
-        type_filter: 'note',
-        domain_id_f: 'domain-uuid',
-      })
-    );
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'search_knowledge_objects',
+        expect.objectContaining({
+          type_filter: 'note',
+          domain_id_f: 'domain-uuid',
+        })
+      );
+    });
   });
 
   it('goToPage fetches with correct offset', async () => {
@@ -121,10 +115,15 @@ describe('useDashboardSearch (integration)', () => {
       }
       return Promise.resolve({ data: Array(20).fill({ id: 'x', title: 't' }), error: null });
     });
-    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }));
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
+
+    await act(async () => {
+      result.current.runSearch(0);
+    });
 
     await waitFor(() => {
       expect(result.current.page).toBe(1);
+      expect(result.current.totalPages).toBe(2);
     });
     mockRpc.mockClear();
 
@@ -140,5 +139,21 @@ describe('useDashboardSearch (integration)', () => {
       'search_knowledge_objects',
       expect.objectContaining({ offset_n: 20, limit_n: 20 })
     );
+  });
+
+  it('dedupes repeat searches with unchanged filters into one request (B11)', async () => {
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
+
+    await act(async () => {
+      result.current.runSearch(0);
+    });
+    await waitFor(() => expect(searchCalls()).toHaveLength(1));
+
+    await act(async () => {
+      result.current.runSearch(0);
+    });
+    // The rebuilt payload is structurally identical, so it hits the same cache entry.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(searchCalls()).toHaveLength(1);
   });
 });

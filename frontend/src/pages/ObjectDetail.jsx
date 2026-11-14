@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -16,14 +16,21 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import BlockNoteViewer from '../components/BlockNoteViewer';
 import { markdownToHtml } from '../lib/markdown';
-import { OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, AI_PROVIDER_IDS, formatObjectTypeLabel } from '../constants';
+import { OBJECT_STATUSES, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL, formatObjectTypeLabel } from '../constants';
 import TypeMark from '../components/TypeMark';
 import { getDeepSeekErrorMessage } from '../lib/deepseekKey';
 import { resolveRunSelection, modelForProvider, isServerSelection } from '../lib/aiProviders';
 import { getErrorMessage } from '../lib/errors';
+import { reportError } from '../lib/reportError';
+import { useNotifyError } from '../lib/useNotifyError';
 import { downloadBlob, printHtml } from '../lib/download';
 import { touchObjectView } from '../lib/objectView';
 import { useObjectDetail } from '../hooks/useObjectDetail';
+import { fetchObjectRow, fetchVersionSnapshot, fetchShares, searchLinkTargets, invalidateObjectVersions, invalidateObject } from '../data/objectDetail';
+import { setObjectInLists, invalidateObjectLists } from '../data/objects';
+import { useAiProviders } from '../data/settings';
+import { usePrefetchObject } from '../data/usePrefetchObject';
+import QueryError from '../components/QueryError';
 import ObjectDetailSharePanel from '../components/ObjectDetailSharePanel';
 import ObjectDetailExportPanel from '../components/ObjectDetailExportPanel';
 import ObjectDetailRunPromptPanel from '../components/ObjectDetailRunPromptPanel';
@@ -45,7 +52,6 @@ export default function ObjectDetail() {
     reload,
     draft,
     versions,
-    setVersions,
     objectDomains,
     setObjectDomains,
     objectTags,
@@ -65,14 +71,19 @@ export default function ObjectDetail() {
     suggestedTags,
     suggestedLinkedObjects,
     myShare,
+    panelErrors,
+    retryPanel,
   } = useObjectDetail({ id, userId: user?.id ?? undefined });
+  const notifyError = useNotifyError();
+  const prefetch = usePrefetchObject();
 
   const [uploading, setUploading] = useState(false);
   const [runTemplateId, setRunTemplateId] = useState('');
   const [runPromptText, setRunPromptText] = useState('');
   const [runAiModel, setRunAiModel] = useState(DEFAULT_AI_MODEL);
   const [runAiProviderId, setRunAiProviderId] = useState(null);
-  const [aiProviders, setAiProviders] = useState([]);
+  const providersQ = useAiProviders(user?.id ?? null);
+  const aiProviders = useMemo(() => providersQ.data ?? [], [providersQ.data]);
   const [runPromptSource, setRunPromptSource] = useState('bank');
   const [runPromptEditFromBank, setRunPromptEditFromBank] = useState(false);
   const [runOutput, setRunOutput] = useState('');
@@ -114,6 +125,14 @@ export default function ObjectDetail() {
     if (!object || editing) return;
     setEditForm(objectToEditForm(object));
   }, [object, editing]);
+
+  // Owner perf check (hand-off): measure from open to first visible content per object id.
+  const visibleMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!object?.id || visibleMarkedRef.current === object.id) return;
+    visibleMarkedRef.current = object.id;
+    performance.mark('pks:object-visible');
+  }, [object?.id]);
 
   const draftAppliedRef = useRef(false);
   useEffect(() => {
@@ -174,23 +193,6 @@ export default function ObjectDetail() {
     if (template?.prompt_text != null) setRunPromptText(template.prompt_text);
   }, [showRunPanel, runPromptSource, runTemplateId, runPromptEditFromBank, promptTemplates]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error: err } = await supabase
-        .from('user_ai_providers')
-        .select('id, name, provider_type')
-        .eq('user_id', user.id)
-        .in('provider_type', AI_PROVIDER_IDS)
-        .order('name');
-      if (cancelled) return;
-      if (err && import.meta.env.DEV) console.warn('Failed to load AI providers:', err);
-      setAiProviders(data || []);
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
   // Clear provider selection if the selected provider was removed (e.g. in another tab)
   useEffect(() => {
     if (!isServerSelection(runAiProviderId) && aiProviders.length > 0 && !aiProviders.some((p) => p.id === runAiProviderId)) {
@@ -223,17 +225,12 @@ export default function ObjectDetail() {
       return;
     }
     const t = setTimeout(async () => {
-      const { data, error: err } = await supabase.rpc('search_knowledge_objects', {
-        search_query: linkSearchQuery.trim(),
-        limit_n: 8,
-        offset_n: 0,
-      });
-      if (err) {
+      try {
+        const list = (await searchLinkTargets(linkSearchQuery.trim())).filter((o) => o.id !== object.id);
+        setLinkSearchResults(list);
+      } catch {
         setLinkSearchResults([]);
-        return;
       }
-      const list = (data || []).filter((o) => o.id !== object.id);
-      setLinkSearchResults(list);
     }, 300);
     return () => clearTimeout(t);
   }, [linkSearchQuery, user?.id, object?.id]);
@@ -285,11 +282,7 @@ export default function ObjectDetail() {
         // version. Stay in edit mode: the effect that resets editForm skips
         // while editing, and the draft stays until the user cancels.
         try {
-          const { data: fresh } = await supabase
-            .from('knowledge_objects')
-            .select(OBJECT_ROW_COLS)
-            .eq('id', object.id)
-            .maybeSingle();
+          const fresh = await fetchObjectRow(object.id);
           if (fresh) setObject((o) => ({ ...o, ...fresh }));
         } catch (_e) { void _e; }
         const msg = 'This object was changed elsewhere (another tab or device). Your text is still in the editor — copy it, click Cancel, then Edit again and paste it back.';
@@ -303,18 +296,10 @@ export default function ObjectDetail() {
       clearDraft(DRAFT_KEYS.object(object.id));
       addToast('success', 'Changes saved');
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_UPDATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { title: editForm.title.trim() });
-      supabase
-        .from('knowledge_object_versions')
-        .select('id, version, title, content, summary, key_points, created_at, edited_by')
-        .eq('knowledge_object_id', object.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-        .then(({ data: vers }) => { if (vers) setVersions(vers); })
-        .catch((e) => { if (import.meta.env.DEV) console.warn('Versions refresh failed:', e); });
+      invalidateObjectVersions(object.id);
+      invalidateObjectLists();
     } catch (err) {
-      const msg = getErrorMessage(err, 'Update failed');
-      addToast('error', msg);
-      setError(msg);
+      setError(notifyError(err, 'Update failed'));
     } finally {
       setSaving(false);
     }
@@ -326,12 +311,7 @@ export default function ObjectDetail() {
     setError('');
     try {
       // Read the snapshot fresh so a partially-loaded version list can never restore blanks.
-      const { data: snap, error: snapErr } = await supabase
-        .from('knowledge_object_versions')
-        .select('title, content, summary, key_points')
-        .eq('id', ver.id)
-        .single();
-      if (snapErr) throw snapErr;
+      const snap = await fetchVersionSnapshot(ver.id);
       const { data: restoredRows, error: err } = await supabase
         .from('knowledge_objects')
         .update({
@@ -350,10 +330,9 @@ export default function ObjectDetail() {
       }
       addToast('success', `Restored to v${ver.version}`);
       reload();
+      invalidateObjectLists();
     } catch (err) {
-      const msg = getErrorMessage(err, 'Restore failed');
-      setError(msg);
-      addToast('error', msg);
+      setError(notifyError(err, 'Restore failed'));
     } finally {
       setRestoringVersion(null);
     }
@@ -396,11 +375,10 @@ export default function ObjectDetail() {
       }
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, newId, { title, duplicated_from: object.id });
       addToast('success', 'Object duplicated');
+      await invalidateObjectLists();
       navigate(`/objects/${newId}`);
     } catch (err) {
-      const msg = getErrorMessage(err, 'Duplicate failed');
-      setError(msg);
-      addToast('error', msg);
+      setError(notifyError(err, 'Duplicate failed'));
     } finally {
       setDuplicating(false);
     }
@@ -419,11 +397,11 @@ export default function ObjectDetail() {
       if (err) throw err;
       logAudit(user.id, AUDIT_ACTIONS.OBJECT_DELETE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { title: object.title });
       addToast('success', 'Moved to Trash');
+      setObjectInLists(object.id, null);
+      await invalidateObjectLists();
       navigate('/', { replace: true });
     } catch (err) {
-      const msg = getErrorMessage(err, 'Delete failed');
-      addToast('error', msg);
-      setError(msg);
+      setError(notifyError(err, 'Delete failed'));
     } finally {
       setDeleting(false);
     }
@@ -441,8 +419,9 @@ export default function ObjectDetail() {
         .eq('user_id', user.id);
       if (e) throw e;
       setObject((o) => ({ ...o, is_pinned: !o.is_pinned }));
+      setObjectInLists(object.id, { is_pinned: !object.is_pinned });
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to update pin'));
+      setError(notifyError(err, 'Failed to update pin'));
     } finally {
       setPinning(false);
     }
@@ -456,8 +435,9 @@ export default function ObjectDetail() {
       if (err) throw err;
       const d = allDomains.find((x) => x.id === domainId);
       if (d) setObjectDomains((prev) => [...prev, d].sort((a, b) => a.name.localeCompare(b.name)));
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to add domain'));
+      setError(notifyError(err, 'Failed to add domain'));
     }
   }
 
@@ -468,8 +448,9 @@ export default function ObjectDetail() {
       const { error: err } = await supabase.from('knowledge_object_domains').delete().eq('knowledge_object_id', object.id).eq('domain_id', domainId);
       if (err) throw err;
       setObjectDomains((prev) => prev.filter((d) => d.id !== domainId));
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove domain'));
+      setError(notifyError(err, 'Failed to remove domain'));
     }
   }
 
@@ -481,8 +462,9 @@ export default function ObjectDetail() {
       if (err) throw err;
       const t = allTags.find((x) => x.id === tagId);
       if (t) setObjectTags((prev) => [...prev, t].sort((a, b) => a.name.localeCompare(b.name)));
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to add tag'));
+      setError(notifyError(err, 'Failed to add tag'));
     }
   }
 
@@ -493,8 +475,9 @@ export default function ObjectDetail() {
       const { error: err } = await supabase.from('knowledge_object_tags').delete().eq('knowledge_object_id', object.id).eq('tag_id', tagId);
       if (err) throw err;
       setObjectTags((prev) => prev.filter((t) => t.id !== tagId));
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove tag'));
+      setError(notifyError(err, 'Failed to remove tag'));
     }
   }
 
@@ -510,8 +493,10 @@ export default function ObjectDetail() {
       if (err) throw err;
       const target = otherObjects.find((o) => o.id === toObjectId);
       setOutgoingLinks((prev) => [...prev, { id: data.id, to_object_id: data.to_object_id, relationship_type: data.relationship_type, target: target || { id: toObjectId, title: '…', type: '' } }]);
+      invalidateObject(toObjectId);
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to add link'));
+      setError(notifyError(err, 'Failed to add link'));
     }
   }
 
@@ -521,10 +506,14 @@ export default function ObjectDetail() {
     try {
       const { error: err } = await supabase.from('link_edges').delete().eq('id', edgeId);
       if (err) throw err;
+      const edge = (isOutgoing ? outgoingLinks : incomingLinks).find((l) => l.id === edgeId);
+      const otherId = isOutgoing ? edge?.to_object_id : edge?.from_object_id;
       if (isOutgoing) setOutgoingLinks((prev) => prev.filter((l) => l.id !== edgeId));
       else setIncomingLinks((prev) => prev.filter((l) => l.id !== edgeId));
+      if (otherId) invalidateObject(otherId);
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove link'));
+      setError(notifyError(err, 'Failed to remove link'));
     }
   }
 
@@ -552,8 +541,9 @@ export default function ObjectDetail() {
       const { error: linkErr } = await supabase.from('knowledge_object_files').insert({ knowledge_object_id: object.id, file_id: fileRow.id });
       if (linkErr) throw linkErr;
       setAttachedFiles((prev) => [...prev, { id: fileRow.id, filename: file.name, mime_type: file.type, size_bytes: file.size }]);
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Upload failed'));
+      setError(notifyError(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }
@@ -578,8 +568,9 @@ export default function ObjectDetail() {
       const { error: err } = await supabase.from('knowledge_object_files').delete().eq('knowledge_object_id', object.id).eq('file_id', fileId);
       if (err) throw err;
       setAttachedFiles((prev) => prev.filter((x) => x.id !== fileId));
+      invalidateObjectLists();
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove attachment'));
+      setError(notifyError(err, 'Failed to remove attachment'));
     }
   }
 
@@ -668,7 +659,7 @@ export default function ObjectDetail() {
       if (data?.output_truncated) addToast('info', 'The AI hit its length limit, so this answer may be cut off.');
     } catch (err) {
       const msg = getErrorMessage(err, 'AI generation failed.');
-      setError(msg);
+      setError(notifyError(err, { message: msg }));
     } finally {
       setGeneratingAI(false);
     }
@@ -694,7 +685,7 @@ export default function ObjectDetail() {
       logAudit(user.id, AUDIT_ACTIONS.PROMPT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { prompt_template_id: runTemplateId || null });
       deliverWebhookEvent('prompt_run.completed', { objectId: object.id, objectTitle: object.title, promptTemplateId: runTemplateId || null });
     } catch (e) {
-      setError(getErrorMessage(e, 'Failed to save run'));
+      setError(notifyError(e, 'Failed to save run'));
     } finally {
       setSavingRun(false);
     }
@@ -723,9 +714,10 @@ export default function ObjectDetail() {
       createNotification(user.id, 'prompt_completed', 'Prompt saved as new object', `Created "${title.slice(0, 60)}${title.length > 60 ? '…' : ''}"`, { type: 'knowledge_object', id: newObj.id });
       logAudit(user.id, AUDIT_ACTIONS.PROMPT_RUN, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, object.id, { prompt_template_id: runTemplateId || null, created_object_id: newObj.id });
       deliverWebhookEvent('prompt_run.completed', { objectId: object.id, createdObjectId: newObj.id, promptTemplateId: runTemplateId || null });
+      await invalidateObjectLists();
       navigate(`/objects/${newObj.id}`);
     } catch (e) {
-      setError(getErrorMessage(e, 'Failed to save as object'));
+      setError(notifyError(e, 'Failed to save as object'));
     } finally {
       setSavingRun(false);
     }
@@ -929,22 +921,13 @@ export default function ObjectDetail() {
 
   async function loadShares() {
     if (!object?.id || !user?.id) return;
-    const [sharesRes, invitesRes] = await Promise.all([
-      supabase.from('share_permissions').select('id, shared_with_email, role, created_at')
-        .eq('knowledge_object_id', object.id).order('created_at', { ascending: false }),
-      supabase.from('share_invites').select('id, email, role, created_at')
-        .eq('knowledge_object_id', object.id).is('accepted_at', null)
-        .order('created_at', { ascending: false }),
-    ]);
-    if (sharesRes.error || invitesRes.error) {
-      if (import.meta.env.DEV) console.warn('Failed to load shares:', sharesRes.error || invitesRes.error);
+    try {
+      setShares(await fetchShares(object.id));
+    } catch (e) {
+      reportError(e);
       setShares([]);
-      return;
+      setError(getErrorMessage(e, 'Failed to load shares'));
     }
-    const pending = (invitesRes.data || []).map((i) => ({
-      id: `invite:${i.id}`, shared_with_email: i.email, role: i.role, created_at: i.created_at, pending: true,
-    }));
-    setShares([...pending, ...(sharesRes.data || [])]);
   }
 
   function isValidEmail(str) {
@@ -974,8 +957,7 @@ export default function ObjectDetail() {
       setShareEmail('');
       addToast('success', `Shared with ${email}. If they don't have a verified PKS account yet, they'll get access when they sign up.`);
     } catch (err) {
-      const msg = getErrorMessage(err, 'Failed to share');
-      addToast('error', msg);
+      const msg = notifyError(err, 'Failed to share');
       setError(msg);
     } finally {
       setSharing(false);
@@ -992,7 +974,7 @@ export default function ObjectDetail() {
       if (err) throw err;
       setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to revoke'));
+      setError(notifyError(err, 'Failed to revoke'));
     }
   }
 
@@ -1025,7 +1007,7 @@ export default function ObjectDetail() {
                 ) : (
                   linkSearchResults.map((o) => (
                     <div key={o.id} className="detail-link-search-item">
-                      <Link to={`/objects/${o.id}`} className="detail-link-search-title" onClick={() => setLinkSearchOpen(false)}>{o.title}</Link>
+                      <Link to={`/objects/${o.id}`} className="detail-link-search-title" onClick={() => setLinkSearchOpen(false)} {...prefetch(o.id)}>{o.title}</Link>
                       <span className="detail-link-search-type">{formatObjectTypeLabel(o.type)}</span>
                       {!outgoingLinks.some((l) => l.to_object_id === o.id) ? (
                         <button type="button" className="btn btn-primary btn-small" onClick={() => { addLink(o.id); setLinkSearchOpen(false); setLinkSearchQuery(''); }}>Link</button>
@@ -1180,7 +1162,9 @@ export default function ObjectDetail() {
         <aside className="detail-sidebar">
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Domains</h3>
-            {objectDomains.length === 0 && !(isOwner && availableDomains.length > 0) ? (
+            {(panelErrors.domains ?? panelErrors.taxonomy) ? (
+              <QueryError what="domains" error={panelErrors.domains ?? panelErrors.taxonomy} onRetry={() => retryPanel(panelErrors.domains ? 'domains' : 'taxonomy')} />
+            ) : objectDomains.length === 0 && !(isOwner && availableDomains.length > 0) ? (
               <p className="detail-empty">No domains yet.</p>
             ) : (
               <div className="chips">
@@ -1207,7 +1191,9 @@ export default function ObjectDetail() {
           </div>
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Tags</h3>
-            {objectTags.length === 0 && !(isOwner && (availableTags.length > 0 || suggestedTags.length > 0)) ? (
+            {(panelErrors.tags ?? panelErrors.taxonomy) ? (
+              <QueryError what="tags" error={panelErrors.tags ?? panelErrors.taxonomy} onRetry={() => retryPanel(panelErrors.tags ? 'tags' : 'taxonomy')} />
+            ) : objectTags.length === 0 && !(isOwner && (availableTags.length > 0 || suggestedTags.length > 0)) ? (
               <p className="detail-empty">No tags yet.</p>
             ) : (
               <div className="chips">
@@ -1244,7 +1230,9 @@ export default function ObjectDetail() {
           </div>
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Attachments</h3>
-            {attachedFiles.length === 0 && !isOwner ? (
+            {panelErrors.files ? (
+              <QueryError what="attachments" error={panelErrors.files} onRetry={() => retryPanel('files')} />
+            ) : attachedFiles.length === 0 && !isOwner ? (
               <p className="detail-empty">No attachments.</p>
             ) : (
               <>
@@ -1272,9 +1260,12 @@ export default function ObjectDetail() {
               </>
             )}
           </div>
-          {isOwner && versions.length > 0 && (
+          {isOwner && (versions.length > 0 || panelErrors.versions) && (
             <div className="detail-section-card">
               <h3 className="detail-section-card-title">Version history</h3>
+              {panelErrors.versions ? (
+                <QueryError what="version history" error={panelErrors.versions} onRetry={() => retryPanel('versions')} />
+              ) : (
               <ul className="version-history-list">
                 {versions.map((v) => (
                   <li key={v.id}>
@@ -1284,11 +1275,16 @@ export default function ObjectDetail() {
                   </li>
                 ))}
               </ul>
+              )}
             </div>
           )}
           {isOwner && (
             <div className="detail-section-card">
               <h3 className="detail-section-card-title">Prompt runs</h3>
+              {(panelErrors.runs ?? panelErrors.prompts) ? (
+                <QueryError what="prompt runs" error={panelErrors.runs ?? panelErrors.prompts} onRetry={() => retryPanel(panelErrors.runs ? 'runs' : 'prompts')} />
+              ) : (
+              <>
               <h4 className="detail-section-card-sub">History</h4>
               <ul className="prompt-runs-list">
                 {promptRuns.slice(0, 5).map((r) => (
@@ -1299,6 +1295,8 @@ export default function ObjectDetail() {
                 ))}
                 {promptRuns.length === 0 && <li className="muted">No runs yet.</li>}
               </ul>
+              </>
+              )}
             </div>
           )}
           {isOwner && suggestedLinkedObjects.filter((o) => !outgoingLinks.some((l) => l.to_object_id === o.id)).length > 0 && (
@@ -1307,7 +1305,7 @@ export default function ObjectDetail() {
               <div className="detail-related-grid">
                 {suggestedLinkedObjects.filter((o) => !outgoingLinks.some((l) => l.to_object_id === o.id)).slice(0, 4).map((o) => (
                   <div key={o.id} className="detail-related-card">
-                    <Link to={`/objects/${o.id}`} className="detail-related-title-link">{o.title}</Link>
+                    <Link to={`/objects/${o.id}`} className="detail-related-title-link" {...prefetch(o.id)}>{o.title}</Link>
                     <span className="detail-related-type">
                       <TypeMark type={o.type} size="sm" className="detail-related-type-mark" />
                       {formatObjectTypeLabel(o.type)}
@@ -1320,7 +1318,9 @@ export default function ObjectDetail() {
           )}
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Links</h3>
-            {outgoingLinks.length === 0 && incomingLinks.length === 0 ? (
+            {panelErrors.links ? (
+              <QueryError what="links" error={panelErrors.links} onRetry={() => retryPanel('links')} />
+            ) : outgoingLinks.length === 0 && incomingLinks.length === 0 ? (
               <>
                 <p className="detail-empty">No links yet.</p>
                 {isOwner && availableToLink.length > 0 && (
@@ -1341,7 +1341,7 @@ export default function ObjectDetail() {
                   <ul className="links-list">
                     {outgoingLinks.map((l) => (
                       <li key={l.id}>
-                        <Link to={`/objects/${l.to_object_id}`}>{l.target?.title ?? l.to_object_id}</Link>
+                        <Link to={`/objects/${l.to_object_id}`} {...prefetch(l.to_object_id)}>{l.target?.title ?? l.to_object_id}</Link>
                         <span className="link-type">{l.relationship_type}</span>
                         {isOwner && <button type="button" className="chip-remove" onClick={() => removeLink(l.id, true)} aria-label="Remove link">×</button>}
                       </li>
@@ -1363,7 +1363,7 @@ export default function ObjectDetail() {
                   <ul className="links-list">
                     {incomingLinks.map((l) => (
                       <li key={l.id}>
-                        <Link to={`/objects/${l.from_object_id}`}>{l.source?.title ?? l.from_object_id}</Link>
+                        <Link to={`/objects/${l.from_object_id}`} {...prefetch(l.from_object_id)}>{l.source?.title ?? l.from_object_id}</Link>
                         <span className="link-type">{l.relationship_type}</span>
                         {isOwner && <button type="button" className="chip-remove" onClick={() => removeLink(l.id, false)} aria-label="Remove link">×</button>}
                       </li>
@@ -1376,7 +1376,9 @@ export default function ObjectDetail() {
           {!(isOwner && versions.length > 0) && (
           <div className="detail-section-card">
             <h3 className="detail-section-card-title">Version history</h3>
-            {versions.length === 0 ? (
+            {panelErrors.versions ? (
+              <QueryError what="version history" error={panelErrors.versions} onRetry={() => retryPanel('versions')} />
+            ) : versions.length === 0 ? (
               <p className="detail-empty">No previous versions yet.</p>
             ) : (
               <ul className="version-list">

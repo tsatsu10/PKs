@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,10 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
+import { useTaxonomy } from '../data/taxonomy';
+import { useTemplatesList } from '../data/templates';
+import { invalidateObjectLists } from '../data/objects';
+import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 
@@ -23,9 +27,10 @@ export default function ObjectNew() {
   const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [templates, setTemplates] = useState([]);
+  const taxonomy = useTaxonomy(user?.id ?? null);
+  const { domains, tags } = taxonomy;
+  const templatesQ = useTemplatesList(user?.id ?? null);
+  const templates = useMemo(() => templatesQ.data ?? [], [templatesQ.data]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateValues, setTemplateValues] = useState({});
   const [form, setForm] = useState({
@@ -51,22 +56,6 @@ export default function ObjectNew() {
       : null;
   const templateFields = schema?.fields || [];
 
-  const fetchDomainsTagsTemplates = useCallback(async () => {
-    if (!user?.id) return;
-    const [dRes, tRes, tmplRes] = await Promise.all([
-      supabase.from('domains').select('id, name').eq('user_id', user.id).order('name'),
-      supabase.from('tags').select('id, name').eq('user_id', user.id).order('name'),
-      supabase.from('templates').select('id, name, schema').eq('user_id', user.id).order('name'),
-    ]);
-    setDomains(dRes.data || []);
-    setTags(tRes.data || []);
-    setTemplates(tmplRes.data || []);
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchDomainsTagsTemplates();
-  }, [fetchDomainsTagsTemplates]);
-
   // Pre-select template from URL ?template=<id>
   const hasAppliedTemplateUrl = useRef(false);
   useEffect(() => {
@@ -77,15 +66,6 @@ export default function ObjectNew() {
       hasAppliedTemplateUrl.current = true;
     }
   }, [templateFromUrl, templates]);
-
-  // Refetch when user returns to this tab (e.g. after adding domains/tags in Settings in another tab)
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState === 'visible') fetchDomainsTagsTemplates();
-    }
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [fetchDomainsTagsTemplates]);
 
   // Template values restored from a draft; the reset effect below must not wipe them.
   // Holds { templateId, values } so the reset effect only consumes it once
@@ -201,6 +181,7 @@ export default function ObjectNew() {
       createNotification(user.id, 'object_created', 'Object created', (title || 'Untitled').slice(0, 80), { type: 'knowledge_object', id: objectId });
       addToast('success', 'Object created');
       clearDraft(DRAFT_KEYS.new);
+      await invalidateObjectLists();
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to create object');
@@ -473,7 +454,10 @@ export default function ObjectNew() {
                       </div>
                     </div>
                   )}
-                  {domains.length === 0 && tags.length === 0 && (
+                  {taxonomy.error && (
+                    <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />
+                  )}
+                  {!taxonomy.error && domains.length === 0 && tags.length === 0 && (
                     <p className="form-hint notion-hint"><Link to="/settings">Settings</Link> → Add domains and tags to classify objects.</p>
                   )}
                 </div>

@@ -1,10 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
+import { useNotifyError } from '../lib/useNotifyError';
+import QueryError from '../components/QueryError';
+import { usePromptsList, invalidatePrompts } from '../data/prompts';
 import { OBJECT_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
 import './PromptBank.css';
 
@@ -12,8 +15,11 @@ export default function PromptBank() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
+  const listQ = usePromptsList(user?.id ?? null);
+  const templates = useMemo(() => listQ.data ?? [], [listQ.data]);
+  const loading = listQ.isPending;
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(undefined);
   const [form, setForm] = useState({
@@ -50,19 +56,6 @@ export default function PromptBank() {
         (t.tags || []).some((tag) => (tag || '').toLowerCase().includes(q))
     );
   }, [templates, searchQuery, tagFilter]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const { data, error: e } = await supabase
-        .from('prompt_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
-      setTemplates(e ? [] : (data || []));
-      setLoading(false);
-    })();
-  }, [user?.id]);
 
   function openNew() {
     setEditingId('new');
@@ -154,23 +147,19 @@ export default function PromptBank() {
           .eq('id', editingId)
           .eq('user_id', user.id);
         if (err) throw err;
-        setTemplates((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...payload } : t)));
         addToast('success', 'Prompt updated');
       } else {
-        const { data, error: err } = await supabase
+        const { error: err } = await supabase
           .from('prompt_templates')
-          .insert({ user_id: user.id, ...payload })
-          .select()
-          .single();
+          .insert({ user_id: user.id, ...payload });
         if (err) throw err;
-        setTemplates((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
         addToast('success', 'Prompt saved');
       }
+      await invalidatePrompts(queryClient);
       closeEditor();
     } catch (e) {
-      const msg = getErrorMessage(e, 'Save failed');
+      const msg = notifyError(e, 'Save failed');
       setError(msg);
-      addToast('error', msg);
     } finally {
       setSaving(false);
     }
@@ -185,14 +174,13 @@ export default function PromptBank() {
         .eq('id', id)
         .eq('user_id', user.id);
       if (err) throw err;
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      await invalidatePrompts(queryClient);
       if (editingId === id) closeEditor();
       setDeleteConfirmId(null);
       addToast('success', 'Prompt deleted');
     } catch (e) {
-      const msg = getErrorMessage(e, 'Delete failed');
+      const msg = notifyError(e, 'Delete failed');
       setError(msg);
-      addToast('error', msg);
     }
   }
 
@@ -271,7 +259,9 @@ export default function PromptBank() {
             </>
           )}
 
-          {templates.length === 0 ? (
+          {listQ.error ? (
+            <QueryError what="prompts" error={listQ.error} onRetry={() => listQ.refetch()} />
+          ) : templates.length === 0 ? (
             <section className="prompt-bank-empty empty-state" aria-label="No prompts">
               <div className="prompt-bank-empty-icon" aria-hidden="true">💬</div>
               <p className="empty-state-title">No prompts yet</p>

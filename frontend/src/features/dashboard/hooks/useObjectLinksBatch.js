@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { reportError } from '../../../lib/reportError';
+import { fetchObjectLinksBatch } from '../../../data/dashboard';
 
 const FETCH_DEBOUNCE_MS = 120;
 
@@ -21,19 +22,18 @@ export function useObjectLinksBatch(userId) {
     pendingIdsRef.current.clear();
     if (!userId || ids.length === 0) return;
 
-    const { data, error } = await supabase.rpc('get_object_links_batch', {
-      p_object_ids: ids,
-      p_limit_per: 3,
-    });
-
-    if (error || !data || activeUserRef.current !== userId) return;
+    let map;
+    try {
+      map = await fetchObjectLinksBatch(ids);
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+    if (activeUserRef.current !== userId) return;
 
     const next = { ...cacheRef.current };
     for (const id of ids) {
-      const entry = data[id];
-      next[id] = entry
-        ? { links: entry.links ?? [], total: Number(entry.total) || 0 }
-        : { links: [], total: 0 };
+      next[id] = map[id] ?? { links: [], total: 0 };
     }
     cacheRef.current = next;
     setLinksState({ userId, map: { ...next } });

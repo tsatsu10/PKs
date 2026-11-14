@@ -5,6 +5,7 @@ import TitleCluster from '../../primitives/TitleCluster';
 import MetaCluster from '../../primitives/MetaCluster';
 import LinkedBar from './LinkedBar';
 import { useRowVisibility } from '../../hooks/useRowVisibility';
+import { usePrefetchObject } from '../../../../data/usePrefetchObject';
 import './StreamView.css';
 import './LinkedBar.css';
 
@@ -26,6 +27,7 @@ export default function TimelineRow({
 }) {
   const summary = snippet || obj.snippet || obj.summary;
   const rowRef = useRowVisibility(obj.id);
+  const prefetch = usePrefetchObject();
 
   return (
     <div
@@ -43,7 +45,7 @@ export default function TimelineRow({
         />
       </label>
       <div className="timeline-row-stack">
-        <Link to={to} className="timeline-row" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}`}>
+        <Link to={to} className="timeline-row" aria-label={`${obj.title}, ${formatObjectTypeLabel(obj.type)}`} {...prefetch(obj.id)}>
           <TypeMark type={obj.type} size="sm" className="timeline-row-mark" />
           <span className="timeline-row-main">
             <TitleCluster object={obj} className="timeline-row-title" />

@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getErrorMessage } from '../lib/errors';
-import { deferAfterPaint } from '../lib/defer';
 import { createDomain, createTag } from '../lib/entities';
+import { useTaxonomy, upsertTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
+import { useObjectsPage, useObjectsCount } from '../data/objects';
+import { useResumeObject } from '../data/dashboard';
+import { qk } from '../data/keys';
 
 export const PAGE_SIZE = 20;
 
@@ -68,21 +71,16 @@ function buildRpcPayload(filters) {
   };
 }
 
-function mergeEntityList(prev, item) {
-  if (prev.some((e) => e.id === item.id)) {
-    return prev.map((e) => (e.id === item.id ? item : e));
-  }
-  return [...prev, item].sort((a, b) => a.name.localeCompare(b.name));
-}
+export { buildRpcPayload };
 
 /**
  * Hook for dashboard object list: search, filters, and page-based pagination.
+ * The list itself lives in the query cache (`useObjectsPage` / `useObjectsCount`), so
+ * identical searches share one request (B11) and rows stay on screen while a new
+ * filter page loads (U9).
  * @param {{ userId: string | null }} options
  */
 export function useDashboardSearch({ userId }) {
-  const [objects, setObjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -92,18 +90,11 @@ export function useDashboardSearch({ userId }) {
   const [dateTo, setDateTo] = useState('');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(null);
-  const [domains, setDomains] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [resumeObject, setResumeObject] = useState(null);
   // Filters of the last search that actually ran; paging and export reuse these, so
   // unapplied edits in the filter panel don't leak into page 2 or "export all matching".
   const [appliedRpcPayload, setAppliedRpcPayload] = useState(null);
-  const appliedRpcPayloadRef = useRef(null);
-  // Only the most recent search may write results (older responses can resolve later).
-  const requestIdRef = useRef(0);
+  const [offset, setOffset] = useState(0);
+  const [actionError, setError] = useState('');
 
   const filterState = useMemo(
     () => ({
@@ -120,97 +111,63 @@ export function useDashboardSearch({ userId }) {
     [searchQuery, typeFilter, statusFilter, domainFilter, tagFilter, dateFrom, dateTo, dueFrom, dueTo]
   );
 
-  const refreshDomains = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase.from('domains').select('id, name').eq('user_id', userId).order('name');
-    setDomains(data || []);
-  }, [userId]);
+  const queryClient = useQueryClient();
+  const { domains, tags } = useTaxonomy(userId);
+  const resumeQ = useResumeObject(userId);
+  const resumeObject = resumeQ.data ?? null;
 
-  const refreshTags = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase.from('tags').select('id, name').eq('user_id', userId).order('name');
-    setTags(data || []);
-  }, [userId]);
+  const pageQ = useObjectsPage(userId ? appliedRpcPayload : null, offset);
+  const countQ = useObjectsCount(userId ? appliedRpcPayload : null);
+
+  const objects = pageQ.data ?? [];
+  const totalCount = countQ.data ?? null;
+  const page = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = totalCount != null
+    ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+    : objects.length < PAGE_SIZE
+      ? page
+      : page + 1;
+  // First load only; filter changes keep the previous rows on screen (U9).
+  const loading = pageQ.isPending;
+  const error = actionError || (pageQ.error ? getErrorMessage(pageQ.error, 'Search failed') : '');
+
+  const refreshTaxonomy = useCallback(() => invalidateTaxonomy(queryClient), [queryClient]);
+  const refreshDomains = refreshTaxonomy;
+  const refreshTags = refreshTaxonomy;
 
   const createDomainInline = useCallback(async (name) => {
     const created = await createDomain(name);
-    setDomains((prev) => mergeEntityList(prev, created));
+    upsertTaxonomyEntity('domains', created, queryClient);
     return created;
-  }, []);
+  }, [queryClient]);
 
   const createTagInline = useCallback(async (name) => {
     const created = await createTag(name);
-    setTags((prev) => mergeEntityList(prev, created));
+    upsertTaxonomyEntity('tags', created, queryClient);
     return created;
-  }, []);
+  }, [queryClient]);
 
   const runSearch = useCallback(
-    async (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
+    (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
       if (!userId) return;
-      const isNewQuery = nextOffset === 0;
       const hasOverride = queryOverride != null || filtersOverride != null;
-      let rpcPayload;
-      if (!isNewQuery && !hasOverride && appliedRpcPayloadRef.current) {
-        rpcPayload = appliedRpcPayloadRef.current;
-      } else {
-        rpcPayload = buildRpcPayload(resolveSearchRpcFilters(filtersOverride, filterState, queryOverride));
-        appliedRpcPayloadRef.current = rpcPayload;
-        setAppliedRpcPayload(rpcPayload);
+      if (nextOffset === 0 || hasOverride || !appliedRpcPayload) {
+        setAppliedRpcPayload(
+          buildRpcPayload(resolveSearchRpcFilters(filtersOverride, filterState, queryOverride))
+        );
       }
-      const requestId = ++requestIdRef.current;
-      setLoading(true);
+      setOffset(nextOffset);
       setError('');
-      try {
-        const rpcName = rpcPayload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
-        const searchPromise = supabase.rpc(rpcName, {
-          ...rpcPayload,
-          limit_n: PAGE_SIZE,
-          offset_n: nextOffset,
-        });
-        const countPromise = supabase.rpc('count_knowledge_objects', rpcPayload);
-        const [{ data, error: err }, countRes] = await Promise.all([searchPromise, countPromise]);
-        if (requestId !== requestIdRef.current) return;
-        if (err) throw err;
-        const list = data || [];
-        const currentPage = Math.floor(nextOffset / PAGE_SIZE) + 1;
-        setObjects(list);
-        setPage(currentPage);
-
-        if (!countRes.error && countRes.data != null) {
-          const count = Number(countRes.data);
-          if (Number.isFinite(count)) {
-            setTotalCount(count);
-            setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
-          } else {
-            setTotalCount(null);
-            applyEstimatedPages();
-          }
-        } else {
-          setTotalCount(null);
-          applyEstimatedPages();
-        }
-
-        function applyEstimatedPages() {
-          if (list.length < PAGE_SIZE) {
-            setTotalPages(currentPage);
-          } else if (isNewQuery) {
-            setTotalPages(2);
-          } else {
-            setTotalPages((prev) => Math.max(prev, currentPage + 1));
-          }
-        }
-      } catch (e) {
-        if (requestId !== requestIdRef.current) return;
-        setError(getErrorMessage(e, 'Search failed'));
-        if (isNewQuery) {
-          setObjects([]);
-          setTotalCount(null);
-        }
-      } finally {
-        if (requestId === requestIdRef.current) setLoading(false);
-      }
     },
-    [userId, filterState]
+    [userId, filterState, appliedRpcPayload]
+  );
+
+  const setObjects = useCallback(
+    (updater) => {
+      queryClient.setQueryData(qk.objects.page(appliedRpcPayload, offset), (prev = []) =>
+        (typeof updater === 'function' ? updater(prev) : updater));
+    },
+    [appliedRpcPayload, offset, queryClient]
   );
 
   const goToPage = useCallback(
@@ -225,58 +182,6 @@ export function useDashboardSearch({ userId }) {
     },
     [runSearch, totalCount]
   );
-
-  useEffect(() => {
-    if (!userId) return;
-    runSearch(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when user becomes available
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const [dRes, tRes] = await Promise.all([
-          supabase.from('domains').select('id, name').eq('user_id', userId).order('name'),
-          supabase.from('tags').select('id, name').eq('user_id', userId).order('name'),
-        ]);
-        if (!cancelled) {
-          setDomains(dRes.data || []);
-          setTags(tRes.data || []);
-        }
-      })();
-    });
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const { data, error: resumeErr } = await supabase
-          .from('knowledge_objects')
-          .select('id, title, last_viewed_at')
-          .eq('user_id', userId)
-          .eq('is_deleted', false)
-          .not('last_viewed_at', 'is', null)
-          .order('last_viewed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!cancelled && !resumeErr && data) {
-          setResumeObject({ id: data.id, title: data.title });
-        }
-      })();
-    });
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
-  }, [userId]);
 
   const clearFilters = useCallback(() => {
     const empty = createEmptyFiltersOverride();
@@ -346,5 +251,7 @@ export function useDashboardSearch({ userId }) {
     createEmptyFiltersOverride,
     filterState,
     appliedRpcPayload,
+    retry: () => pageQ.refetch(),
+    listError: pageQ.error,
   };
 }

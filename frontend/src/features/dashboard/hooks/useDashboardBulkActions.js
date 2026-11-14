@@ -7,20 +7,8 @@ import { getExportIncludeFromTemplate, buildObjectMarkdown, zipEntryName } from 
 import { downloadBlob } from '../../../lib/download';
 import { getErrorMessage } from '../../../lib/errors';
 import { resolveOwnedObjectIds } from '../lib/dashboardUtils';
-
-// Keep `.in()` filters well under URL length limits (~36 chars per UUID).
-const IN_CHUNK = 100;
-
-/** Select rows where `column` is in `ids`, chunked; throws on any failed chunk. */
-async function selectInChunks(table, columns, column, ids) {
-  const rows = [];
-  for (let i = 0; i < ids.length; i += IN_CHUNK) {
-    const { data, error } = await supabase.from(table).select(columns).in(column, ids.slice(i, i + IN_CHUNK));
-    if (error) throw error;
-    rows.push(...(data || []));
-  }
-  return rows;
-}
+import { invalidateObjectLists } from '../../../data/objects';
+import { fetchFilteredObjectIds, fetchObjectsByIdsForExport } from '../../../data/exports';
 
 /**
  * Dashboard selection, export, and bulk-action state/handlers.
@@ -30,7 +18,6 @@ export function useDashboardBulkActions({
   addToast,
   setError,
   objects,
-  runSearch,
   appliedRpcPayload,
 }) {
   const [rawSelectedIds, setSelectedIds] = useState(new Set());
@@ -78,24 +65,7 @@ export function useDashboardBulkActions({
   }, []);
 
   const fetchFilteredIds = useCallback(async () => {
-    const ids = [];
-    const limit = 100;
-    let offset = 0;
-    const payload = appliedRpcPayload ?? {};
-    const rpcName = payload.search_query ? 'search_knowledge_objects_with_snippets' : 'search_knowledge_objects';
-    while (true) {
-      const { data, error: err } = await supabase.rpc(rpcName, {
-        ...payload,
-        limit_n: limit,
-        offset_n: offset,
-      });
-      if (err) throw err;
-      if (!data?.length) break;
-      ids.push(...data.map((o) => o.id));
-      if (data.length < limit) break;
-      offset += limit;
-    }
-    return ids;
+    return fetchFilteredObjectIds(appliedRpcPayload ?? {});
   }, [appliedRpcPayload]);
 
   const handleExportSelected = useCallback(async () => {
@@ -111,29 +81,9 @@ export function useDashboardBulkActions({
         return;
       }
       const include = getExportIncludeFromTemplate(exportTemplate, { includeLinks: false });
-      const objs = await selectInChunks('knowledge_objects', '*', 'id', ids);
+      const objs = await fetchObjectsByIdsForExport(ids);
       if (!objs.length) throw new Error('No objects found');
       const objMap = Object.fromEntries(objs.map((o) => [o.id, o]));
-      const [kodRows, kotRows] = await Promise.all([
-        selectInChunks('knowledge_object_domains', 'knowledge_object_id, domain_id, domains(id, name)', 'knowledge_object_id', ids),
-        selectInChunks('knowledge_object_tags', 'knowledge_object_id, tag_id, tags(id, name)', 'knowledge_object_id', ids),
-      ]);
-      const domainsByObj = {};
-      kodRows.forEach((r) => {
-        if (!domainsByObj[r.knowledge_object_id]) domainsByObj[r.knowledge_object_id] = [];
-        if (r.domains) domainsByObj[r.knowledge_object_id].push(r.domains);
-      });
-      const tagsByObj = {};
-      kotRows.forEach((r) => {
-        if (!tagsByObj[r.knowledge_object_id]) tagsByObj[r.knowledge_object_id] = [];
-        if (r.tags) tagsByObj[r.knowledge_object_id].push(r.tags);
-      });
-      ids.forEach((id) => {
-        if (objMap[id]) {
-          objMap[id].domains = domainsByObj[id] || [];
-          objMap[id].tags = tagsByObj[id] || [];
-        }
-      });
 
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
@@ -248,13 +198,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkDomainId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk add domain failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkAddTag = useCallback(async () => {
     const tagId = bulkTagId;
@@ -278,13 +228,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkTagId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk add tag failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkRemoveDomain = useCallback(async () => {
     const domainId = bulkDomainId;
@@ -308,13 +258,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkDomainId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk remove domain failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkDomainId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkRemoveTag = useCallback(async () => {
     const tagId = bulkTagId;
@@ -338,13 +288,13 @@ export function useDashboardBulkActions({
       setBulkModal(null);
       setBulkTagId('');
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk remove tag failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [bulkTagId, selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -362,13 +312,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk delete failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkChangeType = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkType) return;
@@ -386,13 +336,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk change type failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, bulkType, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, bulkType, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   const bulkSetStatus = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkStatus) return;
@@ -410,13 +360,13 @@ export function useDashboardBulkActions({
       addToast('success', msg);
       setBulkModal(null);
       clearSelection();
-      runSearch(0);
+      await invalidateObjectLists();
     }).catch((err) => {
       const msg = getErrorMessage(err, 'Bulk set status failed');
       setError(msg);
       addToast('error', msg);
     });
-  }, [selectedIds.size, bulkStatus, getOwnedSelection, addToast, runBulk, clearSelection, runSearch, setError]);
+  }, [selectedIds.size, bulkStatus, getOwnedSelection, addToast, runBulk, clearSelection, setError]);
 
   return {
     selectedIds,

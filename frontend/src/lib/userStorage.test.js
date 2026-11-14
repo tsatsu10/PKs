@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   USER_LOCAL_STORAGE_KEYS,
   ORPHANED_LOCAL_STORAGE_KEYS,
@@ -7,6 +7,7 @@ import {
   clearUserData,
   claimUserData,
   shouldClearForOwner,
+  registerUserDataHooks,
   DRAFT_OWNER_KEY,
   DATA_OWNER_KEY,
 } from './userStorage';
@@ -145,5 +146,17 @@ describe('claimUserData (a user becomes signed in)', () => {
     expect(localStorage.getItem(SAVED_FILTERS_KEY)).toBeNull();
     expect(sessionStorage.getItem(DRAFT_OWNER_KEY)).toBeNull();
     expect(localStorage.getItem(DATA_OWNER_KEY)).toBeNull();
+  });
+
+  it('runs registered hooks on clear and claim', () => {
+    const onClear = vi.fn();
+    const onClaim = vi.fn();
+    const unregister = registerUserDataHooks({ onClear, onClaim });
+    localStorage.setItem(DATA_OWNER_KEY, 'u1');
+    clearUserData();
+    claimUserData('u2');
+    unregister();
+    expect(onClear).toHaveBeenCalledWith('u1');
+    expect(onClaim).toHaveBeenCalledWith('u2');
   });
 });

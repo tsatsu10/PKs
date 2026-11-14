@@ -1,45 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SkeletonList } from '../components/Skeleton';
+import QueryError from '../components/QueryError';
+import LoadMore from '../components/LoadMore';
 import { formatObjectTypeLabel } from '../constants';
+import { useNotifyError } from '../lib/useNotifyError';
+import { useNotificationsList, invalidateNotifications } from '../data/notifications';
 import './Notifications.css';
-
-const PAGE_SIZE = 30;
 
 export default function Notifications() {
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
   const [filter, setFilter] = useState('all'); // all | unread
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      setLoading(true);
-      let q = supabase
-        .from('notifications')
-        .select('id, type, title, body, read_at, related_type, related_id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
-      if (filter === 'unread') q = q.is('read_at', null);
-      const { data, error } = await q;
-      setList(error ? [] : (data || []));
-      setLoading(false);
-    })();
-  }, [user?.id, filter]);
+  const { rows: list, query, patchRow } = useNotificationsList(user?.id ?? null, filter);
+  const loading = query.isPending;
 
   async function markRead(id) {
     if (!user?.id) return;
+    const readAt = new Date().toISOString();
     const { error } = await supabase
       .from('notifications')
-      .update({ read_at: new Date().toISOString() })
+      .update({ read_at: readAt })
       .eq('id', id)
       .eq('user_id', user.id);
-    if (!error) setList((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    if (error) {
+      notifyError(error, 'Failed to update notification');
+      return;
+    }
+    patchRow(id, { read_at: readAt });
   }
 
   async function markUnread(id) {
@@ -49,7 +42,11 @@ export default function Notifications() {
       .update({ read_at: null })
       .eq('id', id)
       .eq('user_id', user.id);
-    if (!error) setList((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: null } : n)));
+    if (error) {
+      notifyError(error, 'Failed to update notification');
+      return;
+    }
+    patchRow(id, { read_at: null });
   }
 
   async function markAllRead() {
@@ -59,7 +56,11 @@ export default function Notifications() {
       .update({ read_at: new Date().toISOString() })
       .eq('user_id', user.id)
       .is('read_at', null);
-    if (!error) setList((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+    if (error) {
+      notifyError(error, 'Failed to update notification');
+      return;
+    }
+    invalidateNotifications(queryClient);
   }
 
   return (
@@ -81,9 +82,12 @@ export default function Notifications() {
         <div className="notifications-loading" role="status" aria-live="polite">
           <SkeletonList lines={6} />
         </div>
+      ) : query.error ? (
+        <QueryError what="notifications" error={query.error} onRetry={() => query.refetch()} />
       ) : list.length === 0 ? (
         <p className="notifications-empty" role="status">No notifications.</p>
       ) : (
+        <>
         <ul className="notifications-list">
           {list.map((n) => (
             <li key={n.id} className={n.read_at ? 'read' : 'unread'}>
@@ -109,6 +113,8 @@ export default function Notifications() {
             </li>
           ))}
         </ul>
+        <LoadMore query={query} />
+        </>
       )}
     </div>
   );

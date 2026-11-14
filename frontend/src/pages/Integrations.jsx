@@ -1,35 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getErrorMessage } from '../lib/errors';
+import { useNotifyError } from '../lib/useNotifyError';
 import { INTEGRATION_TYPES, WEBHOOK_EVENTS } from '../constants';
 import Breadcrumbs from '../components/Breadcrumbs';
+import QueryError from '../components/QueryError';
 import { SkeletonList } from '../components/Skeleton';
+import { useIntegrationsList, invalidateIntegrations } from '../data/integrations';
 import './Integrations.css';
 
 export default function Integrations() {
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
+  const listQ = useIntegrationsList(user?.id ?? null);
+  const list = listQ.data ?? [];
+  const loading = listQ.isPending;
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', type: 'webhook', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
   const [adding, setAdding] = useState(false);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [editConfig, setEditConfig] = useState({ url: '', events: [], secret: '' });
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const { data, error: e } = await supabase
-        .from('integrations')
-        .select('id, name, type, enabled, config, created_at, has_secret')
-        .eq('user_id', user.id)
-        .order('name');
-      setList(e ? [] : (data || []));
-      setLoading(false);
-    })();
-  }, [user?.id]);
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -50,16 +43,14 @@ export default function Integrations() {
           ...(form.webhookSecret?.trim() ? { secret: form.webhookSecret.trim() } : {}),
         };
       }
-      const { data, error: err } = await supabase
+      const { error: err } = await supabase
         .from('integrations')
-        .insert(payload)
-        .select('id, name, type, enabled, config, created_at, has_secret')
-        .single();
+        .insert(payload);
       if (err) throw err;
-      setList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      await invalidateIntegrations(queryClient);
       setForm({ name: '', type: 'webhook', webhookUrl: '', webhookEvents: [], webhookSecret: '' });
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to add integration'));
+      setError(notifyError(err, 'Failed to add integration'));
     } finally {
       setAdding(false);
     }
@@ -106,13 +97,11 @@ export default function Integrations() {
         .eq('id', editingConfigId)
         .eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.map((i) => (
-        i.id === editingConfigId ? { ...i, config, has_secret: 'secret' in config ? config.secret !== '' : i.has_secret } : i
-      )));
+      await invalidateIntegrations(queryClient);
       setEditingConfigId(null);
       setEditConfig({ url: '', events: [], secret: '' });
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to update webhook config'));
+      setError(notifyError(err, 'Failed to update webhook config'));
     }
   }
 
@@ -125,9 +114,9 @@ export default function Integrations() {
         .eq('id', id)
         .eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.map((i) => (i.id === id ? { ...i, enabled } : i)));
+      await invalidateIntegrations(queryClient);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to update'));
+      setError(notifyError(err, 'Failed to update'));
     }
   }
 
@@ -137,9 +126,9 @@ export default function Integrations() {
     try {
       const { error: err } = await supabase.from('integrations').delete().eq('id', id).eq('user_id', user.id);
       if (err) throw err;
-      setList((prev) => prev.filter((i) => i.id !== id));
+      await invalidateIntegrations(queryClient);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to delete'));
+      setError(notifyError(err, 'Failed to delete'));
     }
   }
 
@@ -209,7 +198,9 @@ export default function Integrations() {
 
       <section className="integrations-list">
         <h2>Your integrations</h2>
-        {list.length === 0 ? (
+        {listQ.error ? (
+          <QueryError what="integrations" error={listQ.error} onRetry={() => listQ.refetch()} />
+        ) : list.length === 0 ? (
           <p className="muted">No integrations yet. Add one to track imports or use with future API/webhooks.</p>
         ) : (
           <ul>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
+import { fetchProfile } from '../data/profile';
 import AuthLayout from '../components/AuthLayout';
 import Turnstile from '../components/Turnstile';
 import './Auth.css';
@@ -47,11 +48,7 @@ export default function Register() {
         setError('Account created. Check your email for a confirmation link, then sign in.');
         return;
       }
-      const { data: profile } = await supabase
-        .from('users')
-        .select('email, display_name, timezone, created_at')
-        .eq('id', data.user.id)
-        .single();
+      const profile = await fetchProfile(data.user.id).catch(() => null);
       const loggedIn = await login({
         id: data.user.id,
         email: data.user.email ?? profile?.email ?? email.trim(),

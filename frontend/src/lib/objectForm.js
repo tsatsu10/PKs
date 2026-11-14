@@ -53,6 +53,7 @@ const EDITOR_WRITABLE_FORM_FIELDS = ['title', 'content', 'summary', 'source'];
 export function buildObjectPatch(object, form, { isOwner = true } = {}) {
   const before = normalizeForm(objectToEditForm(object));
   const after = normalizeForm(form);
+  /** @type {Record<string, unknown>} */
   const patch = {};
   for (const key of Object.keys(after)) {
     if (!isOwner && !EDITOR_WRITABLE_FORM_FIELDS.includes(key)) continue;

@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { deferAfterPaint } from '../../../lib/defer';
+import { useDashboardActivity } from '../../../data/dashboard';
 
 const EMPTY_ACTIVITY = {
   trendingTags: [],
@@ -12,37 +10,11 @@ const EMPTY_ACTIVITY = {
  * @param {string | null} userId
  */
 export function useActivityPulse(userId) {
-  // Keyed by userId: loading is derived as "no result yet for this user".
-  const [result, setResult] = useState({ userId: null, activity: EMPTY_ACTIVITY });
-
-  useEffect(() => {
-    if (!userId) return;
-
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const { data, error } = await supabase.rpc('get_dashboard_activity');
-        if (cancelled) return;
-
-        if (error || !data) {
-          setResult({ userId, activity: EMPTY_ACTIVITY });
-          return;
-        }
-
-        setResult({ userId, activity: {
-          trendingTags: Array.isArray(data.trending_tags) ? data.trending_tags : [],
-          recentLinks: Array.isArray(data.recent_links) ? data.recent_links : [],
-        } });
-      })();
-    });
-
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
-  }, [userId]);
-
-  if (!userId) return { activity: EMPTY_ACTIVITY, loading: false };
-  const loaded = result.userId === userId;
-  return { activity: loaded ? result.activity : EMPTY_ACTIVITY, loading: !loaded };
+  const q = useDashboardActivity(!!userId);
+  return {
+    activity: q.data ?? EMPTY_ACTIVITY,
+    loading: !!userId && q.isPending,
+    error: q.error,
+    retry: () => q.refetch(),
+  };
 }

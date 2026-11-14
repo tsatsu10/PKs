@@ -1,63 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { deferAfterPaint } from '../lib/defer';
+import { useNotifyError } from '../lib/useNotifyError';
+import QueryError from './QueryError';
+import {
+  useUnreadCount,
+  useRecentNotifications,
+  invalidateNotifications,
+} from '../data/notifications';
 import './NotificationCenter.css';
-
-const LIMIT = 10;
 
 export default function NotificationCenter() {
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const queryClient = useQueryClient();
+  const notifyError = useNotifyError();
+  const userId = user?.id ?? null;
+  const unreadCount = useUnreadCount(userId).data ?? 0;
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const recentQ = useRecentNotifications(userId, open);
+  const list = recentQ.data ?? [];
+  const loading = recentQ.isPending;
   const panelRef = useRef(null);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    const cancelDefer = deferAfterPaint(() => {
-      (async () => {
-        const { count, error } = await supabase
-          .from('notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .is('read_at', null);
-        if (!cancelled && !error) setUnreadCount(count ?? 0);
-      })();
-    });
-    return () => {
-      cancelled = true;
-      cancelDefer();
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!open || !user?.id) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('id, type, title, body, read_at, related_type, related_id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(LIMIT);
-      if (!cancelled) {
-        setList(error ? [] : (data || []));
-        setLoading(false);
-      }
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .is('read_at', null);
-      if (!cancelled && count != null) setUnreadCount(count);
-    })();
-    return () => { cancelled = true; };
-  }, [open, user?.id]);
 
   async function markRead(id) {
     if (!user?.id) return;
@@ -66,10 +31,11 @@ export default function NotificationCenter() {
       .update({ read_at: new Date().toISOString() })
       .eq('id', id)
       .eq('user_id', user.id);
-    if (!error) {
-      setList((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
-      setUnreadCount((c) => Math.max(0, c - 1));
+    if (error) {
+      notifyError(error, 'Failed to mark read');
+      return;
     }
+    await invalidateNotifications(queryClient);
   }
 
   async function markAllRead() {
@@ -79,10 +45,11 @@ export default function NotificationCenter() {
       .update({ read_at: new Date().toISOString() })
       .eq('user_id', user.id)
       .is('read_at', null);
-    if (!error) {
-      setList((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
-      setUnreadCount(0);
+    if (error) {
+      notifyError(error, 'Failed to mark all read');
+      return;
     }
+    await invalidateNotifications(queryClient);
   }
 
   useEffect(() => {
@@ -149,7 +116,9 @@ export default function NotificationCenter() {
               </div>
             </div>
             <div className="notification-panel-body">
-              {loading ? (
+              {recentQ.error ? (
+                <QueryError what="notifications" error={recentQ.error} onRetry={() => recentQ.refetch()} />
+              ) : loading ? (
                 <p className="notification-loading">Loading…</p>
               ) : list.length === 0 ? (
                 <div className="empty-state">

@@ -41,7 +41,7 @@ PKS already has a strong base: typed objects (21 types), domains/tags, versionin
 | 7 | **Trash retention** before the purge. | Phase 0c | 30 days |
 | 8 | **Email provider** for email-in, digests and Web Push (VAPID). iOS push needs an installed PWA. | Phase 3/5 | Postmark or Resend |
 | 9 | **Mobile strategy.** PWA only (no iOS share target) or a Capacitor wrapper. | Phase 3 | PWA only |
-| 10 | **Journal and PasteBin folded into objects?** | Phase 3 | Yes, fold them in |
+| 10 | ✅ **Decided 2026-10-13: fold Journal and PasteBin into objects.** Journal entries become daily notes (`type = 'daily'`), opened from Today; PasteBin becomes snippets (`type = 'snippet'`). Migration per Phase 3 items 3–4. | Phase 3 | — |
 | 11 | **How serious is offline?** An outbox is enough for most users; PowerSync is a bigger commitment. | Phase 6 | Outbox |
 
 ## Migration rules (apply to every schema change)
