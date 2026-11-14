@@ -35,6 +35,9 @@ SELECT throws_ok(
 
 -- D5: deleting a user who edited a shared object must not fail on the FK.
 RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
+-- Versions coalesce per 10 minutes: backdate so the editor's edit takes a snapshot.
+UPDATE public.knowledge_object_versions SET created_at = now() - interval '11 minutes'
+WHERE knowledge_object_id = '00000000-0000-0000-0000-000000000001';
 SELECT tests.act_as('editor');
 UPDATE public.knowledge_objects SET title = 'v3' WHERE id = '00000000-0000-0000-0000-000000000001';
 RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
