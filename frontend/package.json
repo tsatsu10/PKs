@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "tokens": "node scripts/build-tokens.mjs"
+    "tokens": "node scripts/build-tokens.mjs",
+    "backfill:content": "node scripts/backfill-content-json.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.55.0",
@@ -36,6 +37,7 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@blocknote/server-util": "0.55.0",
     "@eslint/js": "^9.39.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -52,7 +54,9 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^7.3.6",
     "vite-plugin-pwa": "^1.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "y-prosemirror": "^1.3.7",
+    "y-protocols": "^1.0.7"
   },
   "optionalDependencies": {
     "@esbuild/win32-x64": "^0.27.3"
