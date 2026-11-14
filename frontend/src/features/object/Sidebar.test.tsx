@@ -6,6 +6,9 @@ import Links from './Links';
 import History from './History';
 import type { OutgoingLink, IncomingLink, VersionRow } from './types';
 
+// useNotifyError imports reportError, which builds the real Supabase client (CI has no env).
+vi.mock('../../lib/reportError', () => ({ reportError: vi.fn() }));
+
 const noopActions = { addDomain: vi.fn(), removeDomain: vi.fn(), addTag: vi.fn(), removeTag: vi.fn() };
 const prefetch = (id: string) => ({ 'data-prefetch': id });
 
