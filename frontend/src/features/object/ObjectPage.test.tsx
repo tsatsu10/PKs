@@ -82,9 +82,9 @@ function PageAtId() {
   return <ObjectPage key={id} />;
 }
 
-function renderPage() {
+function renderPage(client = createTestQueryClient()) {
   return render(
-    <QueryClientProvider client={createTestQueryClient()}>
+    <QueryClientProvider client={client}>
       <ToastProvider>
         <MemoryRouter initialEntries={['/objects/o1']}>
           <Link to="/objects/o2">go to o2</Link>
@@ -282,6 +282,17 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
     renderPage();
     await titleBox();
     expect(performance.getEntriesByName('pks:object-visible').length).toBe(1);
+  });
+
+  it('a stale cached copy is replaced by the fresh row before anything is typed', async () => {
+    const client = createTestQueryClient();
+    client.setQueryData(['object', 'o1', 'detail'], { ...OBJ, title: 'Cached', revision: 2 }, { updatedAt: 1 });
+    detail = { ...OBJ, title: 'Fresh', revision: 5 };
+    renderPage(client);
+    await waitFor(async () => expect(await titleBox()).toHaveValue('Fresh'), { timeout: 5000 });
+    fireEvent.change(await titleBox(), { target: { value: 'New' } });
+    await waitFor(() => expect(updates()).toHaveLength(1), { timeout: 5000 });
+    expect(updates()[0].ops).toContainEqual(['eq', ['revision', 5]]);
   });
 
   it('moving to another object resets the page', async () => {

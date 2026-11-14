@@ -40,7 +40,7 @@ async function write(id, revision, blocks) {
   })
   if (error) {
     console.error(`Row ${id}: ${error.message}`)
-    return false
+    throw error
   }
   return data === true
 }
@@ -53,3 +53,5 @@ const totals = await backfillBatch({
 })
 console.log(`${dryRun ? '[dry run] ' : ''}scanned ${totals.scanned}, updated ${totals.updated}, `
   + `skipped ${totals.skipped}, failed ${totals.failed}`)
+// Done means updated 0 *and* failed 0; a non-zero exit makes a failing run impossible to miss.
+if (totals.failed > 0) process.exitCode = 1

@@ -67,6 +67,12 @@ export default function ObjectPage() {
     if (!save.restored) queue.change(legacy.fields);
   }, [queue, legacy, save.restored]);
 
+  // Opened from a cached copy: when the fresh row is newer and nothing is typed yet, re-seed.
+  const serverRevision = object?.revision;
+  useEffect(() => {
+    if (queue && serverRevision !== undefined) queue.adoptServerRevision(serverRevision);
+  }, [queue, serverRevision]);
+
   // Fields and the editor seed once per object and per reload (Load theirs, restore): the server
   // row with any unsent edits on top. Background refetches never replace what is being typed.
   const seedKey = `${id}:${save.seed}`;

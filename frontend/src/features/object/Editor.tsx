@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
@@ -7,6 +7,7 @@ import { createPasteHandler } from '../../components/blockNotePaste';
 import { useTheme } from '../../context/ThemeContext';
 import '../../components/BlockNoteEditor.css';
 import { toContentFields, type ContentFields } from './content';
+import { sanitizeBlocks } from '../../lib/safeBlocks';
 
 type Props = {
   /** BlockNote blocks (content_json). Preferred when present. */
@@ -30,10 +31,10 @@ export type EditorHandle = { focusEnd: () => void };
 const Editor = forwardRef<EditorHandle, Props>(function Editor({ initialJson, initialMarkdown, onChange, autoFocus = false }, ref) {
   const hasJson = Array.isArray(initialJson) && initialJson.length > 0;
   // Seeded once per mount: later prop changes never replace what the user is typing.
-  const options = useMemo(() => ({
+  const [options] = useState(() => ({
     pasteHandler: createPasteHandler(),
-    initialContent: hasJson ? (initialJson as never) : undefined,
-  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+    initialContent: hasJson ? (sanitizeBlocks(initialJson) as never) : undefined,
+  }));
   const editor = useCreateBlockNote(options);
   const markdownRef = useRef(initialMarkdown);
   const initializing = useRef(!hasJson);
@@ -50,7 +51,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor({ initialJson, in
     (async () => {
       try {
         const blocks = md ? await editor.tryParseMarkdownToBlocks(md) : [{ type: 'paragraph', content: [] }];
-        if (mounted) editor.replaceBlocks(editor.document, blocks as never);
+        if (mounted) editor.replaceBlocks(editor.document, sanitizeBlocks(blocks) as never);
       } catch {
         // Keep the raw text visible rather than an empty editor, so an edit can't wipe it.
         if (mounted) editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: md }] as never);

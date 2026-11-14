@@ -5,6 +5,7 @@ import '@blocknote/mantine/style.css';
 import BlockNoteMantineProvider from './BlockNoteMantineProvider';
 import { useTheme } from '../context/ThemeContext';
 import './BlockNoteEditor.css';
+import { sanitizeBlocks } from '../lib/safeBlocks';
 
 /**
  * Read-only BlockNote view for rendering markdown as blocks.
@@ -22,7 +23,8 @@ export default function BlockNoteViewer({ content, className = '' }) {
       try {
         const blocks = await editor.tryParseMarkdownToBlocks(md);
         if (mounted) {
-          editor.replaceBlocks(editor.document, blocks);
+          // Stored Markdown can carry ![x](javascript:…) too.
+          editor.replaceBlocks(editor.document, sanitizeBlocks(blocks));
         }
       } catch {
         if (mounted) {

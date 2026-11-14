@@ -11,6 +11,7 @@ import {
   clearExplicitLogoutMark,
 } from '../lib/authEvents';
 import { clearUserData, clearOrphanedLocalData, claimUserData } from '../lib/userStorage';
+import { prepareSignOut } from '../features/object/save/saveQueue';
 import { fetchProfile } from '../data/profile';
 
 const AuthContext = createContext(null);
@@ -249,6 +250,9 @@ export function AuthProvider({ children }) {
   }, [setEnriched]);
 
   const logout = useCallback(async () => {
+    // Send unsaved object edits before sign-out deletes their local copies; if some can't be
+    // sent (offline, conflict), the user decides whether to discard them.
+    if (!(await prepareSignOut())) return;
     try {
       // Set inside the try so the finally below always resets it.
       loggingOutRef.current = true;

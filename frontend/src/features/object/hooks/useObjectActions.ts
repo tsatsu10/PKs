@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 import { logAudit } from '../../../lib/audit';
 import { useNotifyError } from '../../../lib/useNotifyError';
@@ -8,6 +9,7 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import { fetchVersionSnapshot } from '../../../data/objectDetail';
 import { setObjectInLists, invalidateObjectLists } from '../../../data/objects';
 import type { SaveQueue } from '../save/saveQueue';
+import { qk } from '../../../data/keys';
 import type { ObjectRow, Named, SetError } from '../types';
 
 type Options = {
@@ -24,6 +26,7 @@ type Options = {
 /** Restore a version, save a version, duplicate, move to Trash, and pin/unpin. */
 export function useObjectActions({ object, userId, objectDomains, objectTags, queue, setObject, setError }: Options) {
   const navigate = useNavigate();
+  const client = useQueryClient();
   const { addToast } = useToast() as { addToast: (type: string, message: string) => void };
   const notifyError = useNotifyError();
   const [restoringVersion, setRestoringVersion] = useState<string | null>(null);
@@ -75,22 +78,25 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
     setDuplicating(true);
     setError('');
     try {
-      const title = `Copy of ${object.title}`.slice(0, 500);
+      // Save what was just typed, then copy the row as saved (the prop may predate it).
+      await queue?.flush();
+      const src = client.getQueryData<ObjectRow>(qk.object.detail(object.id)) ?? object;
+      const title = `Copy of ${src.title}`.slice(0, 500);
       const { data: newObj, error: insErr } = await supabase
         .from('knowledge_objects')
         .insert({
           user_id: userId,
-          type: object.type,
+          type: src.type,
           title,
-          source: object.source || null,
-          content: object.content || null,
-          content_json: object.content_json ?? null,
-          summary: object.summary || null,
-          key_points: object.key_points ?? [],
-          status: object.status || 'active',
-          due_at: object.due_at || null,
-          remind_at: object.remind_at || null,
-          cover_url: object.cover_url || null,
+          source: src.source || null,
+          content: src.content || null,
+          content_json: src.content_json ?? null,
+          summary: src.summary || null,
+          key_points: src.key_points ?? [],
+          status: src.status || 'active',
+          due_at: src.due_at || null,
+          remind_at: src.remind_at || null,
+          cover_url: src.cover_url || null,
         })
         .select('id')
         .single();
@@ -122,6 +128,8 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
     setDeleting(true);
     setError('');
     try {
+      // Save what was just typed first, so restoring from Trash brings it back.
+      await queue?.flush();
       const { error: err } = await supabase
         .from('knowledge_objects')
         .update({ is_deleted: true })

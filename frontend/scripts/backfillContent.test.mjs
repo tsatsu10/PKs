@@ -33,6 +33,13 @@ describe('backfillBatch', () => {
     expect(result).toEqual({ scanned: 2, updated: 1, skipped: 1, failed: 0 })
   })
 
+  it('counts a write error (permissions, config) as failed, not skipped', async () => {
+    const fetchBatch = vi.fn().mockResolvedValueOnce(rows(2, 'a'))
+    const write = vi.fn().mockRejectedValueOnce(new Error('permission denied')).mockResolvedValueOnce(true)
+    const result = await backfillBatch({ fetchBatch, parse: async () => [], write, dryRun: false })
+    expect(result).toEqual({ scanned: 2, updated: 1, skipped: 0, failed: 1 })
+  })
+
   it('counts a parse error as failed and keeps going', async () => {
     const fetchBatch = vi.fn().mockResolvedValueOnce(rows(2, 'a'))
     const parse = vi.fn().mockRejectedValueOnce(new Error('bad')).mockResolvedValueOnce([])

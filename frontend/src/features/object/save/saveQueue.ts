@@ -11,7 +11,7 @@ import { slugForTitle } from '../../../lib/objectForm';
 import { registerUserDataHooks } from '../../../lib/userStorage';
 import { queryClient as defaultClient } from '../../../data/queryClient';
 import { qk } from '../../../data/keys';
-import { OBJECT_COLS, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
+import { OBJECT_COLS, fetchObjectRow, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
 import { invalidateObjectLists, setObjectInLists } from '../../../data/objects';
 import {
   readLocalCopy, writeLocalCopy, writeLocalCopyNow, deleteLocalCopy, deleteLocalCopies, deleteOtherUsersLocalCopies,
@@ -45,6 +45,11 @@ export interface SaveQueue {
   applyVersion(v: VersionFields): Promise<void>;
   /** The fields on the page must be re-seeded from the server row plus pending(). */
   onReloaded(listener: () => void): () => void;
+  /**
+   * A newer server row arrived (e.g. the refetch after opening from a cached copy). With nothing
+   * typed yet, move the base to it and re-seed the page (emits onReloaded); otherwise leave it.
+   */
+  adoptServerRevision(revision: number): void;
 }
 export type VersionFields = {
   version: number; title: string; content: string | null; content_json: unknown[] | null;
@@ -106,6 +111,8 @@ class Queue implements SaveQueue {
     return () => { this.listeners.delete(listener); };
   };
   pending = (): SaveFields => ({ ...this.inFlight, ...this.queued });
+  /** Edits not yet saved (queued or in flight). */
+  hasUnsentEdits = () => this.hasUnsent();
   baseRevision = () => this.base;
 
   private setState(status: SaveStatus, message: string | null = null) {
@@ -128,6 +135,11 @@ class Queue implements SaveQueue {
     if (client) this.client = client;
     this.holders += 1;
     if (this.holders > 1) return;
+    if (this.state.status === 'blocked') {
+      // Blocked is not forever: the session may be back, or access granted again. Re-diagnose.
+      this.authRetried = false;
+      this.setState('pending');
+    }
     window.addEventListener('pagehide', this.onHide);
     document.addEventListener('visibilitychange', this.onVisibility);
     if (Object.keys(this.queued).length > 0 && !this.sending) this.schedule();
@@ -220,7 +232,7 @@ class Queue implements SaveQueue {
       this.queued = { ...patch, ...this.queued };
       this.inFlight = null;
       if (failed) await this.onError(error);
-      else await this.onZeroRows();
+      else await this.onZeroRows(patch);
       return;
     }
     this.inFlight = null;
@@ -267,8 +279,29 @@ class Queue implements SaveQueue {
     this.retryLater(); // network, server, rate limited, unknown
   }
 
+  /**
+   * The revision moved, but maybe only because this very patch was saved and its response was
+   * lost (tab closed mid-request, a dropped connection). If the server already holds every value
+   * in the patch, adopt its revision and count the patch as saved instead of raising a conflict.
+   */
+  private async alreadySaved(patch: Patch): Promise<boolean> {
+    let row: Row | null;
+    try {
+      row = (await fetchObjectRow(this.objectId)) as Row | null;
+    } catch {
+      return false;
+    }
+    if (this.closed || !row) return false;
+    const fields = patch as Record<string, unknown>;
+    if (!Object.keys(fields).every((k) => sameValue(k, fields[k], row[k]))) return false;
+    const queued = this.queued as Record<string, unknown>;
+    for (const k of Object.keys(fields)) if (queued[k] === fields[k]) delete queued[k];
+    this.onSaved(row);
+    return true;
+  }
+
   /** R7: zero rows matched. Say why, instead of always blaming another edit. */
-  private async onZeroRows() {
+  private async onZeroRows(patch: Patch) {
     let check;
     try {
       check = await fetchSaveCheck(this.objectId, this.userId);
@@ -278,7 +311,9 @@ class Queue implements SaveQueue {
     }
     if (this.closed) return;
     if (!check.row || check.row.is_deleted) this.block(DELETED_MESSAGE);
-    else if (check.row.revision !== this.base) this.setState('conflict');
+    else if (check.row.revision !== this.base) {
+      if (!(await this.alreadySaved(patch))) this.setState('conflict');
+    }
     else if (check.row.user_id !== this.userId && check.shareRole !== 'editor') this.block(NO_ACCESS_MESSAGE);
     else this.retryLater();
   }
@@ -374,6 +409,12 @@ class Queue implements SaveQueue {
     this.reloadListeners.forEach((l) => l());
   }
 
+  adoptServerRevision = (revision: number) => {
+    if (this.closed || revision <= this.base || this.hasUnsent() || this.sending) return;
+    this.base = revision;
+    this.reloadListeners.forEach((l) => l());
+  };
+
   onReloaded = (listener: () => void) => {
     this.reloadListeners.add(listener);
     return () => { this.reloadListeners.delete(listener); };
@@ -392,8 +433,12 @@ class Queue implements SaveQueue {
   dispose() {
     if (this.holders > 1) { this.holders -= 1; return; }
     this.clearTimers();
-    this.stopRetry();
-    this.stopWaiting();
+    if (!this.hasUnsent()) {
+      this.stopRetry();
+      this.stopWaiting();
+    }
+    // With unsent edits, the backoff timer and the online wait keep running after the page
+    // leaves, so the edit is sent when the connection returns (onSaved then forgets the queue).
     if (this.attached) {
       window.removeEventListener('pagehide', this.onHide);
       document.removeEventListener('visibilitychange', this.onVisibility);
@@ -406,6 +451,8 @@ class Queue implements SaveQueue {
   close() {
     this.closed = true;
     if (this.fade) clearTimeout(this.fade);
+    this.stopRetry();
+    this.stopWaiting();
     this.holders = Math.min(this.holders, 1);
     this.dispose();
   }
@@ -447,6 +494,29 @@ export async function openSaveQueue(opts: Options): Promise<{
   return { queue, restored: Object.keys(fields).length ? { fields, baseRevision: queue.baseRevision() } : null };
 }
 
+/** Send every queue's edits now (bounded by `timeoutMs`), e.g. before signing out. */
+export async function flushAllSaveQueues(timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); });
+  const flushes = Promise.all([...registry.values()].map((q) => q.flush().catch(() => undefined)));
+  await Promise.race([flushes, timeout]);
+  clearTimeout(timer);
+}
+
+const confirmDiscard = (n: number) => window.confirm(
+  `You have unsaved changes on ${n === 1 ? 'one object' : `${n} objects`} (offline, or waiting for you to resolve a conflict). Sign out and discard them?`,
+);
+
+/**
+ * Before a deliberate sign-out (which deletes local copies): save what can be saved, then ask
+ * before discarding the rest. Resolves to false when the user chose to stay signed in.
+ */
+export async function prepareSignOut(confirm: (unsent: number) => boolean = confirmDiscard): Promise<boolean> {
+  await flushAllSaveQueues(3000);
+  const unsent = [...registry.values()].filter((q) => !q.closed && q.hasUnsentEdits()).length;
+  return unsent === 0 || confirm(unsent);
+}
+
 /** Sign-out: stop every queue at once (their local copies are deleted by the caller). */
 export function disposeAllSaveQueues(): void {
   for (const queue of registry.values()) queue.close();
@@ -467,4 +537,26 @@ export function connectSaveQueuesToSession(): () => void {
       void deleteOtherUsersLocalCopies(userId);
     },
   });
+}
+
+const TIMESTAMP_KEYS = new Set(['due_at', 'remind_at']);
+
+/** Does the server's value match what we sent? (jsonb reorders object keys; timestamps reformat.) */
+function sameValue(key: string, sent: unknown, stored: unknown): boolean {
+  if (TIMESTAMP_KEYS.has(key) && sent && stored) return Date.parse(String(sent)) === Date.parse(String(stored));
+  return deepEqual(sent ?? null, stored ?? null);
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const bb = b as unknown[];
+    return a.length === bb.length && a.every((v, i) => deepEqual(v, bb[i]));
+  }
+  const ao = a as Record<string, unknown>;
+  const bo = b as Record<string, unknown>;
+  const keys = Object.keys(ao);
+  return keys.length === Object.keys(bo).length && keys.every((k) => k in bo && deepEqual(ao[k], bo[k]));
 }

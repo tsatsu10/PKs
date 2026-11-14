@@ -12,8 +12,9 @@ vi.mock('../../../lib/supabase', async () => {
 });
 vi.mock('../../../lib/reportError', () => ({ reportError: vi.fn() }));
 
-import { openSaveQueue, disposeAllSaveQueues } from './saveQueue';
-import { readLocalCopy } from './localCopy';
+import { openSaveQueue, disposeAllSaveQueues, flushAllSaveQueues, prepareSignOut } from './saveQueue';
+import { readLocalCopy, writeLocalCopyNow } from './localCopy';
+import { slugForTitle } from '../../../lib/objectForm';
 
 const h = saveHarness(() => sb.current!);
 let n = 0;
@@ -120,5 +121,81 @@ describe('saveQueue: zero rows updated (R7)', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(h.updates()).toHaveLength(1);
     await vi.waitFor(async () => expect((await readLocalCopy('u1', id))?.fields).toMatchObject({ title: 'A', summary: 'more' }));
+  });
+});
+
+describe('saveQueue: review fixes', () => {
+  it('a blocked queue tries again when the object is reopened', async () => {
+    const expired = { data: null, error: { code: 'PGRST301', message: 'JWT expired' } };
+    h.script(expired, expired);
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    await vi.advanceTimersByTimeAsync(800);
+    await settle();
+    expect(queue.getState().status).toBe('blocked');
+    queue.dispose();
+    const again = await open();
+    expect(again.queue).toBe(queue);
+    await vi.advanceTimersByTimeAsync(800);
+    await settle();
+    expect(h.updates()).toHaveLength(3);
+    expect(queue.getState().status).toBe('saved');
+  });
+
+  it('leaving while retrying keeps retrying in the background', async () => {
+    h.script({ data: null, error: { message: 'Failed to fetch' } });
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    await vi.advanceTimersByTimeAsync(800);
+    expect(queue.getState().status).toBe('retrying');
+    queue.dispose();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.updates()).toHaveLength(2);
+    expect(queue.getState().status).toBe('saved');
+  });
+
+  it('leaving while offline sends when the connection returns', async () => {
+    const { queue } = await open();
+    onlineManager.setOnline(false);
+    queue.change({ title: 'A' });
+    await vi.advanceTimersByTimeAsync(800);
+    queue.dispose();
+    onlineManager.setOnline(true);
+    await settle();
+    expect(h.updates()).toHaveLength(1);
+  });
+
+  it('a save whose response was lost is recognised on reopen instead of raising a conflict', async () => {
+    const json = [{ type: 'paragraph', props: { textColor: 'default', backgroundColor: 'default' }, content: [], children: [] }];
+    const serverJson = [{ children: [], content: [], props: { backgroundColor: 'default', textColor: 'default' }, type: 'paragraph' }];
+    h.row = { ...h.row!, revision: 9, title: 'A', slug: slugForTitle('A', id), content: 'x', content_json: serverJson };
+    await writeLocalCopyNow('u1', id, { fields: { title: 'A', content: 'x', content_json: json }, baseRevision: 3 });
+    const { queue } = await open();
+    await vi.advanceTimersByTimeAsync(800);
+    await settle();
+    await settle();
+    expect(queue.getState().status).toBe('saved');
+    expect(queue.baseRevision()).toBe(9);
+    await vi.waitFor(async () => expect(await readLocalCopy('u1', id)).toBeNull());
+  });
+
+  it('flushAllSaveQueues sends edits still inside the debounce window', async () => {
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    await flushAllSaveQueues(3000);
+    expect(h.updates()).toHaveLength(1);
+    expect(queue.getState().status).toBe('saved');
+  });
+
+  it('prepareSignOut saves first, and asks before discarding edits it could not save', async () => {
+    const confirm = vi.fn(() => false);
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    await expect(prepareSignOut(confirm)).resolves.toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    h.row = { ...h.row!, revision: 99 };
+    queue.change({ title: 'B' });
+    await expect(prepareSignOut(confirm)).resolves.toBe(false);
+    expect(confirm).toHaveBeenCalledWith(1);
   });
 });

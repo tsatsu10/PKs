@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
@@ -6,6 +6,7 @@ import BlockNoteMantineProvider from '../../components/BlockNoteMantineProvider'
 import BlockNoteViewer from '../../components/BlockNoteViewer';
 import { useTheme } from '../../context/ThemeContext';
 import '../../components/BlockNoteEditor.css';
+import { sanitizeBlocks } from '../../lib/safeBlocks';
 
 type Props = { json: unknown[] | null; markdown: string | null };
 
@@ -18,7 +19,7 @@ export default function ContentView({ json, markdown }: Props) {
 
 function JsonView({ json }: { json: unknown[] }) {
   // Seeded once per mount; the parent keys this view on the object.
-  const options = useMemo(() => ({ initialContent: json as never }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [options] = useState(() => ({ initialContent: sanitizeBlocks(json) as never }));
   const editor = useCreateBlockNote(options);
   const { resolvedTheme } = useTheme() as { resolvedTheme: 'light' | 'dark' };
   return (
