@@ -6,7 +6,11 @@ import {
   EXPORT_FORMAT_LABELS,
   zipEntryName,
   safeFileBase,
+  buildObjectExportText,
+  buildObjectExportHtml,
+  buildObjectExportJson,
 } from './export.js';
+import { markdownToHtml } from './markdown.js';
 
 describe('getExportIncludeFromTemplate', () => {
   it('returns full preset for "full" template', () => {
@@ -155,5 +159,38 @@ describe('safeFileBase', () => {
 
   it('defaults maxLength to 80', () => {
     expect(safeFileBase('x'.repeat(100))).toHaveLength(80);
+  });
+});
+
+describe('object export builders', () => {
+  const ALL = { content: true, summary: true, key_points: true, tags: true, domains: true, links: true };
+  const base = { id: 'o1', title: 'T', type: 'note', updated_at: '2026-11-01T00:00:00Z', content: 'body', summary: null, key_points: [], source: null };
+  const ctx = (over = {}) => ({ object: base, domains: [], tags: [], outgoing: [], incoming: [], ...over });
+  const otherLink = { id: 'e1', to_object_id: 'o2', relationship_type: 'references', target: { id: 'o2', title: 'Other', type: 'note' } };
+
+  it('buildObjectExportText markdown has the summary, tags and links sections', () => {
+    const out = buildObjectExportText(
+      ctx({ object: { ...base, summary: 'S' }, tags: [{ id: 't', name: 'ai' }], outgoing: [otherLink] }), true, ALL,
+    );
+    expect(out).toContain('## Summary\nS');
+    expect(out).toContain('**Tags:** \nai');
+    expect(out).toContain('- Out: Other');
+  });
+
+  it('buildObjectExportText leaves out empty sections', () => {
+    const out = buildObjectExportText(ctx(), true, ALL);
+    for (const word of ['Summary', 'Tags', 'Domains', 'Links']) expect(out).not.toContain(word);
+  });
+
+  it('buildObjectExportHtml escapes the title', () => {
+    const out = buildObjectExportHtml(ctx({ object: { ...base, title: '<script>x</script>' } }), ALL, markdownToHtml);
+    expect(out).toContain('&lt;script&gt;');
+    expect(out).not.toContain('<script>');
+  });
+
+  it('buildObjectExportJson includes only what include allows', () => {
+    const out = JSON.parse(buildObjectExportJson(ctx({ tags: [{ id: 't', name: 'ai' }], outgoing: [otherLink] }), { ...ALL, tags: false }));
+    expect(out).not.toHaveProperty('tags');
+    expect(out.links.outgoing[0]).toEqual({ title: 'Other', type: 'references' });
   });
 });
