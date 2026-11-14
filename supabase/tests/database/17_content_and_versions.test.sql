@@ -81,7 +81,7 @@ SELECT is(public.snapshot_knowledge_object('00000000-0000-0000-0000-000000000003
   1, 'owner can snapshot and gets the new version number');
 RESET ROLE; SELECT set_config('request.jwt.claims', '', true);
 SELECT tests.act_as('editor');
-SELECT is(public.snapshot_knowledge_object('00000000-0000-0000-0000-000000000003', NULL, 'mine'),
+SELECT is(public.snapshot_knowledge_object('00000000-0000-0000-0000-000000000003', NULL, 'Kept from a conflict before overwrite'),
   2, 'editor can snapshot');
 SELECT is((SELECT revision FROM public.knowledge_objects WHERE id = '00000000-0000-0000-0000-000000000003'),
   2::bigint, 'the snapshot RPC does not bump revision');
