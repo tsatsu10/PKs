@@ -8,6 +8,16 @@ describe('isSafeUrl', () => {
     }
   });
 
+  it('fails closed for non-string values (an array or object would be stringified into href/src)', () => {
+    expect(isSafeUrl(undefined)).toBe(true);
+    expect(isSafeUrl(null)).toBe(true);
+    for (const url of [['javascript:alert(1)'], { toString: () => 'javascript:alert(1)' }, 42]) {
+      expect(isSafeUrl(url)).toBe(false);
+    }
+    const [out] = sanitizeBlocks([{ type: 'image', props: { url: ['javascript:alert(1)'] }, children: [] }]);
+    expect(out.props.url).toBe('');
+  });
+
   it('rejects script and other schemes, however they are spelled', () => {
     for (const url of ['javascript:alert(1)', ' JavaScript:alert(1)', 'java\nscript:alert(1)', 'vbscript:x', 'data:text/html,<script>', 'file:///etc/passwd']) {
       expect(isSafeUrl(url)).toBe(false);

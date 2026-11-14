@@ -7,9 +7,13 @@
 
 const SAFE_SCHEME = /^(https?:|mailto:|blob:|data:image\/)/i;
 
-/** Web, mail, blob and inline-image URLs, relative paths and empty values. Anything else is unsafe. */
+/**
+ * Web, mail, blob and inline-image URLs, relative paths and empty values. Anything else is
+ * unsafe, including non-strings: the DOM stringifies an array or object assigned to href/src.
+ */
 export function isSafeUrl(url: unknown): boolean {
-  if (typeof url !== 'string') return true;
+  if (url === undefined || url === null) return true;
+  if (typeof url !== 'string') return false;
   // Browsers ignore whitespace and control characters inside a scheme ("java\nscript:").
   // eslint-disable-next-line no-control-regex
   const compact = url.replace(/[\u0000- ]/g, '');
