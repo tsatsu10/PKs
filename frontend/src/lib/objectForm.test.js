@@ -90,3 +90,11 @@ describe('drafts keep the revision they were based on', () => {
     expect(buildObjectPatch(row, restored.form, { isOwner: false })).toEqual({});
   });
 });
+
+describe('slugForTitle', () => {
+  it('slugifies the trimmed title and appends the id prefix', async () => {
+    const { slugForTitle } = await import('./objectForm');
+    expect(slugForTitle('  Q4 Plan  ', object.id)).toBe('q4-plan-abcdef12');
+    expect(slugForTitle('!!!', object.id)).toBeNull();
+  });
+});

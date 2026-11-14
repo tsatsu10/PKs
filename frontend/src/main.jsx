@@ -6,8 +6,11 @@ import App from './App.jsx'
 import { registerServiceWorker } from './lib/registerServiceWorker'
 import { markUpdateAvailable } from './lib/pwaUpdate'
 import { reportError, installGlobalErrorReporting } from './lib/reportError'
+import { connectSaveQueuesToSession } from './features/object/save/saveQueue'
 
 installGlobalErrorReporting()
+// Sign-out deletes unsent object edits; another user signing in deletes the previous user's.
+connectSaveQueuesToSession()
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   const start = () => {

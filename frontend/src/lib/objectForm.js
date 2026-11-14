@@ -59,11 +59,19 @@ export function buildObjectPatch(object, form, { isOwner = true } = {}) {
     if (!isOwner && !EDITOR_WRITABLE_FORM_FIELDS.includes(key)) continue;
     if (before[key] !== after[key]) patch[key] = after[key];
   }
-  if (isOwner && 'title' in patch) {
-    const base = slugify(after.title);
-    patch.slug = base ? `${base}-${object.id.slice(0, 8)}` : null;
-  }
+  if (isOwner && 'title' in patch) patch.slug = slugForTitle(after.title, object.id);
   return patch;
+}
+
+/**
+ * The slug for an owner's title change: the slugified title plus the id prefix, or null.
+ * @param {string} title
+ * @param {string} id
+ * @returns {string | null}
+ */
+export function slugForTitle(title, id) {
+  const base = slugify((title ?? '').trim());
+  return base ? `${base}-${id.slice(0, 8)}` : null;
 }
 
 /** Draft payload that remembers which revision the edit started from. */
