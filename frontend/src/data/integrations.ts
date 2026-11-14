@@ -4,7 +4,7 @@ import { fetchAll } from './fetchAll';
 import { qk } from './keys';
 
 export const INTEGRATION_COLS = 'id, name, type, enabled, config, created_at, has_secret';
-export type IntegrationRow = { id: string; name: string; type: string; enabled: boolean; config: unknown; created_at: string; has_secret: boolean };
+export type IntegrationRow = { id: string; name: string; type: string; enabled: boolean; config: unknown; created_at: string; has_secret: boolean | null };
 
 export const useIntegrationsList = (userId: string | null) => useQuery({
   queryKey: qk.integrations.list(),
