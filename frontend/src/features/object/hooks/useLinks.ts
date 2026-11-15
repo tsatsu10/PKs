@@ -3,22 +3,27 @@ import { supabase } from '../../../lib/supabase';
 import { useNotifyError } from '../../../lib/useNotifyError';
 import { invalidateObjectLists } from '../../../data/objects';
 import { invalidateObject, searchLinkTargets } from '../../../data/objectDetail';
-import type { ObjectRow, LinkTarget, OutgoingLink, IncomingLink, ListSetter, SetError } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
+import { optimistic } from '../../../data/optimistic';
+import { qk } from '../../../data/keys';
+import { useUndoToast } from './useUndoToast';
+import type { ObjectRow, LinkTarget, OutgoingLink, IncomingLink, SetError } from '../types';
 
 type Options = {
   object: ObjectRow | null;
   userId: string | undefined;
   otherObjects: LinkTarget[];
-  outgoingLinks: OutgoingLink[];
-  incomingLinks: IncomingLink[];
-  setOutgoingLinks: ListSetter<OutgoingLink>;
-  setIncomingLinks: ListSetter<IncomingLink>;
   setError: SetError;
 };
 
-/** Add and remove links, plus the header's link-search state (300 ms debounce, Escape / outside click close). */
-export function useLinks({ object, userId, otherObjects, outgoingLinks, incomingLinks, setOutgoingLinks, setIncomingLinks, setError }: Options) {
+/**
+ * Add and remove links (applied at once, rolled back on failure; removal offers Undo), plus the
+ * header's link-search state (300 ms debounce, Escape / outside click close).
+ */
+export function useLinks({ object, userId, otherObjects, setError }: Options) {
+  const client = useQueryClient();
   const notifyError = useNotifyError();
+  const undoToast = useUndoToast();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<LinkTarget[]>([]);
   const [open, setOpen] = useState(false);
@@ -58,20 +63,44 @@ export function useLinks({ object, userId, otherObjects, outgoingLinks, incoming
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [open]);
 
+  type Links = { outgoing: OutgoingLink[]; incoming: IncomingLink[] };
+  type Edge = { from: string; to: string; type: string };
+
+  /**
+   * Optimistically put `link` into object `oid`'s cached links (outgoing or incoming), insert the edge,
+   * and swap in the real id. Throws after rolling back.
+   */
+  async function insertEdge(oid: string, edge: Edge, outgoing: boolean, link: OutgoingLink | IncomingLink) {
+    const key = qk.object.links(oid);
+    const side = outgoing ? 'outgoing' : 'incoming';
+    const data = await optimistic(client, {
+      keys: [{ queryKey: key, exact: true }],
+      apply: () => client.setQueryData<Links>(key, (prev) => ({
+        outgoing: prev?.outgoing ?? [], incoming: prev?.incoming ?? [],
+        [side]: [...(prev?.[side] ?? []), link],
+      } as Links)),
+      run: async () => {
+        const { data: row, error: err } = await supabase.from('link_edges')
+          .insert({ from_object_id: edge.from, to_object_id: edge.to, relationship_type: edge.type })
+          .select('id').single();
+        if (err) throw err;
+        return row as { id: string };
+      },
+    });
+    client.setQueryData<Links>(key, (prev) => prev && ({
+      ...prev, [side]: (prev[side] as Array<{ id: string }>).map((l) => (l.id === link.id ? { ...l, id: data.id } : l)),
+    } as Links));
+    invalidateObject(outgoing ? edge.to : edge.from);
+    void invalidateObjectLists();
+  }
+
   async function addLink(toObjectId: string, relationshipType = 'references') {
     if (!object || !toObjectId) return;
     setError('');
+    const target = otherObjects.find((o) => o.id === toObjectId) ?? { id: toObjectId, title: '…', type: '' };
+    const link: OutgoingLink = { id: `tmp:${crypto.randomUUID()}`, to_object_id: toObjectId, relationship_type: relationshipType, target };
     try {
-      const { data, error: err } = await supabase.from('link_edges').insert({
-        from_object_id: object.id,
-        to_object_id: toObjectId,
-        relationship_type: relationshipType,
-      }).select('id, to_object_id, relationship_type').single();
-      if (err) throw err;
-      const target = otherObjects.find((o) => o.id === toObjectId);
-      setOutgoingLinks((prev) => [...prev, { id: data.id, to_object_id: data.to_object_id, relationship_type: data.relationship_type, target: target || { id: toObjectId, title: '…', type: '' } }]);
-      invalidateObject(toObjectId);
-      invalidateObjectLists();
+      await insertEdge(object.id, { from: object.id, to: toObjectId, type: relationshipType }, true, link);
     } catch (err) {
       setError(notifyError(err, 'Failed to add link'));
     }
@@ -80,17 +109,33 @@ export function useLinks({ object, userId, otherObjects, outgoingLinks, incoming
   async function removeLink(edgeId: string, isOutgoing: boolean) {
     if (!object) return;
     setError('');
+    const oid = object.id;
+    const key = qk.object.links(oid);
+    const current = client.getQueryData<Links>(key);
+    const link = (isOutgoing ? current?.outgoing : current?.incoming)?.find((l) => l.id === edgeId);
+    const otherId = link ? ('to_object_id' in link ? link.to_object_id : link.from_object_id) : undefined;
+    const pending = optimistic(client, {
+      keys: [{ queryKey: key, exact: true }],
+      apply: () => client.setQueryData<Links>(key, (prev) => prev && ({
+        outgoing: isOutgoing ? prev.outgoing.filter((l) => l.id !== edgeId) : prev.outgoing,
+        incoming: isOutgoing ? prev.incoming : prev.incoming.filter((l) => l.id !== edgeId),
+      })),
+      run: async () => {
+        const { error: err } = await supabase.from('link_edges').delete().eq('id', edgeId);
+        if (err) throw err;
+      },
+    });
+    const withdraw = link && otherId
+      ? undoToast('Link removed', () => insertEdge(oid, isOutgoing
+        ? { from: oid, to: otherId, type: link.relationship_type }
+        : { from: otherId, to: oid, type: link.relationship_type }, isOutgoing, link))
+      : () => undefined;
     try {
-      const { error: err } = await supabase.from('link_edges').delete().eq('id', edgeId);
-      if (err) throw err;
-      const otherId = isOutgoing
-        ? outgoingLinks.find((l) => l.id === edgeId)?.to_object_id
-        : incomingLinks.find((l) => l.id === edgeId)?.from_object_id;
-      if (isOutgoing) setOutgoingLinks((prev) => prev.filter((l) => l.id !== edgeId));
-      else setIncomingLinks((prev) => prev.filter((l) => l.id !== edgeId));
+      await pending;
       if (otherId) invalidateObject(otherId);
-      invalidateObjectLists();
+      void invalidateObjectLists();
     } catch (err) {
+      withdraw();
       setError(notifyError(err, 'Failed to remove link'));
     }
   }

@@ -57,14 +57,15 @@ describe('useObjectPage', () => {
     focusManager.setFocused(undefined);
   });
 
-  it('setObjectTags updates the cached panel like the old state setter', async () => {
+  it('setPromptRuns updates the cached panel like the old state setter', async () => {
     respondAll();
     const { result } = renderHook(() => useObjectPage({ id: 'o1', userId: 'u1' }), { wrapper: wrapperFor(createTestQueryClient()) });
     await waitFor(() => expect(result.current.object).toBeTruthy());
     // Let the tags panel settle first, so its resolution can't overwrite the manual update.
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    await act(async () => { result.current.setObjectTags((prev) => [...prev, { id: 't1', name: 'x' }]); });
-    await waitFor(() => expect(result.current.objectTags).toEqual([{ id: 't1', name: 'x' }]));
+    const run = { id: 'r1', prompt_template_id: 'p1', status: 'done', output: 'x', created_at: '2026-11-01T00:00:00Z' };
+    await act(async () => { result.current.setPromptRuns((prev) => [...prev, run]); });
+    await waitFor(() => expect(result.current.promptRuns).toEqual([run]));
   });
 
   it('links to trashed objects are hidden', async () => {
