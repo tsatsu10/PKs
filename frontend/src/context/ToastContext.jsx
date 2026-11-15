@@ -4,16 +4,20 @@ import { createContext, useContext, useState, useCallback } from 'react';
 const ToastContext = createContext(null);
 
 const TOAST_TTL_MS = 4000;
+/** How long an Undo toast stays (U5). */
+export const UNDO_TTL_MS = 6000;
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((type, message) => {
+  /** opts.action: { label, onClick } adds a button (e.g. Undo); opts.ttlMs overrides the lifetime. Returns the id. */
+  const addToast = useCallback((type, message, opts = {}) => {
     const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, type, message }]);
+    setToasts((prev) => [...prev, { id, type, message, action: opts.action }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, TOAST_TTL_MS);
+    }, opts.ttlMs ?? TOAST_TTL_MS);
+    return id;
   }, []);
 
   const dismiss = useCallback((id) => {
@@ -40,6 +44,15 @@ function ToastList({ toasts, onDismiss }) {
           aria-live="polite"
         >
           <span className="toast-message">{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => { onDismiss(t.id); t.action.onClick(); }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             type="button"
             className="toast-dismiss"
@@ -56,6 +69,6 @@ function ToastList({ toasts, onDismiss }) {
 
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) return { addToast: () => {}, dismiss: () => {} };
+  if (!ctx) return { addToast: () => '', dismiss: () => {} };
   return ctx;
 }

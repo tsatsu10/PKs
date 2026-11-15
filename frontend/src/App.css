@@ -164,6 +164,23 @@ body {
   opacity: 1;
 }
 
+.toast-action {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+}
+
+.toast-action:hover,
+.toast-action:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
 /* Skeleton loaders */
 .skeleton {
   background: var(--surface-elevated);
