@@ -13,6 +13,7 @@ import { withKeepalive } from '../../../lib/keepalive';
 import { queryClient as defaultClient } from '../../../data/queryClient';
 import { qk } from '../../../data/keys';
 import { OBJECT_COLS, fetchObjectRow, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
+import { isCreating, whenCreated } from '../../../data/createObject';
 import { invalidateObjectLists, setObjectInLists } from '../../../data/objects';
 import {
   readLocalCopy, writeLocalCopy, writeLocalCopyNow, writeLocalCopySync, deleteLocalCopy, deleteLocalCopies,
@@ -216,6 +217,13 @@ class Queue implements SaveQueue {
     let row: Row | null = null;
     let failed = false;
     let error: unknown = null;
+    // Edits typed into a just-created object wait for its insert, instead of matching zero rows
+    // and reading as "deleted". While the create is failing they stay here, unsent and kept locally.
+    // Only then: otherwise the request must start synchronously (pagehide, see onHide).
+    if (isCreating(this.objectId)) {
+      await whenCreated(this.objectId);
+      if (this.closed) return;
+    }
     try {
       const result = await supabase
         .from('knowledge_objects')

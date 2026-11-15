@@ -6,6 +6,7 @@ import { qk } from './keys';
 import { queryClient as defaultClient } from './queryClient';
 import { promptsQuery } from './prompts';
 import { LIST_COLS } from './objects';
+import { whenCreated } from './createObject';
 
 export const OBJECT_COLS = `${LIST_COLS}, content_json`;
 export type ObjectRow = Record<string, unknown> & { id: string; user_id: string; is_deleted: boolean; revision: number };
@@ -54,7 +55,8 @@ export async function fetchSaveCheck(id: string, userId: string): Promise<SaveCh
 
 export const objectDetailQuery = (id: string) => queryOptions({
   queryKey: qk.object.detail(id),
-  queryFn: () => fetchObjectRow(id),
+  // An object created on this page is read only once its insert has landed (createObject).
+  queryFn: async () => { await whenCreated(id); return fetchObjectRow(id); },
   // The editor seeds from this data; never swap it underneath a user (part 2 adds "changed elsewhere").
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
