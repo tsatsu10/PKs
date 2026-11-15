@@ -71,7 +71,8 @@ jobs:
   e2e:
     # Playwright against a real local stack (auth + REST), spec 2c / T4. The owner's machine has no
     # Docker, so this job is where the e2e tests run.
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.56 ships no Chromium for ubuntu-latest (26.04). Bump both together.
+    runs-on: ubuntu-24.04
     env:
       OPENAI_API_KEY: ci-placeholder
       SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: ci-placeholder
