@@ -16,6 +16,8 @@ import { createDomain, createTag } from '../lib/entities';
 import { getExportIncludeFromTemplate, buildObjectMarkdown } from '../lib/export';
 import { downloadBlob } from '../lib/download';
 import QueryError from '../components/QueryError';
+import TimezoneSuggestion from '../components/TimezoneSuggestion';
+import { browserTimeZone } from '../lib/timezone';
 import { useTaxonomy, upsertTaxonomyEntity, removeTaxonomyEntity, invalidateTaxonomy } from '../data/taxonomy';
 import { useAiProviders, invalidateAiProviders } from '../data/settings';
 import { fetchOwnObjectsForExport, fetchAccountExtras } from '../data/exports';
@@ -89,12 +91,12 @@ export default function Settings() {
   if (profileFormKey && profileFormKey !== profileFormFor) {
     setProfileFormFor(profileFormKey);
     setProfileDisplayName(user.displayName ?? '');
-    setProfileTimezone(user.timezone ?? 'Africa/Accra');
+    setProfileTimezone(user.timezone ?? browserTimeZone());
   }
 
   async function saveProfile(e) {
     e.preventDefault();
-    // Until the profile loads the form holds defaults ('Africa/Accra'); saving
+    // Until the profile loads the form holds defaults (the browser's zone); saving
     // them would overwrite the stored timezone and display name.
     if (!profileLoaded) return;
     setProfileError('');
@@ -104,7 +106,7 @@ export default function Settings() {
         .from('users')
         .update({
           display_name: profileDisplayName.trim() || null,
-          timezone: profileTimezone.trim() || 'Africa/Accra',
+          timezone: profileTimezone.trim() || browserTimeZone(),
         })
         .eq('id', user.id);
       if (err) throw err;
@@ -432,6 +434,7 @@ export default function Settings() {
               <option value="UTC" />
             </datalist>
           </label>
+          {profileLoaded && <TimezoneSuggestion stored={profileTimezone.trim()} onUse={setProfileTimezone} />}
           {!profileLoaded && (
             <p id="profile-loading-hint" className="settings-desc" role="status">
               Loading your saved profile… You can save once it has loaded.
