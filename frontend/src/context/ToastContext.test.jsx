@@ -1,10 +1,16 @@
+import { useEffect } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ToastProvider, useToast, UNDO_TTL_MS } from './ToastContext';
 
-let api;
-function Grab() { api = useToast(); return null; }
-const mount = () => render(<ToastProvider><Grab /></ToastProvider>);
+const ref = { current: null };
+function Grab({ intoRef }) {
+  const toast = useToast();
+  useEffect(() => { intoRef.current = toast; });
+  return null;
+}
+const mount = () => render(<ToastProvider><Grab intoRef={ref} /></ToastProvider>);
+const api = new Proxy({}, { get: (_t, k) => ref.current[k] });
 
 describe('ToastContext', () => {
   afterEach(() => { vi.useRealTimers(); });
