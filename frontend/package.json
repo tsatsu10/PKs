@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "check:bundle": "node scripts/check-bundle.mjs",
     "tokens": "node scripts/build-tokens.mjs",
-    "backfill:content": "node scripts/backfill-content-json.mjs"
+    "backfill:content": "node scripts/backfill-content-json.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@blocknote/core": "^0.55.0",
@@ -39,8 +40,10 @@
   "devDependencies": {
     "@blocknote/server-util": "0.55.0",
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.20.5",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
