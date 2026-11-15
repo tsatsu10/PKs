@@ -41,7 +41,7 @@ export default function ObjectPage() {
   const userId = user?.id ?? undefined;
   const page = useObjectPage({ id, userId });
   const {
-    object, setObject, loading, error, setError, versions, objectDomains,
+    object, loading, error, setError, versions, objectDomains,
     objectTags, allDomains, allTags, outgoingLinks, incomingLinks,
     otherObjects, attachedFiles, promptTemplates, promptRuns, setPromptRuns, suggestedTags,
     suggestedLinkedObjects, myShare, panelErrors, retryPanel,
@@ -93,7 +93,7 @@ export default function ObjectPage() {
     }
   };
 
-  const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setObject, setError });
+  const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setError });
   const taxonomy = useTaxonomyActions({ object, allDomains, allTags, setError });
   const links = useLinks({ object, userId, otherObjects, setError });
   const attachments = useAttachments({ object, userId, setError });

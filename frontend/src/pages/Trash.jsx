@@ -10,12 +10,16 @@ import TypeMark from '../components/TypeMark';
 import QueryError from '../components/QueryError';
 import LoadMore from '../components/LoadMore';
 import { SkeletonList } from '../components/Skeleton';
-import { useTrashList } from '../data/trash';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTrashList, restoreFromTrash } from '../data/trash';
+import { optimistic } from '../data/optimistic';
+import { qk } from '../data/keys';
 import { invalidateObjectLists } from '../data/objects';
 import './Trash.css';
 
 export default function Trash() {
   const { user } = useAuth();
+  const client = useQueryClient();
   const { addToast } = useToast();
   const notifyError = useNotifyError();
   const { rows: objects, query, removeRow } = useTrashList(user?.id ?? null);
@@ -24,18 +28,17 @@ export default function Trash() {
   const [restoringId, setRestoringId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+  /** The row leaves the list at once and comes back if the update fails. */
   async function handleRestore(id) {
     setRestoringId(id);
     setError('');
     try {
-      const { error: err } = await supabase
-        .from('knowledge_objects')
-        .update({ is_deleted: false })
-        .eq('id', id)
-        .eq('user_id', user.id);
-      if (err) throw err;
+      await optimistic(client, {
+        keys: [{ queryKey: qk.trash.list(), exact: true }],
+        apply: () => removeRow(id),
+        run: () => restoreFromTrash(id, user.id),
+      });
       addToast('success', 'Restored');
-      removeRow(id);
       invalidateObjectLists();
     } catch (e) {
       notifyError(e, 'Restore failed');

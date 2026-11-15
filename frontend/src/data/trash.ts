@@ -21,3 +21,8 @@ export function useTrashList(userId: string | null) {
     },
   });
 }
+
+/** Take an object out of Trash (Trash page Restore, and Undo after Move to Trash). */
+export async function restoreFromTrash(id: string, userId: string): Promise<void> {
+  unwrap(await db.from('knowledge_objects').update({ is_deleted: false }).eq('id', id).eq('user_id', userId));
+}
