@@ -1,3 +1,4 @@
+import { browserTimeZone } from '../lib/timezone';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -38,7 +39,7 @@ export default function Register() {
         email,
         password,
         options: {
-          data: { display_name: displayName.trim() || undefined, displayName: displayName.trim() || undefined },
+          data: { display_name: displayName.trim() || undefined, displayName: displayName.trim() || undefined, timezone: browserTimeZone() },
           captchaToken: captchaToken || undefined,
         },
       });
@@ -53,7 +54,7 @@ export default function Register() {
         id: data.user.id,
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? displayName.trim() ?? '',
-        timezone: profile?.timezone ?? 'Africa/Accra',
+        timezone: profile?.timezone ?? browserTimeZone(),
         createdAt: profile?.created_at ?? data.user.created_at,
       });
       if (!loggedIn) {

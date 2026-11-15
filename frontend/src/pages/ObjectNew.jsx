@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
@@ -14,7 +13,8 @@ import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constan
 import { slugify } from '../lib/slugify';
 import { useTaxonomy } from '../data/taxonomy';
 import { useTemplatesList } from '../data/templates';
-import { invalidateObjectLists } from '../data/objects';
+import { createObject } from '../data/createObject';
+import { useQueryClient } from '@tanstack/react-query';
 import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
@@ -22,6 +22,7 @@ import './ObjectForm.css';
 export default function ObjectNew() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const templateFromUrl = searchParams.get('template');
   const { addToast } = useToast();
@@ -148,12 +149,12 @@ export default function ObjectNew() {
       }
       const baseSlug = slugify(title || 'Untitled') || 'untitled';
       const slug = baseSlug ? `${baseSlug}-${Date.now().toString(36)}` : `untitled-${Date.now().toString(36)}`;
-      const { data, error: err } = await supabase
-        .from('knowledge_objects')
-        .insert({
-          user_id: user.id,
+      const finalTitle = title || 'Untitled';
+      const objectId = createObject({
+        userId: user.id,
+        row: {
           type: form.type,
-          title: title || 'Untitled',
+          title: finalTitle,
           source: form.source.trim() || null,
           content,
           summary: summary || null,
@@ -161,27 +162,20 @@ export default function ObjectNew() {
           due_at: form.due_at ? new Date(form.due_at).toISOString() : null,
           remind_at: form.remind_at ? new Date(form.remind_at).toISOString() : null,
           slug,
-        })
-        .select('id')
-        .single();
-      if (err) throw err;
-      const objectId = data.id;
-      if (form.domainIds?.length) {
-        await supabase.from('knowledge_object_domains').insert(
-          form.domainIds.map((domain_id) => ({ knowledge_object_id: objectId, domain_id }))
-        );
-      }
-      if (form.tagIds?.length) {
-        await supabase.from('knowledge_object_tags').insert(
-          form.tagIds.map((tag_id) => ({ knowledge_object_id: objectId, tag_id }))
-        );
-      }
-      logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, objectId, { title: title || 'Untitled', type: form.type });
-      deliverWebhookEvent('object.created', { objectId, title: title || 'Untitled', type: form.type });
-      createNotification(user.id, 'object_created', 'Object created', (title || 'Untitled').slice(0, 80), { type: 'knowledge_object', id: objectId });
+        },
+        domainIds: form.domainIds,
+        tagIds: form.tagIds,
+        domains: domains.filter((d) => form.domainIds.includes(d.id)).map(({ id, name }) => ({ id, name })),
+        tags: tags.filter((t) => form.tagIds.includes(t.id)).map(({ id, name }) => ({ id, name })),
+        onCreated: (createdId) => {
+          // The draft goes only once the row exists: a failed create must not lose what was typed.
+          clearDraft(DRAFT_KEYS.new);
+          logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title: finalTitle, type: form.type });
+          deliverWebhookEvent('object.created', { objectId: createdId, title: finalTitle, type: form.type });
+          createNotification(user.id, 'object_created', 'Object created', finalTitle.slice(0, 80), { type: 'knowledge_object', id: createdId });
+        },
+      }, queryClient);
       addToast('success', 'Object created');
-      clearDraft(DRAFT_KEYS.new);
-      await invalidateObjectLists();
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to create object');

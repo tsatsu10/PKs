@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getErrorMessage } from '../lib/errors';
 import { createDomain, createTag } from '../lib/entities';
@@ -147,19 +147,25 @@ export function useDashboardSearch({ userId }) {
     return created;
   }, [queryClient]);
 
+  // runSearch reads the latest filters from a ref, so typing in the search box
+  // doesn't change its identity or anything downstream of it (P2).
+  const filterStateRef = useRef(filterState);
+  useLayoutEffect(() => {
+    filterStateRef.current = filterState;
+  }, [filterState]);
+
   const runSearch = useCallback(
     (nextOffset = 0, queryOverride = null, filtersOverride = null) => {
       if (!userId) return;
       const hasOverride = queryOverride != null || filtersOverride != null;
-      if (nextOffset === 0 || hasOverride || !appliedRpcPayload) {
-        setAppliedRpcPayload(
-          buildRpcPayload(resolveSearchRpcFilters(filtersOverride, filterState, queryOverride))
-        );
-      }
+      const payload = buildRpcPayload(
+        resolveSearchRpcFilters(filtersOverride, filterStateRef.current, queryOverride)
+      );
+      setAppliedRpcPayload((prev) => (nextOffset === 0 || hasOverride || !prev ? payload : prev));
       setOffset(nextOffset);
       setError('');
     },
-    [userId, filterState, appliedRpcPayload]
+    [userId]
   );
 
   const setObjects = useCallback(

@@ -3,7 +3,13 @@ import { isoToDateTimeLocal, dateTimeLocalToIso } from './datetime';
 
 // Node applies TZ changes at runtime. A non-UTC zone reproduces bug B6 even when CI runs in UTC.
 // vi.stubEnv avoids the `process` global (not in the browser ESLint globals) and restores cleanly.
-beforeAll(() => { vi.stubEnv('TZ', 'America/New_York'); });
+// Node ignores TZ changes made inside worker threads, so under --pool=threads the stub silently does nothing.
+beforeAll(() => {
+  vi.stubEnv('TZ', 'America/New_York');
+  if (new Date('2026-03-10T15:30:00.000Z').getHours() !== 11) {
+    throw new Error('TZ stub did not take effect (worker threads ignore TZ changes). Run this file with the default forks pool.');
+  }
+});
 afterAll(() => { vi.unstubAllEnvs(); });
 
 describe('datetime-local conversion', () => {

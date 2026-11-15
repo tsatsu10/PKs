@@ -13,6 +13,7 @@ import { withKeepalive } from '../../../lib/keepalive';
 import { queryClient as defaultClient } from '../../../data/queryClient';
 import { qk } from '../../../data/keys';
 import { OBJECT_COLS, fetchObjectRow, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
+import { isCreating, whenCreated } from '../../../data/createObject';
 import { invalidateObjectLists, setObjectInLists } from '../../../data/objects';
 import {
   readLocalCopy, writeLocalCopy, writeLocalCopyNow, writeLocalCopySync, deleteLocalCopy, deleteLocalCopies,
@@ -44,7 +45,8 @@ export interface SaveQueue {
   /** Save version: flush, then snapshot the current row. Resolves to the new version number. */
   snapshot(reason?: string): Promise<number>;
   /** Restore: flush, snapshot the current row, then save the version's fields (emits onReloaded). */
-  applyVersion(v: VersionFields): Promise<void>;
+  /** Restore `v`: resolves to the version number of the snapshot taken just before (for Undo). */
+  applyVersion(v: VersionFields): Promise<number>;
   /** The fields on the page must be re-seeded from the server row plus pending(). */
   onReloaded(listener: () => void): () => void;
   /**
@@ -215,6 +217,20 @@ class Queue implements SaveQueue {
     let row: Row | null = null;
     let failed = false;
     let error: unknown = null;
+    // Edits typed into a just-created object wait for its insert, instead of matching zero rows
+    // and reading as "deleted". While the create is failing they stay here, unsent and kept locally.
+    // Only then: otherwise the request must start synchronously (pagehide, see onHide).
+    if (isCreating(this.objectId)) {
+      await whenCreated(this.objectId);
+      if (this.closed) return;
+      // send() checked the connection before the wait; check again before the request goes out.
+      if (!onlineManager.isOnline()) {
+        this.queued = { ...patch, ...this.queued };
+        this.inFlight = null;
+        this.goOffline();
+        return;
+      }
+    }
     try {
       const result = await supabase
         .from('knowledge_objects')
@@ -397,9 +413,9 @@ class Queue implements SaveQueue {
     return this.rpcSnapshot(null, reason ?? null);
   }
 
-  async applyVersion(v: VersionFields): Promise<void> {
+  async applyVersion(v: VersionFields): Promise<number> {
     await this.flush();
-    await this.snapshot(`Before restoring v${v.version}`);
+    const before = await this.snapshot(`Before restoring v${v.version}`);
     this.change({
       title: v.title,
       content: v.content ?? '',
@@ -409,6 +425,7 @@ class Queue implements SaveQueue {
     });
     await this.flush();
     this.reloadListeners.forEach((l) => l());
+    return before;
   }
 
   adoptServerRevision = (revision: number) => {

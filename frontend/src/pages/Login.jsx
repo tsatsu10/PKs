@@ -1,3 +1,4 @@
+import { browserTimeZone } from '../lib/timezone';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -78,7 +79,7 @@ export default function Login() {
         id: data.user.id,
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? '',
-        timezone: profile?.timezone ?? 'Africa/Accra',
+        timezone: profile?.timezone ?? browserTimeZone(),
         createdAt: profile?.created_at ?? data.user.created_at,
       });
       if (!loggedIn) throw new Error('Sign-in did not create a session. Please try again.');

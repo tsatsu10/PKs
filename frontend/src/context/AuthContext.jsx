@@ -1,3 +1,4 @@
+import { browserTimeZone } from '../lib/timezone';
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -22,7 +23,7 @@ function mapUser(au, profile) {
     id: au.id,
     email: au.email ?? profile?.email,
     displayName: profile?.display_name ?? au.user_metadata?.display_name ?? au.user_metadata?.displayName ?? '',
-    timezone: profile?.timezone ?? 'Africa/Accra',
+    timezone: profile?.timezone ?? browserTimeZone(),
     createdAt: profile?.created_at ?? au.created_at,
   };
 }

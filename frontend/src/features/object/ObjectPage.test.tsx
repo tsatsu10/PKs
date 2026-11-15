@@ -41,6 +41,18 @@ vi.mock('../../lib/reportError', () => ({ reportError: vi.fn() }));
 const dl = vi.hoisted(() => ({ downloadBlob: vi.fn(), printHtml: vi.fn(() => true) }));
 vi.mock('../../lib/download', () => dl);
 
+const cs = vi.hoisted(() => ({ failed: null as null | { error: unknown; retry: () => void } }));
+vi.mock('../../data/createObject', async (orig) => {
+  const real = await orig<typeof import('../../data/createObject')>();
+  return {
+    ...real,
+    useCreateState: (id: string | undefined) => {
+      const state = real.useCreateState(id);
+      return cs.failed ? { status: 'failed' as const, ...cs.failed } : state;
+    },
+  };
+});
+
 import ObjectPage from './ObjectPage';
 import { disposeAllSaveQueues } from './save/saveQueue';
 
@@ -108,6 +120,7 @@ beforeEach(async () => {
   myShare = null;
   detail = OBJ;
   override = null;
+  cs.failed = null;
   sessionStorage.clear();
   performance.clearMarks();
   sb.current!.calls.length = 0;
@@ -135,6 +148,34 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
     expect(screen.getByRole('searchbox', { name: 'Search objects to link' })).toBeInTheDocument();
+  });
+
+  it('a failed create shows a Retry bar and the editor stays usable', async () => {
+    const retry = vi.fn();
+    cs.failed = { error: { message: 'Failed to fetch' }, retry };
+    renderPage();
+    expect(await titleBox()).toBeEnabled();
+    const bar = screen.getAllByRole('alert').find((el) => el.textContent?.includes("Couldn't create this object"))!;
+    expect(bar).toHaveTextContent("Couldn't create this object: Couldn't reach the server.");
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('while a create is unfinished, object actions and side panels are inert; the editor is not', async () => {
+    cs.failed = { error: { message: 'Failed to fetch' }, retry: vi.fn() };
+    renderPage();
+    expect((await titleBox()).closest('[inert]')).toBeNull();
+    for (const name of ['Pin', 'Duplicate', 'Delete']) {
+      expect(screen.getByRole('button', { name, hidden: true }).closest('[inert]')).not.toBeNull();
+    }
+    expect(screen.getByRole('searchbox', { name: 'Search objects to link', hidden: true }).closest('[inert]')).not.toBeNull();
+  });
+
+  it('no Retry bar when nothing is being created', async () => {
+    renderPage();
+    await titleBox();
+    expect(screen.queryByText(/Couldn't create this object/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' }).closest('[inert]')).toBeNull();
   });
 
   it('editor also edits in place but sees no owner-only actions', async () => {

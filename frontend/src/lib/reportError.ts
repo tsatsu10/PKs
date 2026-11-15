@@ -37,19 +37,25 @@ function hash(text: string): string {
   return (h >>> 0).toString(16);
 }
 
-export function reportError(err: unknown): void {
+/**
+ * Send an unexpected error to the server log. Returns true when it was sent (or already sent
+ * within the dedupe window), false when it was skipped (expected kinds, app messages) or
+ * couldn't be sent (offline, session cap).
+ */
+export function reportError(err: unknown): boolean {
   try {
     const kind = classifyError(err);
-    if (!REPORTED_KINDS.has(kind)) return;
-    if (kind === 'unknown' && isAppMessage(err)) return;
-    if (!onlineManager.isOnline() || sentThisSession >= SESSION_CAP) return;
+    if (!REPORTED_KINDS.has(kind)) return false;
+    if (kind === 'unknown' && isAppMessage(err)) return false;
+    if (!onlineManager.isOnline()) return false;
 
     const message = scrub(messageOf(err)).slice(0, 500);
     const stack = err instanceof Error && err.stack ? scrub(err.stack).slice(0, 4096) : null;
     const fingerprint = hash(`${kind}|${message}|${stack?.split('\n')[1] ?? ''}`);
     const now = Date.now();
     const previous = lastSent.get(fingerprint);
-    if (previous !== undefined && now - previous < DEDUPE_MS) return;
+    if (previous !== undefined && now - previous < DEDUPE_MS) return true;
+    if (sentThisSession >= SESSION_CAP) return false;
     lastSent.set(fingerprint, now);
     sentThisSession += 1;
 
@@ -64,15 +70,17 @@ export function reportError(err: unknown): void {
         p_fingerprint: fingerprint,
       }),
     ).catch(() => undefined);
+    return true;
   } catch {
     // The reporter must never throw or report itself.
+    return false;
   }
 }
 
 /** Report errors outside React: uncaught exceptions and unhandled promise rejections. */
 export function installGlobalErrorReporting(target: Window = window): () => void {
-  const onError = (event: ErrorEvent) => reportError(event.error ?? event.message);
-  const onRejection = (event: Event) => reportError((event as PromiseRejectionEvent).reason);
+  const onError = (event: ErrorEvent) => { reportError(event.error ?? event.message); };
+  const onRejection = (event: Event) => { reportError((event as PromiseRejectionEvent).reason); };
   target.addEventListener('error', onError);
   target.addEventListener('unhandledrejection', onRejection);
   return () => {

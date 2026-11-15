@@ -314,11 +314,10 @@ export function useDashboardPage() {
     }
   }, []);
 
-  // Run search with URL query only when URL or user changes, not when user types (runSearch identity changes with searchQuery)
+  // Run search with URL query only when URL or user changes (runSearch is stable per user)
   useEffect(() => {
     if (user?.id && qFromUrl) runSearch(0, qFromUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only react to URL/user, not runSearch
-  }, [user?.id, qFromUrl]);
+  }, [user?.id, qFromUrl, runSearch]);
 
   // Persist view mode and density
   useEffect(() => {
@@ -338,8 +337,7 @@ export function useDashboardPage() {
     }
     const t = setTimeout(() => runSearch(0), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce searchQuery only; runSearch identity changes with filters
-  }, [searchQuery, user?.id]);
+  }, [searchQuery, user?.id, runSearch]);
 
 
   function dismissRunPromptBanner() {

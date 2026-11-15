@@ -13,13 +13,15 @@ type Props = {
   actions: ReturnType<typeof useObjectActions>;
   onToggleExport: () => void;
   onToggleShare: () => void;
+  /** The object doesn't exist on the server yet (create pending or failed): nothing here can act on it. */
+  inert?: boolean;
 };
 
 /** Breadcrumbs, the link-search slot and the action buttons. Editing happens in place (no Edit/Save). */
-export default function Header({ object, isOwner, canEdit, canLink, linkSearch, actions, onToggleExport, onToggleShare }: Props) {
+export default function Header({ object, isOwner, canEdit, canLink, linkSearch, actions, onToggleExport, onToggleShare, inert = false }: Props) {
   const { togglePin, pinning, duplicate, duplicating, remove, deleting, saveVersion, savingVersion } = actions;
   return (
-    <header className="object-detail-header">
+    <header className="object-detail-header" inert={inert}>
       <div className="object-detail-header-left">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: object.title || 'Object' }]} />
       </div>

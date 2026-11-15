@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
 import { formatObjectTypeLabel } from '../../../../constants';
@@ -9,7 +10,7 @@ import './TableView.css';
 /**
  * Dense table-style row (replaces legacy list view).
  */
-export default function TableViewRow({
+function TableViewRow({
   obj,
   to,
   selected,
@@ -49,3 +50,4 @@ export default function TableViewRow({
   );
 }
 
+export default memo(TableViewRow);

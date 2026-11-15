@@ -5,6 +5,7 @@ import { getErrorMessage } from '../../../lib/errors';
 import { reportError } from '../../../lib/reportError';
 import { useToast } from '../../../context/ToastContext';
 import { fetchShares, type ShareRow } from '../../../data/objectDetail';
+import { useUndoToast } from './useUndoToast';
 import type { ObjectRow, SetError } from '../types';
 
 export type ShareRole = 'viewer' | 'editor';
@@ -18,6 +19,7 @@ function isValidEmail(str: string) {
 /** The owner's share panel: load, add (by email) and revoke shares and pending invites. */
 export function useShares({ object, userId, setError }: { object: ObjectRow | null; userId: string | undefined; setError: SetError }) {
   const notifyError = useNotifyError();
+  const undoToast = useUndoToast();
   const { addToast } = useToast() as { addToast: (type: string, message: string) => void };
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [email, setEmail] = useState('');
@@ -62,16 +64,36 @@ export function useShares({ object, userId, setError }: { object: ObjectRow | nu
     }
   }
 
+  /** Removes the row at once (back on failure) and offers Undo, which shares again with the same email and role. */
   async function revoke(shareId: string) {
     if (!object) return;
     setError('');
-    try {
+    const oid = object.id;
+    const removed = shares.find((x) => x.id === shareId);
+    setShares((prev) => prev.filter((x) => x.id !== shareId));
+    const pending = (async () => {
       const { error: err } = shareId.startsWith('invite:')
-        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length)).eq('knowledge_object_id', object.id)
-        : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', object.id);
+        ? await supabase.from('share_invites').delete().eq('id', shareId.slice('invite:'.length)).eq('knowledge_object_id', oid)
+        : await supabase.from('share_permissions').delete().eq('id', shareId).eq('knowledge_object_id', oid);
       if (err) throw err;
-      setShares((prev) => prev.filter((s) => s.id !== shareId));
+    })();
+    // Undo shares again by email, so a legacy row without one can't be undone.
+    const email = removed?.shared_with_email;
+    const withdraw = removed && email
+      ? undoToast('Access removed', async () => {
+        const { error: rpcErr } = await supabase.rpc('share_object_by_email', {
+          p_object_id: oid, p_email: email, p_role: removed.role,
+        });
+        if (rpcErr) throw rpcErr;
+        await load();
+      }, pending)
+      : () => undefined;
+    try {
+      await pending;
     } catch (err) {
+      withdraw();
+      if (removed) setShares((prev) => (prev.some((x) => x.id === shareId) ? prev : [...prev, removed]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))));
       setError(notifyError(err, 'Failed to revoke'));
     }
   }

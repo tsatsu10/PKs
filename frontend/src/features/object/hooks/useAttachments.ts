@@ -4,15 +4,21 @@ import { useNotifyError } from '../../../lib/useNotifyError';
 import { getErrorMessage } from '../../../lib/errors';
 import { FILES_BUCKET, getStoragePath } from '../../../lib/storage';
 import { invalidateObjectLists } from '../../../data/objects';
-import type { ObjectRow, FileRow, ListSetter, SetError } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
+import { optimistic } from '../../../data/optimistic';
+import { qk } from '../../../data/keys';
+import { useUndoToast } from './useUndoToast';
+import type { ObjectRow, FileRow, SetError } from '../types';
 
 const POPUP_BLOCKED = 'Your browser blocked the download window. Allow pop-ups for this site, then try again.';
 
-type Options = { object: ObjectRow | null; userId: string | undefined; setAttachedFiles: ListSetter<FileRow>; setError: SetError };
+type Options = { object: ObjectRow | null; userId: string | undefined; setError: SetError };
 
-/** Attach a file (upload + link), download it through a signed URL, or detach it. */
-export function useAttachments({ object, userId, setAttachedFiles, setError }: Options) {
+/** Attach a file (upload + link), download it through a signed URL, or detach it (at once, with Undo). */
+export function useAttachments({ object, userId, setError }: Options) {
+  const client = useQueryClient();
   const notifyError = useNotifyError();
+  const undoToast = useUndoToast();
   const [uploading, setUploading] = useState(false);
 
   async function attach(e: ChangeEvent<HTMLInputElement>) {
@@ -38,7 +44,8 @@ export function useAttachments({ object, userId, setAttachedFiles, setError }: O
       await supabase.from('files').update({ storage_key: path }).eq('id', fileRow.id);
       const { error: linkErr } = await supabase.from('knowledge_object_files').insert({ knowledge_object_id: object.id, file_id: fileRow.id });
       if (linkErr) throw linkErr;
-      setAttachedFiles((prev) => [...prev, { id: fileRow.id, filename: file.name, mime_type: file.type, size_bytes: file.size }]);
+      client.setQueryData<FileRow[]>(qk.object.files(object.id), (prev = []) =>
+        [...prev, { id: fileRow.id, filename: file.name, mime_type: file.type, size_bytes: file.size, storage_key: path }]);
       invalidateObjectLists();
     } catch (err) {
       setError(notifyError(err, 'Upload failed'));
@@ -71,15 +78,35 @@ export function useAttachments({ object, userId, setAttachedFiles, setError }: O
     }
   }
 
+  /** Optimistically link or unlink file `f` on object `oid`. Throws after rolling back. */
+  async function setAttached(oid: string, f: FileRow, attached: boolean) {
+    const key = qk.object.files(oid);
+    await optimistic(client, {
+      keys: [{ queryKey: key, exact: true }],
+      apply: () => client.setQueryData<FileRow[]>(key, (prev = []) =>
+        attached ? [...prev.filter((x) => x.id !== f.id), f] : prev.filter((x) => x.id !== f.id)),
+      run: async () => {
+        const { error: err } = attached
+          ? await supabase.from('knowledge_object_files').insert({ knowledge_object_id: oid, file_id: f.id })
+          : await supabase.from('knowledge_object_files').delete().eq('knowledge_object_id', oid).eq('file_id', f.id);
+        if (err) throw err;
+      },
+    });
+    void invalidateObjectLists();
+  }
+
   async function detach(fileId: string) {
     if (!object) return;
     setError('');
+    const oid = object.id;
+    const file = client.getQueryData<FileRow[]>(qk.object.files(oid))?.find((x) => x.id === fileId)
+      ?? { id: fileId, filename: '', mime_type: null, size_bytes: null };
+    const pending = setAttached(oid, file, false);
+    const withdraw = undoToast('Attachment removed', () => setAttached(oid, file, true), pending);
     try {
-      const { error: err } = await supabase.from('knowledge_object_files').delete().eq('knowledge_object_id', object.id).eq('file_id', fileId);
-      if (err) throw err;
-      setAttachedFiles((prev) => prev.filter((x) => x.id !== fileId));
-      invalidateObjectLists();
+      await pending;
     } catch (err) {
+      withdraw();
       setError(notifyError(err, 'Failed to remove attachment'));
     }
   }

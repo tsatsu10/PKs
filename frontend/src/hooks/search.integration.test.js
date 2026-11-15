@@ -156,4 +156,25 @@ describe('useDashboardSearch (integration)', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(searchCalls()).toHaveLength(1);
   });
+
+  it('keeps runSearch stable while filters change, and runs with the latest values (P2)', async () => {
+    const { result } = renderHook(() => useDashboardSearch({ userId: 'user-1' }), { wrapper: wrapper() });
+    const first = result.current.runSearch;
+
+    await act(async () => {
+      result.current.setSearchQuery('stable');
+      result.current.setTypeFilter('note');
+    });
+    expect(result.current.runSearch).toBe(first);
+
+    await act(async () => {
+      result.current.runSearch(0);
+    });
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'search_knowledge_objects_with_snippets',
+        expect.objectContaining({ search_query: 'stable', type_filter: 'note' })
+      );
+    });
+  });
 });

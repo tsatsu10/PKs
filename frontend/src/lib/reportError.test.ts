@@ -38,6 +38,16 @@ describe('reportError', () => {
     expect(args.p_app_version).toBe('dev');
   });
 
+  it('returns whether the error was (or already had been) sent', () => {
+    expect(reportError(new Error('Name is required'))).toBe(false);
+    expect(reportError({ code: '23505', message: 'duplicate key' })).toBe(false);
+    expect(reportError(serverErr())).toBe(true);
+    expect(reportError(serverErr())).toBe(true); // deduped: already sent
+    expect(rpc).toHaveBeenCalledTimes(1);
+    onlineManager.setOnline(false);
+    expect(reportError(serverErr('other'))).toBe(false);
+  });
+
   it('skips expected kinds and app-authored messages', () => {
     reportError({ code: '23505', message: 'duplicate key' });
     reportError({ message: 'TypeError: Failed to fetch' });

@@ -405,7 +405,6 @@ export default function DashboardView(props) {
                     const rowIndex = virtualRow.index;
                     const startIdx = rowIndex * cardColumns;
                     const rowObjects = objects.slice(startIdx, startIdx + cardColumns);
-                    const objectLink = (id) => `/objects/${id}${runPromptTemplate ? `?runPrompt=${runPromptTemplate.id}` : ''}`;
                     return (
                       <div
                         key={`card-row-${rowIndex}`}
@@ -427,7 +426,7 @@ export default function DashboardView(props) {
                             <DashboardObjectCard
                               key={rowObj.id}
                               obj={rowObj}
-                              to={objectLink(rowObj.id)}
+                              to={`/objects/${rowObj.id}${runPromptSuffix}`}
                               selected={selectedIds.has(rowObj.id)}
                               onToggleSelect={toggleSelect}
                               animationDelay={Math.min(startIdx + colIdx, 12) * 25}

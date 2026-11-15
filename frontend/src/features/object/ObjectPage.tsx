@@ -24,6 +24,8 @@ import ConflictBar from './ConflictBar';
 import { useSaveQueue } from './save/useSaveQueue';
 import type { SaveFields } from './save/saveQueue';
 import { adoptLegacyDraft } from './legacyDraft';
+import { useCreateState } from '../../data/createObject';
+import { getErrorMessage } from '../../lib/errors';
 import type { ObjectRow } from './types';
 import { SynthesizeCta, RunPromptPanel } from './AiPanel';
 import Taxonomy from './Taxonomy';
@@ -41,12 +43,13 @@ export default function ObjectPage() {
   const userId = user?.id ?? undefined;
   const page = useObjectPage({ id, userId });
   const {
-    object, setObject, loading, error, setError, versions, objectDomains, setObjectDomains,
-    objectTags, setObjectTags, allDomains, allTags, outgoingLinks, setOutgoingLinks, incomingLinks, setIncomingLinks,
-    otherObjects, attachedFiles, setAttachedFiles, promptTemplates, promptRuns, setPromptRuns, suggestedTags,
+    object, loading, error, setError, versions, objectDomains,
+    objectTags, allDomains, allTags, outgoingLinks, incomingLinks,
+    otherObjects, attachedFiles, promptTemplates, promptRuns, setPromptRuns, suggestedTags,
     suggestedLinkedObjects, myShare, panelErrors, retryPanel,
   } = page;
   const prefetch = usePrefetchObject();
+  const create = useCreateState(id);
   const isOwner = !!object && object.user_id === userId;
   const canEdit = isOwner || myShare?.role === 'editor';
 
@@ -93,10 +96,10 @@ export default function ObjectPage() {
     }
   };
 
-  const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setObject, setError });
-  const taxonomy = useTaxonomyActions({ object, allDomains, allTags, setObjectDomains, setObjectTags, setError });
-  const links = useLinks({ object, userId, otherObjects, outgoingLinks, incomingLinks, setOutgoingLinks, setIncomingLinks, setError });
-  const attachments = useAttachments({ object, userId, setAttachedFiles, setError });
+  const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setError });
+  const taxonomy = useTaxonomyActions({ object, allDomains, allTags, setError });
+  const links = useLinks({ object, userId, otherObjects, setError });
+  const attachments = useAttachments({ object, userId, setError });
   const shares = useShares({ object, userId, setError });
   const run = useRunPrompt({ object, userId, promptTemplates, setPromptRuns, setError });
   const exportState = useObjectExport({ object, userId, objectDomains, objectTags, outgoingLinks, incomingLinks, setError });
@@ -131,6 +134,10 @@ export default function ObjectPage() {
     restoreVersion: actions.restoreVersion, restoringVersion: actions.restoringVersion,
   };
 
+  // Until the row exists, actions on it (pin, delete, tags, links, versions...) would fail or wait
+  // forever on the save queue. The editor stays usable: its edits wait for the insert.
+  const creating = create.status !== 'none';
+
   return (
     <div className="object-detail">
       <Header
@@ -142,8 +149,18 @@ export default function ObjectPage() {
         actions={actions}
         onToggleExport={() => exportState.setShow((v) => !v)}
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
+        inert={creating}
       />
       {error && <div className="form-error" role="alert">{error}</div>}
+      {create.status === 'failed' && (
+        // The editor stays usable: its edits wait in the save queue until the object exists.
+        <div className="conflict-bar" role="alert">
+          <p className="conflict-bar-text">Couldn&apos;t create this object: {getErrorMessage(create.error)}</p>
+          <div className="conflict-bar-actions">
+            <button type="button" className="btn btn-primary btn-small" onClick={create.retry}>Retry</button>
+          </div>
+        </div>
+      )}
 
       {showSharePanel && isOwner && <SharePanel shares={shares} onClose={() => setShowSharePanel(false)} />}
       {exportState.show && <ExportPanel exportState={exportState} />}
@@ -184,7 +201,7 @@ export default function ObjectPage() {
             ) : null}
           </div>
         </div>
-        <aside className="detail-sidebar">
+        <aside className="detail-sidebar" inert={creating}>
           <Taxonomy
             isOwner={isOwner}
             objectDomains={objectDomains}

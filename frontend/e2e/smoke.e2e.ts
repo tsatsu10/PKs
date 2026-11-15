@@ -81,24 +81,30 @@ test('add a link to another object', async ({ page }) => {
   await expect(page.getByRole('link', { name: `Link target ${word}` }).first()).toBeVisible();
 });
 
-test('move to trash, then restore', async ({ page }) => {
+test('move to trash, undo, then trash and restore', async ({ page }) => {
   const title = marker('Trashable');
   const { id } = await createObject(title);
-  await openObject(page, id);
-
-  page.once('dialog', (d) => d.accept()); // "Move this object to Trash?"
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect.poll(async () => {
+  const isDeleted = async () => {
     const { data } = await adminClient().from('knowledge_objects').select('is_deleted').eq('id', id).single();
     return data?.is_deleted;
-  }, { timeout: SERVER_TIMEOUT_MS }).toBe(true);
+  };
+  await openObject(page, id);
+
+  // No confirmation dialog any more (U5): the toast offers Undo instead.
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect.poll(isDeleted, { timeout: SERVER_TIMEOUT_MS }).toBe(true);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(isDeleted, { timeout: SERVER_TIMEOUT_MS }).toBe(false);
+
+  await openObject(page, id);
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect.poll(isDeleted, { timeout: SERVER_TIMEOUT_MS }).toBe(true);
 
   await page.goto('/trash');
   const row = page.locator('.trash-item').filter({ hasText: title });
   await row.getByRole('button', { name: 'Restore' }).click();
   await expect(row).toHaveCount(0);
-  const { data } = await adminClient().from('knowledge_objects').select('is_deleted').eq('id', id).single();
-  expect(data?.is_deleted).toBe(false);
+  await expect.poll(isDeleted, { timeout: SERVER_TIMEOUT_MS }).toBe(false);
 
   await openObject(page, id);
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title);

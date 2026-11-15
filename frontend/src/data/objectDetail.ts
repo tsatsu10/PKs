@@ -6,6 +6,7 @@ import { qk } from './keys';
 import { queryClient as defaultClient } from './queryClient';
 import { promptsQuery } from './prompts';
 import { LIST_COLS } from './objects';
+import { whenCreated } from './createObject';
 
 export const OBJECT_COLS = `${LIST_COLS}, content_json`;
 export type ObjectRow = Record<string, unknown> & { id: string; user_id: string; is_deleted: boolean; revision: number };
@@ -22,6 +23,14 @@ export type VersionSnapshot = { title: string; content: string | null; content_j
 export async function fetchVersionSnapshot(versionId: string): Promise<VersionSnapshot> {
   const row = unwrap(await db.from('knowledge_object_versions').select('title, content, content_json, summary, key_points')
     .eq('id', versionId).maybeSingle()) as VersionSnapshot | null;
+  if (!row) throw new Error("That version doesn't exist or was deleted.");
+  return row;
+}
+
+/** One version of an object by its number (Undo of a restore names the snapshot by number). */
+export async function fetchVersionSnapshotByNumber(objectId: string, version: number): Promise<VersionSnapshot & { version: number }> {
+  const row = unwrap(await db.from('knowledge_object_versions').select('version, title, content, content_json, summary, key_points')
+    .eq('knowledge_object_id', objectId).eq('version', version).maybeSingle()) as (VersionSnapshot & { version: number }) | null;
   if (!row) throw new Error("That version doesn't exist or was deleted.");
   return row;
 }
@@ -46,7 +55,8 @@ export async function fetchSaveCheck(id: string, userId: string): Promise<SaveCh
 
 export const objectDetailQuery = (id: string) => queryOptions({
   queryKey: qk.object.detail(id),
-  queryFn: () => fetchObjectRow(id),
+  // An object created on this page is read only once its insert has landed (createObject).
+  queryFn: async () => { await whenCreated(id); return fetchObjectRow(id); },
   // The editor seeds from this data; never swap it underneath a user (part 2 adds "changed elsewhere").
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
