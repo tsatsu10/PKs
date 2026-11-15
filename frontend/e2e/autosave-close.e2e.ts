@@ -22,6 +22,16 @@ async function typeThenCloseTab(page: Page, text: string) {
   expect(Date.now() - lastKey, 'the tab must close within 1 s of the last keystroke').toBeLessThan(CLOSE_WITHIN_MS);
 }
 
+/**
+ * Cut the network and wait until the app has noticed (its offline banner). Otherwise a tab closed
+ * within a few hundred ms still thinks it is online and sends with keepalive, and Playwright's
+ * offline emulation does not hold back a keepalive request that outlives its page.
+ */
+async function goOffline(page: Page) {
+  await page.context().setOffline(true);
+  await expect(page.getByText("You're offline.")).toBeVisible();
+}
+
 async function reopen(context: BrowserContext, objectId: string) {
   const page = await context.newPage();
   await openObject(page, objectId);
@@ -53,7 +63,7 @@ test('edit offline, close the tab within 1 s, reconnect, reopen: the content is 
 
   const page = await context.newPage();
   await openObject(page, id);
-  await context.setOffline(true);
+  await goOffline(page);
   await typeThenCloseTab(page, text);
 
   // Nothing could have been sent.
@@ -74,7 +84,7 @@ test('edit offline with the tab open, reconnect: it saves without a reload', asy
 
   const page = await context.newPage();
   await openObject(page, id);
-  await context.setOffline(true);
+  await goOffline(page);
   await typeAtEnd(page, text);
   await expect(saveIndicator(page)).toHaveText('Not saved: offline');
   expect(await serverContentText(id)).not.toContain(text);
