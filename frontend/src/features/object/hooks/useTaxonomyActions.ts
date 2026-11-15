@@ -62,7 +62,7 @@ export function useTaxonomyActions({ object, allDomains, allTags, setError }: Op
     setError('');
     const oid = object.id;
     const pending = change(kind, oid, entityId, false);
-    const withdraw = undoToast(`${LABEL[kind]} removed`, () => change(kind, oid, entityId, true));
+    const withdraw = undoToast(`${LABEL[kind]} removed`, () => change(kind, oid, entityId, true), pending);
     try {
       await pending;
     } catch (err) {

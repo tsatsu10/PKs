@@ -168,13 +168,14 @@ export default function ObjectNew() {
         domains: domains.filter((d) => form.domainIds.includes(d.id)).map(({ id, name }) => ({ id, name })),
         tags: tags.filter((t) => form.tagIds.includes(t.id)).map(({ id, name }) => ({ id, name })),
         onCreated: (createdId) => {
+          // The draft goes only once the row exists: a failed create must not lose what was typed.
+          clearDraft(DRAFT_KEYS.new);
           logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title: finalTitle, type: form.type });
           deliverWebhookEvent('object.created', { objectId: createdId, title: finalTitle, type: form.type });
           createNotification(user.id, 'object_created', 'Object created', finalTitle.slice(0, 80), { type: 'knowledge_object', id: createdId });
         },
       }, queryClient);
       addToast('success', 'Object created');
-      clearDraft(DRAFT_KEYS.new);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to create object');

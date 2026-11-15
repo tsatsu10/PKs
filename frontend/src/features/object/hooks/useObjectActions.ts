@@ -156,7 +156,7 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
       await restoreFromTrash(id, userId);
       addToast('success', 'Restored');
       await Promise.all([invalidateObjectLists(client), invalidateObject(id, client)]);
-    });
+    }, pending);
     try {
       await pending;
       logAudit(userId, AUDIT_ACTIONS.OBJECT_DELETE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, id, { title });

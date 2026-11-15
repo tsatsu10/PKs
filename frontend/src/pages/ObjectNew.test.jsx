@@ -24,6 +24,7 @@ const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => navigate }));
 
 import ObjectNew from './ObjectNew';
+import { getDraft, DRAFT_KEYS, DRAFT_OWNER_KEY } from '../lib/draftStorage';
 import { qk } from '../data/keys';
 
 const OK = { data: [], error: null };
@@ -68,5 +69,30 @@ describe('ObjectNew', () => {
     await waitFor(() => expect(side.logAudit).toHaveBeenCalledWith('owner', expect.anything(), expect.anything(), id, expect.objectContaining({ title: 'Fresh idea' })));
     expect(side.deliverWebhookEvent).toHaveBeenCalledWith('object.created', expect.objectContaining({ objectId: id }));
     expect(side.createNotification).toHaveBeenCalled();
+  });
+
+  it('keeps the form draft until the insert lands, and keeps it if the insert fails', async () => {
+    const DOWN = { data: null, error: { code: 'PGRST000', message: 'down' } };
+    const first = deferred();
+    sb.current.respond = (call) => (isObjectInsert(call) ? first.promise : OK);
+    sessionStorage.setItem(DRAFT_OWNER_KEY, 'owner');
+    renderNew();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Keep me' } });
+    await waitFor(() => expect(getDraft(DRAFT_KEYS.new)?.form?.title).toBe('Keep me'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(getDraft(DRAFT_KEYS.new)?.form?.title).toBe('Keep me');
+    await act(async () => { first.resolve(DOWN); await Promise.resolve(); });
+    expect(getDraft(DRAFT_KEYS.new)?.form?.title).toBe('Keep me');
+  });
+
+  it('clears the form draft once the insert lands', async () => {
+    sessionStorage.setItem(DRAFT_OWNER_KEY, 'owner');
+    renderNew();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Done' } });
+    await waitFor(() => expect(getDraft(DRAFT_KEYS.new)?.form?.title).toBe('Done'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(side.logAudit).toHaveBeenCalled());
+    expect(getDraft(DRAFT_KEYS.new)).toBeFalsy();
   });
 });

@@ -134,6 +134,10 @@ export default function ObjectPage() {
     restoreVersion: actions.restoreVersion, restoringVersion: actions.restoringVersion,
   };
 
+  // Until the row exists, actions on it (pin, delete, tags, links, versions...) would fail or wait
+  // forever on the save queue. The editor stays usable: its edits wait for the insert.
+  const creating = create.status !== 'none';
+
   return (
     <div className="object-detail">
       <Header
@@ -145,6 +149,7 @@ export default function ObjectPage() {
         actions={actions}
         onToggleExport={() => exportState.setShow((v) => !v)}
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
+        inert={creating}
       />
       {error && <div className="form-error" role="alert">{error}</div>}
       {create.status === 'failed' && (
@@ -196,7 +201,7 @@ export default function ObjectPage() {
             ) : null}
           </div>
         </div>
-        <aside className="detail-sidebar">
+        <aside className="detail-sidebar" inert={creating}>
           <Taxonomy
             isOwner={isOwner}
             objectDomains={objectDomains}

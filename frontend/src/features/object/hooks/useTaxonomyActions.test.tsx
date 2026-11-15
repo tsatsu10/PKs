@@ -53,6 +53,20 @@ describe('useTaxonomyActions', () => {
     expect(reinsert?.ops).toContainEqual(['insert', [{ knowledge_object_id: 'o1', tag_id: 't2' }]]);
   });
 
+  it('Undo clicked while the removal is still in flight waits for it, then re-adds the tag', async () => {
+    const { result, tags } = setup();
+    const d = holdNext(sb.current!);
+    let p!: Promise<void>;
+    act(() => { p = result.current.removeTag('t2'); });
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await act(async () => { await Promise.resolve(); });
+    const tagInserts = () => sb.current!.calls.filter((c) => c.table === 'knowledge_object_tags' && c.ops.some(([m]) => m === 'insert'));
+    expect(tagInserts()).toHaveLength(0);
+    await act(async () => { d.resolve(OK); await p; });
+    await waitFor(() => expect(tagInserts()).toHaveLength(1));
+    await waitFor(() => expect(tags()).toEqual(['t2', 't1']));
+  });
+
   it('a failed removeTag puts the tag back, reports it, and withdraws the Undo', async () => {
     const { result, tags, setError } = setup();
     const d = holdNext(sb.current!);

@@ -161,10 +161,21 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it('while a create is unfinished, object actions and side panels are inert; the editor is not', async () => {
+    cs.failed = { error: { message: 'Failed to fetch' }, retry: vi.fn() };
+    renderPage();
+    expect((await titleBox()).closest('[inert]')).toBeNull();
+    for (const name of ['Pin', 'Duplicate', 'Delete']) {
+      expect(screen.getByRole('button', { name, hidden: true }).closest('[inert]')).not.toBeNull();
+    }
+    expect(screen.getByRole('searchbox', { name: 'Search objects to link', hidden: true }).closest('[inert]')).not.toBeNull();
+  });
+
   it('no Retry bar when nothing is being created', async () => {
     renderPage();
     await titleBox();
     expect(screen.queryByText(/Couldn't create this object/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' }).closest('[inert]')).toBeNull();
   });
 
   it('editor also edits in place but sees no owner-only actions', async () => {

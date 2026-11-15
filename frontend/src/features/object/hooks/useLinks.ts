@@ -136,7 +136,7 @@ export function useLinks({ object, userId, otherObjects, setError }: Options) {
     const withdraw = link && otherId
       ? undoToast('Link removed', () => insertEdge(oid, isOutgoing
         ? { from: oid, to: otherId, type: link.relationship_type }
-        : { from: otherId, to: oid, type: link.relationship_type }, isOutgoing, link))
+        : { from: otherId, to: oid, type: link.relationship_type }, isOutgoing, link), pending)
       : () => undefined;
     try {
       await pending;

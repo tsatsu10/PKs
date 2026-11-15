@@ -57,13 +57,14 @@ export default function QuickCapture() {
         userId: user.id,
         row: { type: 'note', title: t, content: c, summary: null, source: null },
         onCreated: (createdId) => {
+          // The draft goes only once the row exists: a failed create must not lose what was typed.
+          clearDraft(DRAFT_KEYS.quick);
           logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title: t, type: 'note' });
           deliverWebhookEvent('object.created', { objectId: createdId, title: t, type: 'note' });
           createNotification(user.id, 'object_created', 'Quick capture', t.slice(0, 80), { type: 'knowledge_object', id: createdId });
         },
       }, queryClient);
       addToast('success', 'Captured');
-      clearDraft(DRAFT_KEYS.quick);
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to capture');

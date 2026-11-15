@@ -223,6 +223,13 @@ class Queue implements SaveQueue {
     if (isCreating(this.objectId)) {
       await whenCreated(this.objectId);
       if (this.closed) return;
+      // send() checked the connection before the wait; check again before the request goes out.
+      if (!onlineManager.isOnline()) {
+        this.queued = { ...patch, ...this.queued };
+        this.inFlight = null;
+        this.goOffline();
+        return;
+      }
     }
     try {
       const result = await supabase

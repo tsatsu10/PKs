@@ -102,7 +102,7 @@ export function useAttachments({ object, userId, setError }: Options) {
     const file = client.getQueryData<FileRow[]>(qk.object.files(oid))?.find((x) => x.id === fileId)
       ?? { id: fileId, filename: '', mime_type: null, size_bytes: null };
     const pending = setAttached(oid, file, false);
-    const withdraw = undoToast('Attachment removed', () => setAttached(oid, file, true));
+    const withdraw = undoToast('Attachment removed', () => setAttached(oid, file, true), pending);
     try {
       await pending;
     } catch (err) {

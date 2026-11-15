@@ -15,5 +15,16 @@ if (missing.length) {
     </StrictMode>,
   )
 } else {
-  import('./bootstrap.jsx').then((m) => m.start())
+  import('./bootstrap.jsx').then((m) => m.start(), () => {
+    // A stale deploy can remove the chunk: offer a reload rather than a blank page.
+    const root = document.getElementById('root')
+    const p = document.createElement('p')
+    const button = document.createElement('button')
+    p.textContent = 'PKS could not load. '
+    button.type = 'button'
+    button.textContent = 'Reload'
+    button.onclick = () => window.location.reload()
+    p.append(button)
+    root.replaceChildren(p)
+  })
 }

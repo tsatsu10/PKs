@@ -36,6 +36,9 @@ const emit = () => listeners.forEach((l) => l());
 
 /** A duplicate key on retry means an earlier attempt's insert did land. */
 const isDuplicate = (err: unknown) => (err as { code?: string } | null)?.code === '23505';
+/** For the object row only a duplicate *id* means that: a clash on another unique index (the slug) is a real failure. */
+const isDuplicateObject = (err: unknown) => isDuplicate(err)
+  && /knowledge_objects_pkey/.test(`${(err as { message?: string }).message ?? ''} ${(err as { details?: string }).details ?? ''}`);
 
 /**
  * Create an object with a client-generated id and return the id at once, so the caller can
@@ -62,7 +65,7 @@ export function createObject(input: NewObject, client: QueryClient = defaultClie
   async function run() {
     if (!objectInserted) {
       const { error } = await supabase.from('knowledge_objects').insert({ ...input.row, id, user_id: input.userId });
-      if (error && !isDuplicate(error)) throw error;
+      if (error && !isDuplicateObject(error)) throw error;
       objectInserted = true;
     }
     // Junction rows: a duplicate means an earlier attempt already added them.

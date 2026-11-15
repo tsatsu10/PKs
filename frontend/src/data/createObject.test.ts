@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { clear } from 'idb-keyval';
+import { onlineManager } from '@tanstack/react-query';
 import { createTestQueryClient } from '../test/queryTestUtils';
 import { saveHarness } from '../features/object/save/testHarness';
 
@@ -42,7 +43,8 @@ function held() {
 const ROW = { type: 'note', title: 'New', content: 'body' };
 const OK: R = { data: null, error: null };
 const DOWN: R = { data: null, error: { code: 'PGRST000', message: 'down' } };
-const DUP: R = { data: null, error: { code: '23505', message: 'duplicate key' } };
+const DUP: R = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "knowledge_objects_pkey"' } };
+const SLUG_DUP: R = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "idx_knowledge_objects_user_slug"' } };
 
 beforeEach(() => {
   sb.current!.calls.length = 0;
@@ -111,6 +113,14 @@ describe('createObject', () => {
     expect(onCreated).toHaveBeenCalledTimes(1);
   });
 
+  it('a 23505 on another unique index (the slug) is a real failure, not a landed insert', async () => {
+    const client = createTestQueryClient();
+    inserts = [SLUG_DUP];
+    const id = createObject({ userId: 'u1', row: ROW }, client);
+    const { result } = renderHook(() => useCreateState(id));
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+  });
+
   it('whenCreated resolves at once for an object that was never created here', async () => {
     await expect(whenCreated('not-pending')).resolves.toBeUndefined();
   });
@@ -156,5 +166,33 @@ describe('createObject and the save queue', () => {
     expect(log.filter((x) => x === 'update')).toHaveLength(1);
     expect(h.patch(0)).toMatchObject({ title: 'Typed early' });
     expect(queue.getState().status).not.toBe('blocked');
+  });
+
+  it('a connection lost while waiting for the insert holds the edit back as offline', async () => {
+    const client = createTestQueryClient();
+    const insert = held();
+    const id = createObject({ userId: 'u1', row: ROW }, client);
+    h.reset({ id, revision: 1 });
+    const harness = sb.current!.respond;
+    sb.current!.respond = ((call: Call) => {
+      if (isInsert(call)) return insert.promise;
+      if (call.ops.some(([m]) => m === 'update')) log.push('update');
+      return harness(call as never);
+    }) as never;
+    const { queue } = await openSaveQueue({ objectId: id, userId: 'u1', isOwner: true, baseRevision: 1, client });
+    queue.change({ title: 'Typed early' });
+    const flushing = queue.flush();
+    await new Promise((r) => setTimeout(r, 20));
+    onlineManager.setOnline(false);
+    try {
+      insert.resolve(OK);
+      await flushing;
+      expect(log).not.toContain('update');
+      expect(queue.getState().status).toBe('offline');
+      expect(queue.pending()).toMatchObject({ title: 'Typed early' });
+    } finally {
+      onlineManager.setOnline(true);
+    }
+    await vi.waitFor(() => expect(log.filter((x) => x === 'update')).toHaveLength(1));
   });
 });
