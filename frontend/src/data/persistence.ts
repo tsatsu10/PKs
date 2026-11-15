@@ -49,7 +49,16 @@ export async function startPersisting(userId: string, client: QueryClient = defa
   });
   session.unsubscribe = unsubscribe;
   active = session;
+  const restoreStarted = Date.now();
   await restored.catch(() => undefined);
+  if (!session.enabled) return;
+  // The cache is written at most once a second, so a restored entry can predate the last change
+  // made before a reload (a save, an added link) while its timestamp still looks fresh. Show it,
+  // but never trust it: mark everything restored stale, and refetch what is on screen already.
+  await client.invalidateQueries({
+    predicate: (q) => q.state.dataUpdatedAt > 0 && q.state.dataUpdatedAt < restoreStarted,
+    refetchType: 'active',
+  }).catch(() => undefined);
 }
 
 export function stopPersisting(): void {

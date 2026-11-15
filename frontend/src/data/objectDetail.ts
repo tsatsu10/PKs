@@ -50,10 +50,6 @@ export const objectDetailQuery = (id: string) => queryOptions({
   // The editor seeds from this data; never swap it underneath a user (part 2 adds "changed elsewhere").
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
-  // But always check on open: a restored cache can hold a pre-save row that still counts as fresh
-  // (the persister writes at most once a second). The cached copy still shows at once, and the
-  // save queue re-seeds the page when the fresh row is newer and nothing is typed yet.
-  refetchOnMount: 'always',
 });
 
 async function fetchLinks(id: string) {
