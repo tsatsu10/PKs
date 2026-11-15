@@ -80,6 +80,7 @@ export default function Login() {
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? '',
         timezone: profile?.timezone ?? browserTimeZone(),
+        storedTimezone: profile?.timezone ?? null,
         createdAt: profile?.created_at ?? data.user.created_at,
       });
       if (!loggedIn) throw new Error('Sign-in did not create a session. Please try again.');

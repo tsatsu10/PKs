@@ -55,6 +55,7 @@ export default function Register() {
         email: data.user.email ?? profile?.email ?? email.trim(),
         displayName: profile?.display_name ?? displayName.trim() ?? '',
         timezone: profile?.timezone ?? browserTimeZone(),
+        storedTimezone: profile?.timezone ?? null,
         createdAt: profile?.created_at ?? data.user.created_at,
       });
       if (!loggedIn) {
