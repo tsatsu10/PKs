@@ -32,6 +32,33 @@ async function goOffline(page: Page) {
   await expect(page.getByText("You're offline.")).toBeVisible();
 }
 
+/**
+ * Diagnostics for a one-off failure (CI run 43770410105): the offline close-tab test once found the
+ * edit on the server. Log connection events, pagehide and every write the page starts, so a repeat
+ * shows whether the app thought it was online at close or a blocked request got through anyway.
+ * Returns the lines collected so far; they also land in the trace as console messages.
+ */
+async function recordConnectionEvents(context: BrowserContext): Promise<string[]> {
+  const lines: string[] = [];
+  context.on('console', (msg) => { if (msg.text().startsWith('[e2e]')) lines.push(msg.text()); });
+  await context.addInitScript(() => {
+    const t0 = performance.now();
+    const log = (m: string) => console.log(`[e2e] +${Math.round(performance.now() - t0)}ms ${m} onLine=${navigator.onLine}`);
+    for (const ev of ['online', 'offline', 'pagehide']) addEventListener(ev, () => log(ev));
+    document.addEventListener('visibilitychange', () => log(`visibility=${document.visibilityState}`));
+    const base = window.fetch;
+    window.fetch = (input, init) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD') {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        log(`fetch ${method} ${new URL(url, location.href).pathname} keepalive=${Boolean(init?.keepalive)}`);
+      }
+      return base(input, init);
+    };
+  });
+  return lines;
+}
+
 async function reopen(context: BrowserContext, objectId: string) {
   const page = await context.newPage();
   await openObject(page, objectId);
@@ -60,6 +87,7 @@ test('edit, close the tab within 1 s, reopen: the content is there (online)', as
 test('edit offline, close the tab within 1 s, reconnect, reopen: the content is there', async ({ context }) => {
   const { id } = await createObject('E2E close offline');
   const text = marker('offline');
+  const events = await recordConnectionEvents(context);
 
   const page = await context.newPage();
   await openObject(page, id);
@@ -67,7 +95,7 @@ test('edit offline, close the tab within 1 s, reconnect, reopen: the content is 
   await typeThenCloseTab(page, text);
 
   // Nothing could have been sent.
-  expect(await serverContentText(id)).not.toContain(text);
+  expect(await serverContentText(id), `page events:\n${events.join('\n')}`).not.toContain(text);
 
   await context.setOffline(false);
   const again = await reopen(context, id);
