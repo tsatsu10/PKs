@@ -123,6 +123,10 @@ jobs:
           VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - run: npm run test:e2e
         working-directory: frontend
+      # Closing a tab races the browser tearing the page down; one pass can get lucky.
+      - name: Stress the close-the-tab tests
+        run: npx playwright test autosave-close --repeat-each=5
+        working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

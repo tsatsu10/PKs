@@ -9,12 +9,14 @@ import { classifyError, getErrorMessage } from '../../../lib/errors';
 import { reportError } from '../../../lib/reportError';
 import { slugForTitle } from '../../../lib/objectForm';
 import { registerUserDataHooks } from '../../../lib/userStorage';
+import { withKeepalive } from '../../../lib/keepalive';
 import { queryClient as defaultClient } from '../../../data/queryClient';
 import { qk } from '../../../data/keys';
 import { OBJECT_COLS, fetchObjectRow, fetchSaveCheck, invalidateObjectVersions, objectDetailQuery } from '../../../data/objectDetail';
 import { invalidateObjectLists, setObjectInLists } from '../../../data/objects';
 import {
-  readLocalCopy, writeLocalCopy, writeLocalCopyNow, deleteLocalCopy, deleteLocalCopies, deleteOtherUsersLocalCopies,
+  readLocalCopy, writeLocalCopy, writeLocalCopyNow, writeLocalCopySync, deleteLocalCopy, deleteLocalCopies,
+  deleteOtherUsersLocalCopies,
 } from './localCopy';
 
 export type SaveFields = Partial<{
@@ -420,10 +422,16 @@ class Queue implements SaveQueue {
     return () => { this.reloadListeners.delete(listener); };
   };
 
+  /**
+   * The tab may be closing: nothing awaited here is sure to finish. Keep the edit synchronously,
+   * then send it with keepalive so the request outlives the page.
+   */
   private onHide = () => {
     if (this.closed || !this.hasUnsent()) return;
-    void writeLocalCopyNow(this.userId, this.objectId, { fields: this.pending(), baseRevision: this.base });
-    void this.flush();
+    const copy = { fields: this.pending(), baseRevision: this.base };
+    writeLocalCopySync(this.userId, this.objectId, copy);
+    void writeLocalCopyNow(this.userId, this.objectId, copy);
+    void withKeepalive(() => this.flush());
   };
 
   private onVisibility = () => {

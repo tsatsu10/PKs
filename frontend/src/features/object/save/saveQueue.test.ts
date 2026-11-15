@@ -14,6 +14,7 @@ import { openSaveQueue, disposeAllSaveQueues, connectSaveQueuesToSession } from 
 import { readLocalCopy, writeLocalCopyNow } from './localCopy';
 import { clearUserData, claimUserData } from '../../../lib/userStorage';
 import { qk } from '../../../data/keys';
+import { keepaliveActive } from '../../../lib/keepalive';
 
 const h = saveHarness(() => sb.current!);
 let n = 0;
@@ -24,6 +25,7 @@ const open = (over: Partial<Parameters<typeof openSaveQueue>[0]> = {}) =>
 beforeAll(() => { connectSaveQueuesToSession(); });
 beforeEach(async () => {
   await clear();
+  localStorage.clear();
   n += 1;
   id = `0000000${n}-aaaa-bbbb-cccc-000000000000`;
   h.reset({ id, revision: 3 });
@@ -137,6 +139,25 @@ describe('saveQueue: leaving', () => {
     await vi.advanceTimersByTimeAsync(100);
     window.dispatchEvent(new Event('pagehide'));
     expect(h.updates()).toHaveLength(1);
+  });
+
+  it('pagehide keeps the edit synchronously, before any await (the tab may be gone after)', async () => {
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    queue.change({ title: 'AB' });
+    window.dispatchEvent(new Event('pagehide'));
+    const key = Object.keys(localStorage).find((k) => k.endsWith(`:u1:${id}`));
+    expect(key).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(key!)!)).toMatchObject({ fields: { title: 'AB' } });
+  });
+
+  it('pagehide sends with keepalive, so the request outlives the tab', async () => {
+    const { queue } = await open();
+    queue.change({ title: 'A' });
+    window.dispatchEvent(new Event('pagehide'));
+    expect(keepaliveActive()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(keepaliveActive()).toBe(false);
   });
 
   it('leaving within the debounce window still saves (flush, then dispose)', async () => {

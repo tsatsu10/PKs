@@ -36,9 +36,11 @@ test('edit, close the tab within 1 s, reopen: the content is there (online)', as
   await openObject(page, id);
   await typeThenCloseTab(page, text);
 
+  // The save sent as the tab closed (keepalive) arrives without the tab ever being reopened.
+  await expect.poll(() => serverContentText(id), { timeout: 5_000 }).toContain(text);
+
   const again = await reopen(context, id);
   await expect(editorSurface(again)).toContainText(text);
-  await expect.poll(() => serverContentText(id), { timeout: SERVER_TIMEOUT_MS }).toContain(text);
 
   // And a cold load (nothing pending any more) shows it from the server.
   await again.reload();
