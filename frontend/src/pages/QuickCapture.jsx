@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { logAudit } from '../lib/audit';
 import { deliverWebhookEvent } from '../lib/webhooks';
 import { createNotification } from '../lib/notifications';
 import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
-import { invalidateObjectLists } from '../data/objects';
+import { createObject } from '../data/createObject';
+import { useQueryClient } from '@tanstack/react-query';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../context/ToastContext';
 import BlockNoteEditor from '../components/BlockNoteEditor';
@@ -17,6 +17,7 @@ import './ObjectForm.css';
 export default function QuickCapture() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,26 +53,17 @@ export default function QuickCapture() {
     }
     setSaving(true);
     try {
-      const { data, error: err } = await supabase
-        .from('knowledge_objects')
-        .insert({
-          user_id: user.id,
-          type: 'note',
-          title: t,
-          content: c,
-          summary: null,
-          source: null,
-        })
-        .select('id')
-        .single();
-      if (err) throw err;
-      const objectId = data.id;
-      logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, objectId, { title: t, type: 'note' });
-      deliverWebhookEvent('object.created', { objectId, title: t, type: 'note' });
-      createNotification(user.id, 'object_created', 'Quick capture', t.slice(0, 80), { type: 'knowledge_object', id: objectId });
+      const objectId = createObject({
+        userId: user.id,
+        row: { type: 'note', title: t, content: c, summary: null, source: null },
+        onCreated: (createdId) => {
+          logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title: t, type: 'note' });
+          deliverWebhookEvent('object.created', { objectId: createdId, title: t, type: 'note' });
+          createNotification(user.id, 'object_created', 'Quick capture', t.slice(0, 80), { type: 'knowledge_object', id: createdId });
+        },
+      }, queryClient);
       addToast('success', 'Captured');
       clearDraft(DRAFT_KEYS.quick);
-      await invalidateObjectLists();
       navigate(`/objects/${objectId}`, { replace: true });
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to capture');

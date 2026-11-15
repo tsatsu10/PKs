@@ -8,6 +8,7 @@ import { useToast } from '../../../context/ToastContext';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import { fetchVersionSnapshot, fetchVersionSnapshotByNumber, invalidateObject, type VersionSnapshot } from '../../../data/objectDetail';
 import { restoreFromTrash } from '../../../data/trash';
+import { createObject } from '../../../data/createObject';
 import { optimistic } from '../../../data/optimistic';
 import { useUndoToast } from './useUndoToast';
 import { setObjectInLists, invalidateObjectLists } from '../../../data/objects';
@@ -92,10 +93,10 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
       await queue?.flush();
       const src = client.getQueryData<ObjectRow>(qk.object.detail(object.id)) ?? object;
       const title = `Copy of ${src.title}`.slice(0, 500);
-      const { data: newObj, error: insErr } = await supabase
-        .from('knowledge_objects')
-        .insert({
-          user_id: userId,
+      const sourceId = object.id;
+      const newId = createObject({
+        userId,
+        row: {
           type: src.type,
           title,
           source: src.source || null,
@@ -107,24 +108,16 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
           due_at: src.due_at || null,
           remind_at: src.remind_at || null,
           cover_url: src.cover_url || null,
-        })
-        .select('id')
-        .single();
-      if (insErr) throw insErr;
-      const newId = newObj.id;
-      if (objectDomains.length) {
-        await supabase.from('knowledge_object_domains').insert(
-          objectDomains.map((d) => ({ knowledge_object_id: newId, domain_id: d.id }))
-        );
-      }
-      if (objectTags.length) {
-        await supabase.from('knowledge_object_tags').insert(
-          objectTags.map((t) => ({ knowledge_object_id: newId, tag_id: t.id }))
-        );
-      }
-      logAudit(userId, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, newId, { title, duplicated_from: object.id });
+        },
+        domainIds: objectDomains.map((d) => d.id),
+        tagIds: objectTags.map((t) => t.id),
+        domains: objectDomains,
+        tags: objectTags,
+        onCreated: (createdId) => {
+          logAudit(userId, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title, duplicated_from: sourceId });
+        },
+      }, client);
       addToast('success', 'Object duplicated');
-      await invalidateObjectLists();
       navigate(`/objects/${newId}`);
     } catch (err) {
       setError(notifyError(err, 'Duplicate failed'));

@@ -3,7 +3,7 @@ import { renderHook, render, act, screen, fireEvent, waitFor } from '@testing-li
 import { useEffect, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { hookWrapper, TEST_OBJECT, holdNext } from '../testUtils';
+import { hookWrapper, TEST_OBJECT, holdNext, deferred } from '../testUtils';
 import { createTestQueryClient } from '../../../test/queryTestUtils';
 import { ToastProvider } from '../../../context/ToastContext';
 import type { SaveQueue } from '../save/saveQueue';
@@ -20,6 +20,7 @@ vi.mock('react-router-dom', async (orig) => ({ ...(await orig<typeof import('rea
 
 import { useObjectActions } from './useObjectActions';
 import { qk } from '../../../data/keys';
+import { logAudit } from '../../../lib/audit';
 
 function setup() {
   const client = createTestQueryClient();
@@ -39,6 +40,7 @@ beforeEach(() => {
   sb.current!.calls.length = 0;
   sb.current!.respond = () => OK;
   navigate.mockReset();
+  vi.mocked(logAudit).mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -118,7 +120,6 @@ describe('useObjectActions', () => {
     }) } as unknown as SaveQueue;
     sb.current!.respond = (call) => {
       if (call.ops.some(([m]) => m === 'insert' || m === 'update')) order.push(call.ops.some(([m]) => m === 'insert') ? 'insert' : 'update');
-      if (call.ops.some(([m]) => m === 'single')) return { data: { id: 'copy' }, error: null };
       return { data: [], error: null };
     };
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -134,6 +135,32 @@ describe('useObjectActions', () => {
     order.length = 0;
     await act(() => result.current.remove());
     expect(order).toEqual(['flush', 'update']);
+  });
+
+  it('duplicate opens the copy before its insert finishes, with the domains and tags', async () => {
+    const client = createTestQueryClient();
+    client.setQueryData(qk.object.detail(TEST_OBJECT.id), TEST_OBJECT);
+    const insert = deferred<{ data: unknown; error: unknown }>();
+    sb.current!.respond = (call) => (call.table === 'knowledge_objects' && call.ops.some(([m]) => m === 'insert') ? insert.promise as never : OK);
+    const domains = [{ id: 'd1', name: 'Work' }];
+    const tags = [{ id: 't1', name: 'idea' }];
+    const { result } = renderHook(() => useObjectActions({
+      object: TEST_OBJECT, userId: 'owner', objectDomains: domains, objectTags: tags, queue: null, setError: vi.fn(),
+    }), { wrapper: hookWrapper(client) });
+    await act(() => result.current.duplicate());
+    expect(navigate).toHaveBeenCalledTimes(1);
+    const path = navigate.mock.calls[0][0] as string;
+    expect(path).toMatch(/^\/objects\/[0-9a-f-]{36}$/);
+    const id = path.split('/').pop()!;
+    expect(client.getQueryData(qk.object.detail(id))).toMatchObject({ id, title: 'Copy of First', content: 'body' });
+    expect(client.getQueryData(qk.object.domains(id))).toEqual(domains);
+    expect(client.getQueryData(qk.object.tags(id))).toEqual(tags);
+    expect(logAudit).not.toHaveBeenCalled();
+    await act(async () => { insert.resolve(OK); await Promise.resolve(); });
+    await waitFor(() => expect(logAudit).toHaveBeenCalledWith('owner', expect.anything(), expect.anything(), id, expect.objectContaining({ duplicated_from: 'o1' })));
+    const junction = (t: string) => sb.current!.calls.find((c) => c.table === t)!.ops.find(([m]) => m === 'insert')![1][0];
+    expect(junction('knowledge_object_domains')).toEqual([{ knowledge_object_id: id, domain_id: 'd1' }]);
+    expect(junction('knowledge_object_tags')).toEqual([{ knowledge_object_id: id, tag_id: 't1' }]);
   });
 
   it('restoring a version offers Undo, which puts back the snapshot taken just before', async () => {

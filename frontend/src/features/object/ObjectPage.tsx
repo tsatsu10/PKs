@@ -24,6 +24,8 @@ import ConflictBar from './ConflictBar';
 import { useSaveQueue } from './save/useSaveQueue';
 import type { SaveFields } from './save/saveQueue';
 import { adoptLegacyDraft } from './legacyDraft';
+import { useCreateState } from '../../data/createObject';
+import { getErrorMessage } from '../../lib/errors';
 import type { ObjectRow } from './types';
 import { SynthesizeCta, RunPromptPanel } from './AiPanel';
 import Taxonomy from './Taxonomy';
@@ -47,6 +49,7 @@ export default function ObjectPage() {
     suggestedLinkedObjects, myShare, panelErrors, retryPanel,
   } = page;
   const prefetch = usePrefetchObject();
+  const create = useCreateState(id);
   const isOwner = !!object && object.user_id === userId;
   const canEdit = isOwner || myShare?.role === 'editor';
 
@@ -144,6 +147,15 @@ export default function ObjectPage() {
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
       />
       {error && <div className="form-error" role="alert">{error}</div>}
+      {create.status === 'failed' && (
+        // The editor stays usable: its edits wait in the save queue until the object exists.
+        <div className="conflict-bar" role="alert">
+          <p className="conflict-bar-text">Couldn&apos;t create this object: {getErrorMessage(create.error)}</p>
+          <div className="conflict-bar-actions">
+            <button type="button" className="btn btn-primary btn-small" onClick={create.retry}>Retry</button>
+          </div>
+        </div>
+      )}
 
       {showSharePanel && isOwner && <SharePanel shares={shares} onClose={() => setShowSharePanel(false)} />}
       {exportState.show && <ExportPanel exportState={exportState} />}
