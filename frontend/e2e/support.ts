@@ -76,6 +76,23 @@ export async function serverContentText(objectId: string): Promise<string> {
   return (data.content_text as string | null) ?? '';
 }
 
+export type VersionSnapshot = { version: number; change_reason: string | null; text: string };
+
+/** The object's version history, newest first; `text` is the snapshot's content (JSON and Markdown). */
+export async function serverVersions(objectId: string): Promise<VersionSnapshot[]> {
+  const { data, error } = await adminClient()
+    .from('knowledge_object_versions')
+    .select('version, change_reason, content, content_json')
+    .eq('knowledge_object_id', objectId)
+    .order('version', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((v) => ({
+    version: v.version as number,
+    change_reason: v.change_reason as string | null,
+    text: `${v.content ?? ''}\n${JSON.stringify(v.content_json ?? null)}`,
+  }));
+}
+
 /** The BlockNote editing surface on the object page. */
 export const editorSurface = (page: Page) => page.locator('.blocknote-editor-wrapper [contenteditable="true"]').first();
 
