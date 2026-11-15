@@ -6,7 +6,7 @@ import { logAudit } from '../../../lib/audit';
 import { useNotifyError } from '../../../lib/useNotifyError';
 import { useToast } from '../../../context/ToastContext';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
-import { fetchVersionSnapshot, invalidateObject } from '../../../data/objectDetail';
+import { fetchVersionSnapshot, fetchVersionSnapshotByNumber, invalidateObject, type VersionSnapshot } from '../../../data/objectDetail';
 import { restoreFromTrash } from '../../../data/trash';
 import { optimistic } from '../../../data/optimistic';
 import { useUndoToast } from './useUndoToast';
@@ -14,6 +14,15 @@ import { setObjectInLists, invalidateObjectLists } from '../../../data/objects';
 import type { SaveQueue } from '../save/saveQueue';
 import { qk } from '../../../data/keys';
 import type { ObjectRow, Named, SetError } from '../types';
+
+const toVersionFields = (version: number, snap: VersionSnapshot) => ({
+  version,
+  title: snap.title,
+  content: snap.content ?? null,
+  content_json: snap.content_json ?? null,
+  summary: snap.summary ?? null,
+  key_points: snap.key_points ?? [],
+});
 
 type Options = {
   object: ObjectRow | null;
@@ -46,15 +55,13 @@ export function useObjectActions({ object, userId, objectDomains, objectTags, qu
     try {
       // Read the snapshot fresh so a partially-loaded version list can never restore blanks.
       const snap = await fetchVersionSnapshot(ver.id);
-      await queue.applyVersion({
-        version: ver.version,
-        title: snap.title,
-        content: snap.content ?? null,
-        content_json: snap.content_json ?? null,
-        summary: snap.summary ?? null,
-        key_points: snap.key_points ?? [],
+      const before = await queue.applyVersion(toVersionFields(ver.version, snap));
+      const oid = object.id;
+      undoToast(`Restored to v${ver.version}`, async () => {
+        const prev = await fetchVersionSnapshotByNumber(oid, before);
+        await queue.applyVersion(toVersionFields(prev.version, prev));
+        addToast('success', 'Undone');
       });
-      addToast('success', `Restored to v${ver.version}`);
     } catch (err) {
       setError(notifyError(err, 'Restore failed'));
     } finally {

@@ -26,6 +26,14 @@ export async function fetchVersionSnapshot(versionId: string): Promise<VersionSn
   return row;
 }
 
+/** One version of an object by its number (Undo of a restore names the snapshot by number). */
+export async function fetchVersionSnapshotByNumber(objectId: string, version: number): Promise<VersionSnapshot & { version: number }> {
+  const row = unwrap(await db.from('knowledge_object_versions').select('version, title, content, content_json, summary, key_points')
+    .eq('knowledge_object_id', objectId).eq('version', version).maybeSingle()) as (VersionSnapshot & { version: number }) | null;
+  if (!row) throw new Error("That version doesn't exist or was deleted.");
+  return row;
+}
+
 export type SaveCheck = {
   row: { revision: number; user_id: string; is_deleted: boolean } | null;
   shareRole: 'viewer' | 'editor' | null;

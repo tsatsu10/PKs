@@ -44,7 +44,8 @@ export interface SaveQueue {
   /** Save version: flush, then snapshot the current row. Resolves to the new version number. */
   snapshot(reason?: string): Promise<number>;
   /** Restore: flush, snapshot the current row, then save the version's fields (emits onReloaded). */
-  applyVersion(v: VersionFields): Promise<void>;
+  /** Restore `v`: resolves to the version number of the snapshot taken just before (for Undo). */
+  applyVersion(v: VersionFields): Promise<number>;
   /** The fields on the page must be re-seeded from the server row plus pending(). */
   onReloaded(listener: () => void): () => void;
   /**
@@ -397,9 +398,9 @@ class Queue implements SaveQueue {
     return this.rpcSnapshot(null, reason ?? null);
   }
 
-  async applyVersion(v: VersionFields): Promise<void> {
+  async applyVersion(v: VersionFields): Promise<number> {
     await this.flush();
-    await this.snapshot(`Before restoring v${v.version}`);
+    const before = await this.snapshot(`Before restoring v${v.version}`);
     this.change({
       title: v.title,
       content: v.content ?? '',
@@ -409,6 +410,7 @@ class Queue implements SaveQueue {
     });
     await this.flush();
     this.reloadListeners.forEach((l) => l());
+    return before;
   }
 
   adoptServerRevision = (revision: number) => {

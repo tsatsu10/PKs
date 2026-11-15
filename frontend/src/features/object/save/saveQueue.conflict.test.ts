@@ -117,6 +117,12 @@ describe('saveQueue: version actions flush unsent edits first', () => {
     expect(h.patch(1)).toMatchObject({ title: 'Old', content: 'old body', content_json: null });
   });
 
+  it('applyVersion resolves to the number of the snapshot it took first', async () => {
+    const { queue } = await openSaveQueue({ objectId: id, userId: 'u1', isOwner: true, baseRevision: 3, client });
+    await expect(queue.applyVersion({ version: 1, title: 'Old', content: 'old', content_json: null, summary: null, key_points: [] }))
+      .resolves.toBe(7);
+  });
+
   it('snapshot sends what you typed before calling the RPC', async () => {
     const { queue } = await openSaveQueue({ objectId: id, userId: 'u1', isOwner: true, baseRevision: 3, client });
     queue.change({ title: 'Typed' });

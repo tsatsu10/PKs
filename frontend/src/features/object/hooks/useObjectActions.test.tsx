@@ -135,4 +135,26 @@ describe('useObjectActions', () => {
     await act(() => result.current.remove());
     expect(order).toEqual(['flush', 'update']);
   });
+
+  it('restoring a version offers Undo, which puts back the snapshot taken just before', async () => {
+    const client = createTestQueryClient();
+    const applyVersion = vi.fn().mockResolvedValueOnce(5).mockResolvedValue(9);
+    const queue = { applyVersion } as unknown as SaveQueue;
+    sb.current!.respond = (call) => {
+      if (call.table !== 'knowledge_object_versions') return OK;
+      const v = call.ops.find(([m, a]) => m === 'eq' && a[0] === 'version')?.[1][1] ?? 2;
+      return { data: { version: v, title: `v${v}`, content: `body ${v}`, content_json: null, summary: null, key_points: [] }, error: null };
+    };
+    const { result } = renderHook(() => useObjectActions({
+      object: TEST_OBJECT, userId: 'owner', objectDomains: [], objectTags: [], queue, setError: vi.fn(),
+    }), { wrapper: hookWrapper(client) });
+    await act(() => result.current.restoreVersion({ id: 'v2id', version: 2 }));
+    expect(applyVersion).toHaveBeenLastCalledWith(expect.objectContaining({ version: 2, title: 'v2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(applyVersion).toHaveBeenCalledTimes(2));
+    expect(applyVersion).toHaveBeenLastCalledWith(expect.objectContaining({ version: 5, title: 'v5', content: 'body 5' }));
+    const read = sb.current!.calls.filter((c) => c.table === 'knowledge_object_versions').at(-1)!;
+    expect(read.ops).toContainEqual(['eq', ['knowledge_object_id', 'o1']]);
+    expect(read.ops).toContainEqual(['eq', ['version', 5]]);
+  });
 });
