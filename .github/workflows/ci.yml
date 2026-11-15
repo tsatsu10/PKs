@@ -53,7 +53,12 @@ jobs:
       # drop; studio/imgproxy/edge-runtime/logflare/vector are dev-UI/observability/edge-function
       # extras pg_prove never touches. kong/postgrest/postgres-meta/supavisor/mailpit are left
       # running (not verified safe to exclude).
-      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime
+      # The image registry sometimes rate-limits pulls ("Rate exceeded"); the CLI's own retry then
+      # trips over ports held by its first attempt. Stop cleanly and try once more.
+      - name: Start the local stack
+        run: |
+          services=studio,imgproxy,edge-runtime,logflare,vector,realtime
+          supabase start -x "$services" || { supabase stop --no-backup; sleep 30; supabase start -x "$services"; }
       - run: supabase test db
       - name: Generate types from this branch's migrations
         run: supabase gen types typescript --local --schema public > database.types.ts
@@ -87,7 +92,12 @@ jobs:
         with:
           version: 2.118.0
       # The app needs auth (gotrue), REST (kong + postgrest) and storage; nothing here uses realtime.
-      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime
+      # The image registry sometimes rate-limits pulls ("Rate exceeded"); the CLI's own retry then
+      # trips over ports held by its first attempt. Stop cleanly and try once more.
+      - name: Start the local stack
+        run: |
+          services=studio,imgproxy,edge-runtime,logflare,vector,realtime
+          supabase start -x "$services" || { supabase stop --no-backup; sleep 30; supabase start -x "$services"; }
       - name: Export the local stack's URL and keys
         run: |
           supabase status -o env | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' > stack.env
