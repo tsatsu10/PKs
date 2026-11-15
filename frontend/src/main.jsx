@@ -23,8 +23,9 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 createRoot(document.getElementById('root'), {
-  // Errors caught by the per-route ErrorBoundary (it still logs them itself).
-  onCaughtError: (error) => reportError(error),
+  // Errors caught by an ErrorBoundary are reported by the boundary itself (it shows whether
+  // the report went out), so they aren't reported here too.
+
   // Errors no boundary caught.
   onUncaughtError: (error) => {
     reportError(error)

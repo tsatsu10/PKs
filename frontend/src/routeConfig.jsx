@@ -2,7 +2,7 @@
  * Route configuration and loading fallback for the app.
  */
 import { lazy } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
@@ -11,7 +11,13 @@ const AppShell = lazy(() => import('./components/AppShell'));
 
 export const PageLoadFallback = LoadingScreen;
 
-const withErrorBoundary = (children) => <ErrorBoundary>{children}</ErrorBoundary>;
+/** A route's boundary clears its error when the path changes, so navigating away recovers. */
+function RouteErrorBoundary({ children }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
+
+const withErrorBoundary = (children) => <RouteErrorBoundary>{children}</RouteErrorBoundary>;
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ObjectNew = lazy(() => import('./pages/ObjectNew'));
