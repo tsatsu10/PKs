@@ -12,6 +12,7 @@ vi.mock('../lib/supabase', async () => {
 
 import { useObjectPage } from '../features/object/useObjectPage';
 import { fetchSaveCheck } from './objectDetail';
+import { qk } from './keys';
 
 const OBJ = { id: 'o1', user_id: 'u1', type: 'note', title: 'T', content: 'body', is_deleted: false, revision: 1 };
 
@@ -42,6 +43,18 @@ describe('useObjectPage', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.object).toBeNull();
     expect(result.current.error).toMatch(/doesn't exist|deleted/i);
+  });
+
+  it('opening the page refetches the object even when the cached copy is fresh', async () => {
+    // The persisted cache can hold a pre-save row that still counts as fresh (it is written at
+    // most once a second): a reload right after a save must not trust it.
+    respondAll();
+    const client = createTestQueryClient();
+    client.setQueryData(qk.object.detail('o1'), { ...OBJ, content: 'stale' });
+    client.setDefaultOptions({ queries: { ...client.getDefaultOptions().queries, staleTime: 60_000 } });
+    const { result } = renderHook(() => useObjectPage({ id: 'o1', userId: 'u1' }), { wrapper: wrapperFor(client) });
+    expect(result.current.object?.content).toBe('stale');
+    await waitFor(() => expect(result.current.object?.content).toBe('body'));
   });
 
   it('window focus and reconnect do not refetch the object (editor safety)', async () => {
