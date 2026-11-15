@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
 import { formatObjectTypeLabel } from '../../../../constants';
@@ -12,7 +13,7 @@ import './LinkedBar.css';
 /**
  * Single Stream view row (timeline style).
  */
-export default function TimelineRow({
+function TimelineRow({
   obj,
   to,
   selected,
@@ -62,3 +63,5 @@ export default function TimelineRow({
     </div>
   );
 }
+
+export default memo(TimelineRow);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { formatObjectTypeLabel } from '../constants';
 import TypeMark from './TypeMark';
@@ -40,8 +41,9 @@ function formatDueLabel(dueAt) {
 
 /**
  * Knowledge object card for dashboard grid view.
+ * Memoised: give it only stable props (strings, booleans, stable callbacks).
  */
-export default function DashboardObjectCard({
+function DashboardObjectCard({
   obj,
   to,
   selected,
@@ -145,3 +147,5 @@ export default function DashboardObjectCard({
     </article>
   );
 }
+
+export default memo(DashboardObjectCard);
