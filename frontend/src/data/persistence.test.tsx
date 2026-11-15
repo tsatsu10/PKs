@@ -93,6 +93,28 @@ describe('cache lifecycle', () => {
     expect(queryFn).not.toHaveBeenCalled();
   });
 
+  it('shows a restored entry at once but refetches it, however fresh it looks', async () => {
+    // The cache is written at most once a second, so after a quick reload the restored entry can
+    // predate the last change (a save, an added link) while its timestamp still looks fresh.
+    const first = createTestQueryClient();
+    await startPersisting('A', first);
+    first.setQueryData(['object', '1', 'links'], { title: 'Before the change' });
+    await flushPersist();
+    stopPersisting();
+
+    const second = createTestQueryClient();
+    await startPersisting('A', second);
+    const queryFn = vi.fn(() => Promise.resolve({ title: 'From the server' }));
+    function Probe() {
+      const { data } = useQuery({ queryKey: ['object', '1', 'links'], queryFn, staleTime: 60_000 });
+      return <p>{(data as { title?: string } | undefined)?.title ?? 'empty'}</p>;
+    }
+    renderWithClient(<Probe />, second);
+    expect(screen.getByText('Before the change')).toBeInTheDocument();
+    expect(await screen.findByText('From the server')).toBeInTheDocument();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores a cache written by another schema version', async () => {
     await set(cacheKey('A'), JSON.stringify({ buster: 'old', timestamp: Date.now(), clientState: { queries: [], mutations: [] } }));
     const client = createTestQueryClient();

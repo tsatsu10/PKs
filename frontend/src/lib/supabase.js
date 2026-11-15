@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { keepaliveFetch } from './keepalive';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,6 +19,8 @@ export const supabase =
   globalThis[GLOBAL_KEY] ??
   (globalThis[GLOBAL_KEY] = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { lock: noOpLock },
+    // The save sent as the tab closes must outlive the page (see lib/keepalive).
+    global: { fetch: keepaliveFetch((input, init) => fetch(input, init)) },
   }));
 
 // Password recovery: /reset-password may only change the password when this tab arrived via a
