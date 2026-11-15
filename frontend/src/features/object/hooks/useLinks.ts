@@ -24,27 +24,35 @@ export function useLinks({ object, userId, otherObjects, setError }: Options) {
   const client = useQueryClient();
   const notifyError = useNotifyError();
   const undoToast = useUndoToast();
-  const [query, setQuery] = useState('');
+  const [query, setQueryState] = useState('');
   const [results, setResults] = useState<LinkTarget[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const objectId = object?.id;
+  const active = !!query.trim() && !!userId && !!objectId;
+
+  // Clearing the query drops old results so they never flash when a new search starts.
+  function setQuery(q: string) {
+    setQueryState(q);
+    if (!q.trim()) setResults([]);
+  }
 
   useEffect(() => {
-    if (!query.trim() || !userId || !objectId) {
-      setResults([]);
-      return;
-    }
+    if (!active) return;
+    let stale = false;
     const t = setTimeout(async () => {
+      let found: LinkTarget[] = [];
       try {
         // link_edges INSERT (RLS) needs the target to be the user's own object, for owners and shared editors alike (B13).
-        setResults((await searchLinkTargets(query.trim())).filter((o) => o.id !== objectId && o.user_id === userId));
+        found = (await searchLinkTargets(query.trim())).filter((o) => o.id !== objectId && o.user_id === userId);
       } catch {
-        setResults([]);
+        found = [];
       }
+      // Ignore a response that lands after the query, user or object changed.
+      if (!stale) setResults(found);
     }, 300);
-    return () => clearTimeout(t);
-  }, [query, userId, objectId]);
+    return () => { stale = true; clearTimeout(t); };
+  }, [active, query, userId, objectId]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -140,5 +148,5 @@ export function useLinks({ object, userId, otherObjects, setError }: Options) {
     }
   }
 
-  return { addLink, removeLink, search: { query, setQuery, results, open, setOpen, containerRef } };
+  return { addLink, removeLink, search: { query, setQuery, results: active ? results : [], open, setOpen, containerRef } };
 }
