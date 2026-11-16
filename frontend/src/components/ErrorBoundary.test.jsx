@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 const rep = vi.hoisted(() => ({ reportError: vi.fn(() => true) }));
 vi.mock('../lib/reportError', () => rep);
 
-import ErrorBoundary, { isChunkLoadError } from './ErrorBoundary';
+import ErrorBoundary, { isChunkLoadError, chunkReloadDecision } from './ErrorBoundary';
 
 const FLAG = 'pks-chunk-reload';
 let boom = null;
@@ -55,13 +55,13 @@ describe('ErrorBoundary', () => {
     boom = chunkErr();
     render(<ErrorBoundary reload={reload}><Child /></ErrorBoundary>);
     expect(reload).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.getItem(FLAG)).toBe('100000');
+    expect(JSON.parse(sessionStorage.getItem(FLAG))).toEqual({ at: 100_000, count: 1 });
   });
 
   it('a stale chunk right after a reload offers Reload instead of looping', () => {
     const reload = vi.fn();
     vi.spyOn(Date, 'now').mockReturnValue(100_000);
-    sessionStorage.setItem(FLAG, String(98_000));
+    sessionStorage.setItem(FLAG, JSON.stringify({ at: 98_000, count: 1 }));
     boom = chunkErr();
     render(<ErrorBoundary reload={reload}><Child /></ErrorBoundary>);
     expect(reload).not.toHaveBeenCalled();
@@ -74,10 +74,47 @@ describe('ErrorBoundary', () => {
   it('a reload flag older than 10 s reloads again', () => {
     const reload = vi.fn();
     vi.spyOn(Date, 'now').mockReturnValue(100_000);
-    sessionStorage.setItem(FLAG, String(89_000));
+    sessionStorage.setItem(FLAG, JSON.stringify({ at: 89_000, count: 1 }));
     boom = chunkErr();
     render(<ErrorBoundary reload={reload}><Child /></ErrorBoundary>);
     expect(reload).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem(FLAG))).toEqual({ at: 100_000, count: 2 });
+  });
+
+  it('stops reloading after two automatic reloads, even when each took longer than 10 s', () => {
+    const reload = vi.fn();
+    vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    sessionStorage.setItem(FLAG, JSON.stringify({ at: 60_000, count: 2 }));
+    boom = chunkErr();
+    render(<ErrorBoundary reload={reload}><Child /></ErrorBoundary>);
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByText('A new version of PKS is available.')).toBeInTheDocument();
+  });
+
+  it('reads the old time-only flag as one reload', () => {
+    const reload = vi.fn();
+    vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    sessionStorage.setItem(FLAG, String(98_000));
+    boom = chunkErr();
+    render(<ErrorBoundary reload={reload}><Child /></ErrorBoundary>);
+    expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('chunkReloadDecision', () => {
+  const MIN = 60_000;
+  it('allows the first reload and counts it', () => {
+    expect(chunkReloadDecision({ at: 0, count: 0 }, 5 * MIN)).toEqual({ reload: true, next: { at: 5 * MIN, count: 1 } });
+  });
+  it('refuses within 10 s of the last reload', () => {
+    expect(chunkReloadDecision({ at: 100_000, count: 1 }, 110_000).reload).toBe(false);
+  });
+  it('allows a second reload after 10 s but not a third', () => {
+    expect(chunkReloadDecision({ at: 100_000, count: 1 }, 110_001)).toEqual({ reload: true, next: { at: 110_001, count: 2 } });
+    expect(chunkReloadDecision({ at: 100_000, count: 2 }, 100_000 + 4 * MIN).reload).toBe(false);
+  });
+  it('resets the count once the last reload is over 5 minutes old (a later deploy)', () => {
+    expect(chunkReloadDecision({ at: 100_000, count: 2 }, 100_001 + 5 * MIN)).toEqual({ reload: true, next: { at: 100_001 + 5 * MIN, count: 1 } });
   });
 });
 

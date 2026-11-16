@@ -2,7 +2,11 @@ import { Component } from 'react';
 import { reportError } from '../lib/reportError';
 
 const CHUNK_FLAG = 'pks-chunk-reload';
-const CHUNK_RELOAD_WINDOW_MS = 10_000;
+/** No automatic reload within 10 s of the last one. */
+const CHUNK_RELOAD_GAP_MS = 10_000;
+/** At most this many automatic reloads per window, so a slow reload loop still stops. */
+const CHUNK_MAX_RELOADS = 2;
+const CHUNK_COUNT_WINDOW_MS = 5 * 60_000;
 const CHUNK_MESSAGE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
 
 /** A lazy page's file is gone (usually a deploy replaced it while this tab was open). */
@@ -11,40 +15,59 @@ export function isChunkLoadError(err) {
   return err.name === 'ChunkLoadError' || (typeof err.message === 'string' && CHUNK_MESSAGE.test(err.message));
 }
 
+/** The last automatic reload: when, and how many there have been in the current window. */
 function readFlag() {
-  try { return Number(sessionStorage.getItem(CHUNK_FLAG)) || 0; } catch { return 0; }
+  let raw = null;
+  try { raw = sessionStorage.getItem(CHUNK_FLAG); } catch { /* storage blocked */ }
+  if (!raw) return { at: 0, count: 0 };
+  try {
+    const v = JSON.parse(raw);
+    if (typeof v === 'number') return { at: v, count: 1 }; // the old time-only flag
+    if (v && Number.isFinite(v.at) && Number.isFinite(v.count)) return { at: v.at, count: v.count };
+  } catch { /* unreadable: treat as absent */ }
+  return { at: 0, count: 0 };
 }
 function writeFlag(value) {
   try {
     if (value === null) sessionStorage.removeItem(CHUNK_FLAG);
-    else sessionStorage.setItem(CHUNK_FLAG, String(value));
+    else sessionStorage.setItem(CHUNK_FLAG, JSON.stringify(value));
   } catch { /* storage blocked: the Reload button still works */ }
 }
 
-const INITIAL = { hasError: false, error: null, recorded: false, chunk: null };
+/** Whether a stale chunk may reload automatically now, and the flag to store if it does. */
+export function chunkReloadDecision(flag, now) {
+  const count = now - flag.at > CHUNK_COUNT_WINDOW_MS ? 0 : flag.count;
+  const ok = count < CHUNK_MAX_RELOADS && (!flag.at || now - flag.at > CHUNK_RELOAD_GAP_MS);
+  return ok ? { reload: true, next: { at: now, count: count + 1 } } : { reload: false, next: null };
+}
+
+const INITIAL = { hasError: false, error: null, recorded: false, chunk: null, chunkFlag: null };
 
 /**
  * Catches React render errors in the tree and shows a fallback UI, so one broken page doesn't
  * unmount the app. A new `resetKey` (the route) clears the error. A stale lazy chunk reloads
- * the page once; if that happened in the last 10 s, it offers a Reload button instead of looping.
+ * the page; if one did in the last 10 s, or twice in 5 minutes, it offers a Reload button instead
+ * of looping.
  */
 export default class ErrorBoundary extends Component {
   state = INITIAL;
 
   static getDerivedStateFromError(error) {
     let chunk = null;
+    let chunkFlag = null;
     if (isChunkLoadError(error)) {
-      const last = readFlag();
-      chunk = !last || Date.now() - last > CHUNK_RELOAD_WINDOW_MS ? 'reload' : 'stale';
+      const d = chunkReloadDecision(readFlag(), Date.now());
+      chunk = d.reload ? 'reload' : 'stale';
+      chunkFlag = d.next;
     }
-    return { hasError: true, error, chunk };
+    return { hasError: true, error, chunk, chunkFlag };
   }
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     const recorded = reportError(error);
     if (this.state.chunk === 'reload') {
-      writeFlag(Date.now());
+      writeFlag(this.state.chunkFlag);
       this.reload();
     }
     this.setState({ recorded });

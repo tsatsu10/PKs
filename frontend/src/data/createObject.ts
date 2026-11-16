@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { qk } from './keys';
 import { queryClient as defaultClient } from './queryClient';
 import { invalidateObjectLists } from './objects';
+import { uuid } from '../lib/uuid';
 
 type Named = { id: string; name: string };
 
@@ -47,7 +48,7 @@ const isDuplicateObject = (err: unknown) => isDuplicate(err)
  * Offline creation is out of scope (Phase 6): a failed insert is not queued.
  */
 export function createObject(input: NewObject, client: QueryClient = defaultClient): string {
-  const id = crypto.randomUUID();
+  const id = uuid();
   const now = new Date().toISOString();
   client.setQueryData(qk.object.detail(id), {
     id, user_id: input.userId, is_deleted: false, revision: 1, is_pinned: false, current_version: null,

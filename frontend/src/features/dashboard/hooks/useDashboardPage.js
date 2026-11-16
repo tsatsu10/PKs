@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../lib/supabase';
 import { logAudit } from '../../../lib/audit';
 import { deliverWebhookEvent } from '../../../lib/webhooks';
 import { useToast } from '../../../context/ToastContext';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../../../constants';
 import { getErrorMessage } from '../../../lib/errors';
 import { useDashboardSearch, createEmptyFiltersOverride } from '../../../hooks/useDashboardSearch';
-import { invalidateObjectLists } from '../../../data/objects';
+import { createObject } from '../../../data/createObject';
 import { useDashboardStats } from '../../../data/dashboard';
 import { useTrailheads } from './useTrailheads';
 import { useDashboardBulkActions } from './useDashboardBulkActions';
@@ -367,28 +366,20 @@ export function useDashboardPage() {
     }
     setQuickAddSaving(true);
     try {
-      const { data, error: err } = await supabase
-        .from('knowledge_objects')
-        .insert({
-          user_id: user.id,
-          type: 'note',
-          title: t,
-          content: c,
-          summary: null,
-          source: null,
-        })
-        .select('id')
-        .single();
-      if (err) throw err;
-      logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, data.id, { title: t, type: 'note' });
-      deliverWebhookEvent('object.created', { objectId: data.id, title: t, type: 'note' });
+      // Same path as Quick capture: client id, navigate at once; a failed insert shows Retry on the object page.
+      const objectId = createObject({
+        userId: user.id,
+        row: { type: 'note', title: t, content: c, summary: null, source: null },
+        onCreated: (createdId) => {
+          logAudit(user.id, AUDIT_ACTIONS.OBJECT_CREATE, AUDIT_ENTITY_TYPES.KNOWLEDGE_OBJECT, createdId, { title: t, type: 'note' });
+          deliverWebhookEvent('object.created', { objectId: createdId, title: t, type: 'note' });
+        },
+      });
       addToast('success', 'Created');
       setShowQuickAdd(false);
       setQuickAddTitle('');
       setQuickAddContent('');
-      await invalidateObjectLists();
-      runSearch(0);
-      navigate(`/objects/${data.id}`);
+      navigate(`/objects/${objectId}`);
     } catch (err) {
       const msg = getErrorMessage(err, 'Failed to create');
       addToast('error', msg);
