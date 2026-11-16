@@ -43,7 +43,14 @@ async function recordConnectionEvents(context: BrowserContext): Promise<string[]
   context.on('console', (msg) => { if (msg.text().startsWith('[e2e]')) lines.push(msg.text()); });
   await context.addInitScript(() => {
     const t0 = performance.now();
-    const log = (m: string) => console.log(`[e2e] +${Math.round(performance.now() - t0)}ms ${m} onLine=${navigator.onLine}`);
+    const log = (m: string) => {
+      const line = `[e2e] +${Math.round(performance.now() - t0)}ms ${m} onLine=${navigator.onLine}`;
+      console.log(line);
+      // Also kept synchronously in localStorage: console messages stop once Playwright detaches
+      // from a closing page, localStorage outlives it.
+      try { localStorage.setItem('e2e-log', `${localStorage.getItem('e2e-log') ?? ''}${Date.now()} ${location.pathname} ${line}
+`); } catch { /* opaque origin */ }
+    };
     for (const ev of ['online', 'offline', 'pagehide']) addEventListener(ev, () => log(ev));
     document.addEventListener('visibilitychange', () => log(`visibility=${document.visibilityState}`));
     const base = window.fetch;
@@ -98,6 +105,10 @@ test('edit offline, close the tab within 1 s, reconnect, reopen: the content is 
 
   // Nothing could have been sent.
   const serverText = await serverContentText(id);
+  const stored = (await context.storageState()).origins
+    .flatMap((o) => o.localStorage).find((e) => e.name === 'e2e-log')?.value ?? '(none)';
+  console.log(`[netlog-debug] ${id} leaked=${serverText.includes(text)}
+${stored}`);
   if (serverText.includes(text)) {
     const { data: row } = await adminClient().from('knowledge_objects')
       .select('revision, updated_at, current_version').eq('id', id).single();
