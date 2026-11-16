@@ -24,8 +24,8 @@ async function typeThenCloseTab(page: Page, text: string) {
 
 /**
  * Cut the network and wait until the app has noticed (its offline banner). Otherwise a tab closed
- * within a few hundred ms still thinks it is online and sends with keepalive, and Playwright's
- * offline emulation does not hold back a keepalive request that outlives its page.
+ * within a few hundred ms still thinks it is online and sends with keepalive, and a request that
+ * outlives its page escapes Playwright's offline emulation (see `reconnectedDuringClose`).
  */
 async function goOffline(page: Page) {
   await page.context().setOffline(true);
@@ -33,30 +33,46 @@ async function goOffline(page: Page) {
 }
 
 /**
- * Diagnostics for a one-off failure (CI run 43770410105): the offline close-tab test once found the
- * edit on the server. Log connection events, pagehide and every write the page starts, so a repeat
- * shows whether the app thought it was online at close or a blocked request got through anyway.
- * Returns the lines collected so far; they also land in the trace as console messages.
+ * Record connection events, pagehide and every write the page starts. The log is kept in
+ * localStorage, synchronously: console messages stop once Playwright detaches from a closing page,
+ * and that is exactly the moment that matters (see `reconnectedDuringClose`).
  */
-async function recordConnectionEvents(context: BrowserContext): Promise<string[]> {
-  const lines: string[] = [];
-  context.on('console', (msg) => { if (msg.text().startsWith('[e2e]')) lines.push(msg.text()); });
+async function recordConnectionEvents(context: BrowserContext) {
   await context.addInitScript(() => {
-    const t0 = performance.now();
-    const log = (m: string) => console.log(`[e2e] +${Math.round(performance.now() - t0)}ms ${m} onLine=${navigator.onLine}`);
+    const log = (m: string) => {
+      try {
+        localStorage.setItem('e2e-events', `${localStorage.getItem('e2e-events') ?? ''}${m} onLine=${navigator.onLine}\n`);
+      } catch { /* opaque origin */ }
+    };
     for (const ev of ['online', 'offline', 'pagehide']) addEventListener(ev, () => log(ev));
-    document.addEventListener('visibilitychange', () => log(`visibility=${document.visibilityState}`));
     const base = window.fetch;
     window.fetch = (input, init) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method !== 'GET' && method !== 'HEAD') {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        log(`fetch ${method} ${new URL(url, location.href).pathname} keepalive=${Boolean(init?.keepalive)}`);
+        log(`fetch ${method} ${new URL(url, location.href).pathname}`);
       }
       return base(input, init);
     };
   });
-  return lines;
+}
+
+async function recordedEvents(context: BrowserContext): Promise<string[]> {
+  const entry = (await context.storageState()).origins
+    .flatMap((o) => o.localStorage).find((e) => e.name === 'e2e-events');
+  return (entry?.value ?? '').split('\n').filter(Boolean);
+}
+
+/**
+ * Playwright lifts a page's network emulation (setOffline, and the user agent) when it detaches
+ * from the page during close, while the page can still run. The page then gets a real `online`
+ * event, and the save queue rightly sends. (CI runs 43770410105, 43779922026, 43783271491; in a
+ * 46-run diagnosis `online` fired after pagehide in 37, and once the PATCH reached the server
+ * before the renderer died.) That is the harness reconnecting, not the app saving while offline.
+ */
+function reconnectedDuringClose(events: string[]): boolean {
+  const hide = events.findIndex((e) => e.startsWith('pagehide') && e.endsWith('onLine=false'));
+  return hide >= 0 && events.slice(hide).some((e) => e.startsWith('online'));
 }
 
 async function reopen(context: BrowserContext, objectId: string) {
@@ -87,15 +103,23 @@ test('edit, close the tab within 1 s, reopen: the content is there (online)', as
 test('edit offline, close the tab within 1 s, reconnect, reopen: the content is there', async ({ context }) => {
   const { id } = await createObject('E2E close offline');
   const text = marker('offline');
-  const events = await recordConnectionEvents(context);
+  await recordConnectionEvents(context);
 
   const page = await context.newPage();
   await openObject(page, id);
   await goOffline(page);
   await typeThenCloseTab(page, text);
 
-  // Nothing could have been sent.
-  expect(await serverContentText(id), `page events:\n${events.join('\n')}`).not.toContain(text);
+  // Nothing could have been sent while the browser was offline. If the edit is on the server
+  // anyway, it must be because the harness went back online during close; otherwise it's a bug.
+  if ((await serverContentText(id)).includes(text)) {
+    const events = await recordedEvents(context);
+    expect(reconnectedDuringClose(events), `saved while offline; page events:\n${events.join('\n')}`).toBe(true);
+    test.info().annotations.push({
+      type: 'note',
+      description: 'The browser went online during close and the edit was sent then; the reopen-and-resend path was not exercised this run.',
+    });
+  }
 
   await context.setOffline(false);
   const again = await reopen(context, id);
