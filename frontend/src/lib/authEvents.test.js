@@ -124,6 +124,7 @@ describe('isSameUser', () => {
     expect(isSameUser(base, { ...base, email: 'x@y.z' })).toBe(false);
     expect(isSameUser(base, { ...base, displayName: 'B' })).toBe(false);
     expect(isSameUser(base, { ...base, timezone: 'Africa/Accra' })).toBe(false);
+    expect(isSameUser(base, { ...base, storedTimezone: null })).toBe(false);
     expect(isSameUser(base, { ...base, createdAt: '2026-02-02' })).toBe(false);
   });
 

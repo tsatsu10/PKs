@@ -112,8 +112,8 @@ export function shouldIgnoreWhileLoggingOut(event, loggingOut) {
 /**
  * Whether two mapped users carry the same data, so a re-verify that found
  * nothing new can keep the existing object (and not reset forms keyed on it).
- * @param {{ id?: string, email?: string, displayName?: string, timezone?: string, createdAt?: string } | null} a
- * @param {{ id?: string, email?: string, displayName?: string, timezone?: string, createdAt?: string } | null} b
+ * @param {{ id?: string, email?: string, displayName?: string, timezone?: string, storedTimezone?: string | null, createdAt?: string } | null} a
+ * @param {{ id?: string, email?: string, displayName?: string, timezone?: string, storedTimezone?: string | null, createdAt?: string } | null} b
  * @returns {boolean}
  */
 export function isSameUser(a, b) {
@@ -122,5 +122,6 @@ export function isSameUser(a, b) {
     && a.email === b.email
     && a.displayName === b.displayName
     && a.timezone === b.timezone
+    && a.storedTimezone === b.storedTimezone
     && a.createdAt === b.createdAt;
 }

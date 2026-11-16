@@ -434,7 +434,7 @@ export default function Settings() {
               <option value="UTC" />
             </datalist>
           </label>
-          {profileLoaded && <TimezoneSuggestion stored={profileTimezone.trim()} onUse={setProfileTimezone} />}
+          {profileLoaded && <TimezoneSuggestion stored={user?.storedTimezone} value={profileTimezone.trim()} onUse={setProfileTimezone} />}
           {!profileLoaded && (
             <p id="profile-loading-hint" className="settings-desc" role="status">
               Loading your saved profile… You can save once it has loaded.

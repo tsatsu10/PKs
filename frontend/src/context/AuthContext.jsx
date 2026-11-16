@@ -24,6 +24,8 @@ function mapUser(au, profile) {
     email: au.email ?? profile?.email,
     displayName: profile?.display_name ?? au.user_metadata?.display_name ?? au.user_metadata?.displayName ?? '',
     timezone: profile?.timezone ?? browserTimeZone(),
+    // What the server actually has (NULL means it uses UTC); Settings offers to fix it.
+    storedTimezone: profile?.timezone ?? null,
     createdAt: profile?.created_at ?? au.created_at,
   };
 }
