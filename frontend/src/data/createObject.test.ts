@@ -16,6 +16,7 @@ import { createObject, whenCreated, useCreateState } from './createObject';
 import { objectDetailQuery } from './objectDetail';
 import { qk } from './keys';
 import { openSaveQueue, disposeAllSaveQueues } from '../features/object/save/saveQueue';
+import { readLocalCopy } from '../features/object/save/localCopy';
 
 type Call = { table: string; ops: Array<[string, unknown[]]> };
 type R = { data: unknown; error: unknown };
@@ -166,6 +167,41 @@ describe('createObject and the save queue', () => {
     expect(log.filter((x) => x === 'update')).toHaveLength(1);
     expect(h.patch(0)).toMatchObject({ title: 'Typed early' });
     expect(queue.getState().status).not.toBe('blocked');
+  });
+
+  it('edits made while the create has failed are kept locally, then all saved after Retry', async () => {
+    const client = createTestQueryClient();
+    inserts = [DOWN, OK];
+    const id = createObject({ userId: 'u1', row: ROW }, client);
+    h.reset({ id, revision: 1 });
+    const harness = sb.current!.respond;
+    sb.current!.respond = ((call: Call) => {
+      if (isInsert(call)) return respond(call);
+      if (call.ops.some(([m]) => m === 'update')) log.push('update');
+      return harness(call as never);
+    }) as never;
+    const { result } = renderHook(() => useCreateState(id));
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+
+    const { queue } = await openSaveQueue({ objectId: id, userId: 'u1', isOwner: true, baseRevision: 1, client });
+    queue.change({ title: 'First' });
+    const flushing = queue.flush();
+    queue.change({ content: 'Edited body' });
+    queue.change({ title: 'Second' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(log).not.toContain('update');
+    expect(queue.getState().status).not.toBe('blocked');
+    expect(queue.pending()).toMatchObject({ title: 'Second', content: 'Edited body' });
+    await vi.waitFor(async () => expect((await readLocalCopy('u1', id))?.fields).toMatchObject({ title: 'Second', content: 'Edited body' }));
+
+    await act(async () => { result.current.retry(); await whenCreated(id); });
+    expect(result.current.status).toBe('none');
+    await flushing;
+    await vi.waitFor(() => expect(h.row).toMatchObject({ title: 'Second', content: 'Edited body' }));
+    expect(log.indexOf('update')).toBeGreaterThan(log.lastIndexOf('insert'));
+    await vi.waitFor(() => expect(queue.getState().status).toBe('saved'));
+    expect(queue.pending()).toEqual({});
+    await vi.waitFor(async () => expect(await readLocalCopy('u1', id)).toBeNull());
   });
 
   it('a connection lost while waiting for the insert holds the edit back as offline', async () => {
