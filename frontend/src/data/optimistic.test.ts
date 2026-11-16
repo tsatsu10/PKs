@@ -43,6 +43,21 @@ describe('optimistic', () => {
     expect(client.getQueryData(['new'])).toBeUndefined();
   });
 
+  it('cancels an in-flight fetch so its stale response cannot overwrite the change', async () => {
+    const client = createTestQueryClient();
+    client.setQueryData(['a'], [1]);
+    const stale = deferred<number[]>();
+    const fetching = client.fetchQuery({ queryKey: ['a'], queryFn: () => stale.promise, staleTime: 0 });
+    const d = deferred<string>();
+    const p = optimistic(client, { keys: [{ queryKey: ['a'] }], apply: () => client.setQueryData(['a'], [1, 2]), run: () => d.promise });
+    expect(client.getQueryData(['a'])).toEqual([1, 2]);
+    stale.resolve([1]);
+    await fetching.catch(() => {});
+    expect(client.getQueryData(['a'])).toEqual([1, 2]);
+    d.resolve('ok');
+    await p;
+  });
+
   it('keeps the change and invalidates each filter on success', async () => {
     const client = createTestQueryClient();
     client.setQueryData(['a'], 1);

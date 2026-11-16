@@ -2,7 +2,7 @@ import type { QueryClient, QueryFilters, QueryKey } from '@tanstack/react-query'
 
 /**
  * An optimistic write over cached queries (onMutate / onError / onSettled in one call):
- * snapshot every query matching `keys`, apply the cache change, run the request, restore the
+ * cancel in-flight fetches and snapshot every query matching `keys`, apply the cache change, run the request, restore the
  * snapshot if it fails (and rethrow, so the caller can notify), and invalidate `keys` afterwards.
  * A key `apply` creates from nothing is removed again on rollback.
  */
@@ -12,6 +12,10 @@ export async function optimistic<T>(client: QueryClient, opts: {
   run: () => Promise<T>;
 }): Promise<T> {
   const { keys, apply, run } = opts;
+  // Cancel in-flight fetches so a response started before this write cannot overwrite it.
+  // The cancel (and its revert) is synchronous in query-core, so `apply` stays synchronous
+  // for callers; the returned promise only tracks the aborted fetch and is not awaited.
+  for (const filter of keys) void client.cancelQueries(filter);
   const before = new Map<string, { key: QueryKey; data: unknown }>();
   for (const filter of keys) {
     for (const [key, data] of client.getQueriesData(filter)) before.set(JSON.stringify(key), { key, data });
