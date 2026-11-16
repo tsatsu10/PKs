@@ -23,6 +23,11 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
+    // Debugging aid: E2E_NETLOG_DIR makes Chromium write its own network log (one file per worker),
+    // which includes requests the page's trace can't see, such as keepalive sends after close.
+    ...(process.env.E2E_NETLOG_DIR
+      ? { launchOptions: { args: [`--log-net-log=${process.env.E2E_NETLOG_DIR}/netlog-${process.pid}.json`] } }
+      : {}),
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts$/ },

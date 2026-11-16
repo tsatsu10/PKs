@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import {
-  createObject, editorSurface, marker, openObject, saveIndicator, serverContentText, typeAtEnd,
+  adminClient, createObject, editorSurface, marker, openObject, saveIndicator, serverContentText, typeAtEnd,
 } from './support';
 
 /**
@@ -92,10 +92,18 @@ test('edit offline, close the tab within 1 s, reconnect, reopen: the content is 
   const page = await context.newPage();
   await openObject(page, id);
   await goOffline(page);
+  const typedAt = new Date().toISOString();
   await typeThenCloseTab(page, text);
+  const closedAt = new Date().toISOString();
 
   // Nothing could have been sent.
-  expect(await serverContentText(id), `page events:\n${events.join('\n')}`).not.toContain(text);
+  const serverText = await serverContentText(id);
+  if (serverText.includes(text)) {
+    const { data: row } = await adminClient().from('knowledge_objects')
+      .select('revision, updated_at, current_version').eq('id', id).single();
+    events.push(`object ${id} typedAt=${typedAt} closedAt=${closedAt} row=${JSON.stringify(row)}`);
+  }
+  expect(serverText, `page events:\n${events.join('\n')}`).not.toContain(text);
 
   await context.setOffline(false);
   const again = await reopen(context, id);

@@ -127,13 +127,31 @@ jobs:
       - name: Stress the close-the-tab tests
         run: npx playwright test autosave-close --repeat-each=5
         working-directory: frontend
+      # DEBUG (offline close-tab flake): repeat the offline test with Chromium's own network log.
+      - name: Repeat the offline close-tab test with a net log
+        if: always()
+        run: |
+          mkdir -p netlog
+          E2E_NETLOG_DIR="$PWD/netlog" npx playwright test autosave-close -g "edit offline, close the tab" --repeat-each=40 --output=test-results-netlog
+        working-directory: frontend
+      - name: Dump the API gateway and REST logs
+        if: always()
+        run: |
+          mkdir -p frontend/stack-logs
+          for c in $(docker ps --format '{{.Names}}' | grep -E 'supabase_(kong|rest|db)_'); do
+            docker logs "$c" > "frontend/stack-logs/$c.log" 2>&1 || true
+          done
+          grep -h 'PATCH' frontend/stack-logs/*kong*.log | tail -100 || true
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
           path: |
             frontend/playwright-report
             frontend/test-results
+            frontend/test-results-netlog
+            frontend/netlog
+            frontend/stack-logs
           retention-days: 7
 
   functions:
