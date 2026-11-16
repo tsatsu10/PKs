@@ -5,6 +5,7 @@ import { invalidateObjectLists } from '../../../data/objects';
 import { invalidateObject, searchLinkTargets } from '../../../data/objectDetail';
 import { useQueryClient } from '@tanstack/react-query';
 import { optimistic } from '../../../data/optimistic';
+import { uuid } from '../../../lib/uuid';
 import { qk } from '../../../data/keys';
 import { useUndoToast } from './useUndoToast';
 import type { ObjectRow, LinkTarget, OutgoingLink, IncomingLink, SetError } from '../types';
@@ -106,7 +107,7 @@ export function useLinks({ object, userId, otherObjects, setError }: Options) {
     if (!object || !toObjectId) return;
     setError('');
     const target = otherObjects.find((o) => o.id === toObjectId) ?? { id: toObjectId, title: '…', type: '' };
-    const link: OutgoingLink = { id: `tmp:${crypto.randomUUID()}`, to_object_id: toObjectId, relationship_type: relationshipType, target };
+    const link: OutgoingLink = { id: `tmp:${uuid()}`, to_object_id: toObjectId, relationship_type: relationshipType, target };
     try {
       await insertEdge(object.id, { from: object.id, to: toObjectId, type: relationshipType }, true, link);
     } catch (err) {
