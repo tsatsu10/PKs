@@ -61,4 +61,9 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // Roadmap Phase 0a exit criterion: no file in features/object/ over 400 lines.
+    files: ['src/features/object/**/*.{js,jsx,ts,tsx}'],
+    rules: { 'max-lines': ['error', { max: 400 }] },
+  },
 ])
