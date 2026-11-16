@@ -184,7 +184,7 @@ export default function ObjectPage() {
                   editable
                   onChange={change}
                   autoFocusTitle={object.title === '' && !object.content && !object.content_json?.length}
-                  titleAddon={<SaveIndicator state={save.state} />}
+                  titleAddon={<SaveIndicator state={save.state} create={create.status} />}
                 />
                 <Properties key={`props:${seedKey}`} object={object} initial={initial} isOwner={isOwner} onChange={change} />
                 {isOwner && <SynthesizeCta run={run} />}

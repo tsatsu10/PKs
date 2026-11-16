@@ -43,4 +43,37 @@ describe('ToastContext', () => {
     act(() => { api.dismiss(id); });
     expect(screen.queryByText('Hello')).not.toBeInTheDocument();
   });
+  it('pauses while hovered and resumes with the time that was left', () => {
+    vi.useFakeTimers();
+    mount();
+    act(() => { api.addToast('success', 'Moved to Trash', { ttlMs: UNDO_TTL_MS }); });
+    const toast = screen.getByText('Moved to Trash').closest('.toast');
+    act(() => { vi.advanceTimersByTime(4000); });
+    fireEvent.mouseEnter(toast);
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Moved to Trash')).toBeInTheDocument();
+    fireEvent.mouseLeave(toast);
+    act(() => { vi.advanceTimersByTime(1999); });
+    expect(screen.getByText('Moved to Trash')).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(screen.queryByText('Moved to Trash')).not.toBeInTheDocument();
+  });
+
+  it('pauses while focus is inside, also after the pointer leaves', () => {
+    vi.useFakeTimers();
+    mount();
+    act(() => { api.addToast('success', 'Tag removed', { ttlMs: UNDO_TTL_MS, action: { label: 'Undo', onClick: () => {} } }); });
+    const undo = screen.getByRole('button', { name: 'Undo' });
+    const toast = undo.closest('.toast');
+    fireEvent.mouseEnter(toast);
+    act(() => { undo.focus(); });
+    fireEvent.mouseLeave(toast);
+    // Focus moving between the toast's own buttons keeps it paused.
+    act(() => { screen.getByRole('button', { name: 'Dismiss' }).focus(); });
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Tag removed')).toBeInTheDocument();
+    act(() => { screen.getByRole('button', { name: 'Dismiss' }).blur(); });
+    act(() => { vi.advanceTimersByTime(UNDO_TTL_MS); });
+    expect(screen.queryByText('Tag removed')).not.toBeInTheDocument();
+  });
 });

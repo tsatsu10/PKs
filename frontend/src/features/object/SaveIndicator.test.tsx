@@ -22,3 +22,24 @@ describe('SaveIndicator', () => {
     expect(region.textContent).toBe(text);
   });
 });
+
+const createCases: Array<[SaveState['status'], 'pending' | 'failed', string, boolean]> = [
+  ['pending', 'pending', 'Creating…', false],
+  ['saving', 'pending', 'Creating…', false],
+  ['pending', 'failed', 'Not saved: not created yet', true],
+  ['saving', 'failed', 'Not saved: not created yet', true],
+  // Nothing typed: the failed-create bar speaks for itself.
+  ['idle', 'pending', '', false],
+  ['idle', 'failed', '', false],
+  // The connection is the more specific reason.
+  ['offline', 'pending', 'Not saved: offline', true],
+];
+
+describe('SaveIndicator while the object is being created', () => {
+  it.each(createCases)('%s with create %s shows "%s"', (status, create, text, problem) => {
+    render(<SaveIndicator state={{ status, message: null }} create={create} />);
+    const region = screen.getByRole('status');
+    expect(region.textContent).toBe(text);
+    expect(region.classList.contains('save-indicator--problem')).toBe(problem);
+  });
+});
