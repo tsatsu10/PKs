@@ -58,6 +58,17 @@ export default defineConfig([
     ...jsxA11y.flatConfigs.recommended,
   },
   {
+    files: ['src/components/**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/features/**'],
+          message: 'components/ must not import features/; move shared code to lib/ or the component into its feature.',
+        }],
+      }],
+    },
+  },
+  {
     files: ['src/**/*.{js,jsx,ts,tsx}'],
     ignores: ['src/data/**', 'src/**/*.test.*', 'src/test/**'],
     rules: {

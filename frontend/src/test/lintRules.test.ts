@@ -51,6 +51,12 @@ describe('eslint guardrails', () => {
     expect(rules).toContain('jsx-a11y/alt-text')
   })
 
+  it('stops components from importing features', async () => {
+    const code = "import x from '../features/dashboard/lib/keyboardMap'; export default x;"
+    expect(await lintText(code, 'src/components/Z.jsx')).toContain('no-restricted-imports')
+    expect(await lintText(code, 'src/pages/Z.jsx')).not.toContain('no-restricted-imports')
+  })
+
   it('every baseline file still has a jsx-a11y violation', async () => {
     // Lints each listed file with jsx-a11y forced on, bypassing the project's
     // baseline exemption. A file that no longer fails must leave the list.

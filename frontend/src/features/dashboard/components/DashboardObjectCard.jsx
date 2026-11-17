@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { formatObjectTypeLabel } from '../constants';
-import TypeMark from './TypeMark';
-import LinkedBar from '../features/dashboard/components/Views/LinkedBar';
-import { useRowVisibility } from '../features/dashboard/hooks/useRowVisibility';
-import { usePrefetchObject } from '../data/usePrefetchObject';
-import '../features/dashboard/components/Views/LinkedBar.css';
+import { formatObjectTypeLabel } from '../../../constants';
+import TypeMark from '../../../components/TypeMark';
+import LinkedBar from './Views/LinkedBar';
+import { useRowVisibility } from '../hooks/useRowVisibility';
+import { usePrefetchObject } from '../../../data/usePrefetchObject';
+import './Views/LinkedBar.css';
 
 function formatRelativeTime(iso) {
   if (!iso) return '';
