@@ -1,0 +1,21 @@
+.ui-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pks-space-2);
+}
+
+.ui-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-pagination-gap {
+  padding: 0 var(--pks-space-2);
+  color: var(--pks-text-muted);
+}
