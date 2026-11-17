@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 const addToast = vi.fn();
-vi.mock('../context/ToastContext', () => ({ useToast: () => ({ addToast }) }));
+vi.mock('../components/ui/Toaster', () => ({ useToast: () => ({ addToast }) }));
 const reportError = vi.fn();
 vi.mock('./reportError', () => ({ reportError: (e: unknown) => reportError(e) }));
 

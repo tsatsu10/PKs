@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import { getErrorMessage, type MessageOverrides } from './errors';
 import { reportError } from './reportError';
 

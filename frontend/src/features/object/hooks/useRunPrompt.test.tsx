@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import { hookWrapper, TEST_OBJECT } from '../testUtils';
 
 const sb = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../../test/supabaseMock').mockSupabase> }));
@@ -27,7 +27,8 @@ const shortcut = () => document.dispatchEvent(new KeyboardEvent('keydown', { ctr
 beforeEach(() => {
   sb.current!.respond = () => ({ data: [], error: null });
 });
-afterEach(() => { document.body.replaceChildren(); });
+// Unmount first: the Toaster portals into body, and React must remove its own nodes.
+afterEach(() => { cleanup(); document.body.replaceChildren(); });
 
 describe('useRunPrompt', () => {
   it('Ctrl+Shift+R opens the panel with the first applicable template', () => {

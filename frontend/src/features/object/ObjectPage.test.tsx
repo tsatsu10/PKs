@@ -5,7 +5,7 @@ import { MemoryRouter, Routes, Route, Link, useParams } from 'react-router-dom';
 import { forwardRef, useImperativeHandle } from 'react';
 import { clear } from 'idb-keyval';
 import { createTestQueryClient } from '../../test/queryTestUtils';
-import { ToastProvider } from '../../context/ToastContext';
+import { ToastProvider } from '../../components/ui/Toaster';
 
 type Call = { table: string; ops: Array<[string, unknown[]]> };
 type Result = { data: unknown; error: unknown };

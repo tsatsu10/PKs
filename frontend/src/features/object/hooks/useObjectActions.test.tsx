@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { hookWrapper, TEST_OBJECT, holdNext, deferred } from '../testUtils';
 import { createTestQueryClient } from '../../../test/queryTestUtils';
-import { ToastProvider } from '../../../context/ToastContext';
+import { ToastProvider } from '../../../components/ui/Toaster';
 import type { SaveQueue } from '../save/saveQueue';
 
 const sb = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../../test/supabaseMock').mockSupabase> }));

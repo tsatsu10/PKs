@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createTestQueryClient } from '../../test/queryTestUtils';
-import { ToastProvider } from '../../context/ToastContext';
+import { ToastProvider } from '../../components/ui/Toaster';
 import type { ObjectRow } from './types';
 
 /** Query client + toasts + router, for rendering the object page's hooks and components in tests. */

@@ -9,7 +9,7 @@ import { getDeepSeekErrorMessage } from '../../../lib/deepseekKey';
 import { resolveRunSelection, modelForProvider, isServerSelection } from '../../../lib/aiProviders';
 import { getErrorMessage } from '../../../lib/errors';
 import { useNotifyError } from '../../../lib/useNotifyError';
-import { useToast } from '../../../context/ToastContext';
+import { useToast } from '../../../components/ui/Toaster';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY, DEFAULT_AI_MODEL } from '../../../constants';
 import { useAiProviders } from '../../../data/settings';
 import { invalidateObjectLists } from '../../../data/objects';

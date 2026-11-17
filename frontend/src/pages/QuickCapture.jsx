@@ -10,7 +10,7 @@ import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage'
 import { createObject } from '../data/createObject';
 import { useQueryClient } from '@tanstack/react-query';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import './ObjectForm.css';
 

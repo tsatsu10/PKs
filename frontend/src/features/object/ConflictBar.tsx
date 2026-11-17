@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../components/ui/Toaster';
 import { useNotifyError } from '../../lib/useNotifyError';
 import type { SaveQueue } from './save/saveQueue';
 
