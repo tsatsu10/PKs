@@ -3,8 +3,10 @@ import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import { a11yBaseline } from './eslint.a11y-baseline.js'
 
 export default defineConfig([
   globalIgnores(['dist', 'src/data/database.types.ts']),
@@ -49,6 +51,11 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
       'react/jsx-uses-vars': 'error',
     },
+  },
+  {
+    files: ['src/**/*.{jsx,tsx}'],
+    ignores: a11yBaseline,
+    ...jsxA11y.flatConfigs.recommended,
   },
   {
     files: ['src/**/*.{js,jsx,ts,tsx}'],
