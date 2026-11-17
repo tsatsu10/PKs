@@ -56,6 +56,8 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
   const [savingRun, setSavingRun] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [runContextOpen, setRunContextOpen] = useState(false);
+  /** Asking whether to throw away unsaved output before closing (A5). */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const applicableTemplates = promptTemplates.filter((t) => appliesTo(t, object?.type));
 
@@ -120,6 +122,17 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
   function closeRunPanel() {
     setShowRunPanel(false);
     setRunOutput('');
+    setConfirmDiscard(false);
+  }
+
+  /** Escape, the backdrop, Close and Cancel: close at once, or ask first when there is output to lose. */
+  function requestCloseRunPanel() {
+    if (runOutput.trim() === '') closeRunPanel();
+    else setConfirmDiscard(true);
+  }
+
+  function keepEditing() {
+    setConfirmDiscard(false);
   }
 
   async function onGenerateWithAI() {
@@ -208,8 +221,7 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
     setError('');
     setSavingRun(true);
     try {
-      setShowRunPanel(false);
-      setRunOutput('');
+      closeRunPanel();
       setLastRun(null);
       setRunPromptText('');
       setRunTemplateId('');
@@ -237,8 +249,7 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
         p_content: runOutput.trim(),
       });
       if (saveErr) throw saveErr;
-      setShowRunPanel(false);
-      setRunOutput('');
+      closeRunPanel();
       setLastRun(null);
       setRunTemplateId('');
       setRunPromptText('');
@@ -255,7 +266,8 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
   }
 
   return {
-    showRunPanel, openRunPanel, closeRunPanel, applicableTemplates, aiProviders,
+    showRunPanel, openRunPanel, requestCloseRunPanel, confirmDiscard, discardAndClose: closeRunPanel, keepEditing,
+    applicableTemplates, aiProviders,
     runPromptSource, setRunPromptSource, runTemplateId, setRunTemplateId, runPromptText, setRunPromptText,
     runPromptEditFromBank, setRunPromptEditFromBank, runAiProviderId, setRunAiProviderId, runAiModel, setRunAiModel,
     runContextOpen, setRunContextOpen, generatingAI, runOutput, setRunOutput, savingRun,

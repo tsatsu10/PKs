@@ -5,7 +5,6 @@ export const a11yBaseline = [
   "src/features/dashboard/components/DashboardObjectCard.jsx",
   "src/components/ShortcutsModal.jsx",
   "src/features/dashboard/components/DashboardCommandPalette.jsx",
-  "src/features/object/AiPanel.tsx",
   "src/features/object/InPlaceFields.tsx",
   "src/features/object/LinkSearch.tsx",
   "src/features/object/ObjectPage.tsx",

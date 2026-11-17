@@ -1,4 +1,9 @@
 import { useEffect } from 'react';
+import Button from '../../components/ui/Button';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import Dialog from '../../components/ui/Dialog';
+import Field from '../../components/ui/Field';
+import Select from '../../components/ui/Select';
 import { AI_PROVIDERS, aiProviderLabel } from '../../constants';
 import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection, isServerSelection } from '../../lib/aiProviders';
 import type { useRunPrompt } from './hooks/useRunPrompt';
@@ -29,15 +34,17 @@ export function SynthesizeCta({ run }: { run: Run }) {
 type PanelProps = { object: ObjectRow; run: Run; promptTemplates: PromptTemplate[]; error: string };
 
 /**
- * Run prompt overlay: source, template, prompt, provider (default or user's API), model, context, generate, output.
+ * Run prompt dialog (A5): source, template, prompt, provider (default or user's API), model, context, generate, output.
  */
 export function RunPromptPanel({ object, run, promptTemplates, error }: PanelProps) {
   const {
     runPromptSource, setRunPromptSource, runTemplateId, setRunTemplateId, runPromptText, setRunPromptText,
     runPromptEditFromBank, setRunPromptEditFromBank, aiProviders, runAiProviderId, setRunAiProviderId,
     runAiModel, setRunAiModel, applicableTemplates, runContextOpen, setRunContextOpen, generatingAI,
-    runOutput, setRunOutput, savingRun, onGenerateWithAI, onSaveRun, onSaveOutputAsObject, closeRunPanel: onClose,
+    runOutput, setRunOutput, savingRun, onGenerateWithAI, onSaveRun, onSaveOutputAsObject,
+    requestCloseRunPanel, confirmDiscard, discardAndClose, keepEditing,
   } = run;
+  const requestClose = () => requestCloseRunPanel();
   const { provider } = resolveRunSelection(runAiProviderId, aiProviders);
   const usingServerKey = isServerSelection(runAiProviderId);
   const allowedModels = modelsForProvider(provider, usingServerKey) as Array<{ id: string; label: string }>;
@@ -66,91 +73,98 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
   };
 
   return (
-    <div
-      className="run-prompt-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="run-prompt-title"
-      aria-description={`Running prompt against: ${objectTitle}`}
+    <Dialog
+      open
+      size="lg"
+      title="Run prompt on this object"
+      description={`Running against: ${objectTitle}`}
+      onClose={requestClose}
+      className="run-prompt-dialog"
+      footer={
+        <>
+          <Button onClick={requestClose}>Cancel</Button>
+          <Button onClick={onSaveRun} disabled={savingRun}>Save run only</Button>
+          <Button variant="primary" onClick={onSaveOutputAsObject} disabled={savingRun || !runOutput.trim()}>
+            {savingRun ? 'Saving…' : 'Save as new object'}
+          </Button>
+        </>
+      }
     >
-      <div className="run-prompt-overlay-backdrop" onClick={onClose} />
-      <div className="run-prompt-overlay-panel">
-        <header className="run-prompt-overlay-header">
-          <h2 id="run-prompt-title" className="run-prompt-overlay-title">
-            Run prompt on this object
-          </h2>
-          <button type="button" className="run-prompt-overlay-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </header>
-        <div className="run-prompt-overlay-body">
-          <div className="run-prompt-object-ref" role="status">
-            <span className="run-prompt-object-ref-label">Using object</span>
-            <span className="run-prompt-object-ref-type">{objectType}</span>
-            <span className="run-prompt-object-ref-title">{objectTitle}</span>
+      <div className="run-prompt-overlay-body">
+        <div className="run-prompt-object-ref">
+          <span className="run-prompt-object-ref-label">Using object</span>
+          <span className="run-prompt-object-ref-type">{objectType}</span>
+          <span className="run-prompt-object-ref-title">{objectTitle}</span>
+        </div>
+        <div className="run-prompt-source-row">
+          <span className="run-prompt-source-label">Source</span>
+          <div className="run-prompt-source-tabs">
+            <button
+              type="button"
+              className={`run-prompt-source-tab ${runPromptSource === 'bank' ? 'active' : ''}`}
+              aria-pressed={runPromptSource === 'bank'}
+              onClick={() => {
+                setRunPromptSource('bank');
+                syncTemplateText();
+              }}
+            >
+              Prompt Bank
+            </button>
+            <button
+              type="button"
+              className={`run-prompt-source-tab ${runPromptSource === 'custom' ? 'active' : ''}`}
+              aria-pressed={runPromptSource === 'custom'}
+              onClick={() => {
+                setRunPromptSource('custom');
+                setRunTemplateId('');
+                setRunPromptText('');
+                setRunPromptEditFromBank(false);
+              }}
+            >
+              Custom prompt
+            </button>
           </div>
-          <div className="run-prompt-source-row">
-            <span className="run-prompt-source-label">Source</span>
-            <div className="run-prompt-source-tabs">
-              <button
-                type="button"
-                className={`run-prompt-source-tab ${runPromptSource === 'bank' ? 'active' : ''}`}
-                onClick={() => {
-                  setRunPromptSource('bank');
-                  syncTemplateText();
-                }}
-              >
-                Prompt Bank
-              </button>
-              <button
-                type="button"
-                className={`run-prompt-source-tab ${runPromptSource === 'custom' ? 'active' : ''}`}
-                onClick={() => {
-                  setRunPromptSource('custom');
-                  setRunTemplateId('');
-                  setRunPromptText('');
-                  setRunPromptEditFromBank(false);
-                }}
-              >
-                Custom prompt
-              </button>
-            </div>
-          </div>
-          {runPromptSource === 'bank' && (
-            <div className="run-prompt-bank-row">
-              <label className="run-prompt-select-label">Template</label>
-              <select
-                value={runTemplateId}
-                onChange={(e) => setRunTemplateId(e.target.value)}
-                className="run-prompt-template-select"
-              >
-                <option value="">Select a prompt</option>
-                {applicableTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              {runTemplateId && (
-                <label className="run-prompt-edit-check">
-                  <input
-                    type="checkbox"
-                    checked={runPromptEditFromBank}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setRunPromptEditFromBank(checked);
-                      const t = promptTemplates.find((x) => x.id === runTemplateId);
-                      if (t?.prompt_text != null) setRunPromptText(t.prompt_text);
-                    }}
-                  />
-                  Edit before running
-                </label>
+        </div>
+        {runPromptSource === 'bank' && (
+          <div className="run-prompt-bank-row">
+            <Field label="Template">
+              {(ids) => (
+                <Select
+                  id={ids.id}
+                  value={runTemplateId}
+                  onChange={(e) => setRunTemplateId(e.target.value)}
+                  className="run-prompt-template-select"
+                >
+                  <option value="">Select a prompt</option>
+                  {applicableTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
               )}
-            </div>
-          )}
-          <div className="run-prompt-prompt-block">
-            <label className="run-prompt-prompt-label">Prompt</label>
+            </Field>
+            {runTemplateId && (
+              <label className="run-prompt-edit-check">
+                <input
+                  type="checkbox"
+                  checked={runPromptEditFromBank}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRunPromptEditFromBank(checked);
+                    const t = promptTemplates.find((x) => x.id === runTemplateId);
+                    if (t?.prompt_text != null) setRunPromptText(t.prompt_text);
+                  }}
+                />
+                Edit before running
+              </label>
+            )}
+          </div>
+        )}
+        <Field label="Prompt" className="run-prompt-prompt-block">
+          {(ids) => (
             <textarea
+              id={ids.id}
               value={runPromptText}
               onChange={(e) => setRunPromptText(e.target.value)}
               className="run-prompt-prompt-input"
@@ -160,33 +174,34 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
               }
               disabled={runPromptSource === 'bank' && !runPromptEditFromBank && !!runTemplateId}
             />
-          </div>
-          <details
-            className="run-prompt-context-details"
-            open={runContextOpen}
-            onToggle={(e) => setRunContextOpen((e.target as HTMLDetailsElement).open)}
-          >
-            <summary className="run-prompt-context-summary">Content sent to AI (from this object)</summary>
-            <div className="run-prompt-context-body">
-              <p className="run-prompt-context-title">{objectTitle}</p>
-              <div className="run-prompt-context-preview">
-                {(object?.content ?? '').slice(0, 800)}
-                {(object?.content?.length ?? 0) > 800 ? '…' : ''}
-              </div>
-            </div>
-          </details>
-          {error && (
-            <p className="run-prompt-overlay-error" role="alert">
-              {error}
-            </p>
           )}
-          <div className="run-prompt-model-row">
-            <label className="run-prompt-select-label">Provider</label>
-            <select
+        </Field>
+        <details
+          className="run-prompt-context-details"
+          open={runContextOpen}
+          onToggle={(e) => setRunContextOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="run-prompt-context-summary">Content sent to AI (from this object)</summary>
+          <div className="run-prompt-context-body">
+            <p className="run-prompt-context-title">{objectTitle}</p>
+            <div className="run-prompt-context-preview">
+              {(object?.content ?? '').slice(0, 800)}
+              {(object?.content?.length ?? 0) > 800 ? '…' : ''}
+            </div>
+          </div>
+        </details>
+        {error && (
+          <p className="run-prompt-overlay-error" role="alert">
+            {error}
+          </p>
+        )}
+        <Field label="Provider" className="run-prompt-model-row">
+          {(ids) => (
+            <Select
+              id={ids.id}
               value={runAiProviderId ?? ''}
               onChange={(e) => handleProviderChange(e.target.value)}
               className="run-prompt-template-select"
-              aria-label="AI provider"
             >
               {(AI_PROVIDERS as Array<{ id: string; label: string }>).map((p, i) => (
                 <option key={p.id} value={i === 0 ? '' : serverSelection(p.id)}>
@@ -196,59 +211,51 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
               {aiProviders.map((p) => (
                 <option key={p.id} value={p.id}>{p.name} ({aiProviderLabel(p.provider_type)})</option>
               ))}
-            </select>
-          </div>
-          <div className="run-prompt-model-row">
-            <label className="run-prompt-select-label">AI model</label>
-            <select
+            </Select>
+          )}
+        </Field>
+        <Field label="AI model" className="run-prompt-model-row">
+          {(ids) => (
+            <Select
+              id={ids.id}
               value={effectiveModel}
               onChange={(e) => setRunAiModel(e.target.value)}
               className="run-prompt-template-select"
-              aria-label="AI model"
             >
               {allowedModels.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
-            </select>
-          </div>
-          <div className="run-prompt-generate-row">
-            <button
-              type="button"
-              className="btn btn-primary run-prompt-generate-btn"
-              onClick={onGenerateWithAI}
-              disabled={generatingAI}
-            >
-              {generatingAI ? 'Generating…' : 'Generate with AI'}
-            </button>
-          </div>
-          <div className="run-prompt-output-block">
-            <label className="run-prompt-output-label">Output</label>
+            </Select>
+          )}
+        </Field>
+        <div className="run-prompt-generate-row">
+          <Button variant="primary" className="run-prompt-generate-btn" onClick={onGenerateWithAI} loading={generatingAI}>
+            {generatingAI ? 'Generating…' : 'Generate with AI'}
+          </Button>
+        </div>
+        <Field label="Output" className="run-prompt-output-block">
+          {(ids) => (
             <textarea
+              id={ids.id}
               value={runOutput}
               onChange={(e) => setRunOutput(e.target.value)}
               className="run-prompt-output-input"
               rows={8}
               placeholder="Generate with AI or paste your own…"
             />
-          </div>
-          <div className="run-prompt-overlay-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={onSaveRun} disabled={savingRun}>
-              Save run only
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onSaveOutputAsObject}
-              disabled={savingRun || !runOutput.trim()}
-            >
-              {savingRun ? 'Saving…' : 'Save as new object'}
-            </button>
-          </div>
-        </div>
+          )}
+        </Field>
       </div>
-    </div>
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard the AI output?"
+        message="The generated text hasn't been saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        danger
+        onConfirm={discardAndClose}
+        onCancel={keepEditing}
+      />
+    </Dialog>
   );
 }
