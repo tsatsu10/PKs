@@ -38,14 +38,17 @@ export default defineConfig({
       manifest: {
         name: 'PKS — Personal Knowledge System',
         short_name: 'PKS',
-        description: 'Your second brain. Capture, organize, and synthesize knowledge.',
+        description: 'Your second brain. Capture, organize, and connect what you learn.',
         start_url: '/',
         display: 'standalone',
         background_color: '#0a0a0f',
         theme_color: '#ec4899',
         orientation: 'portrait-primary',
         icons: [
-          { src: '/pks-logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/pks-logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
       workbox: {
