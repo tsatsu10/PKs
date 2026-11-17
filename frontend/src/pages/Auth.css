@@ -84,14 +84,15 @@
   gap: 0.75rem;
   margin: 0;
   padding: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .auth-brand-chip {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  min-width: 8.5rem;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 0.8rem 0.9rem;
   border-radius: 12px;
   background: var(--auth-chip-bg);
@@ -119,12 +120,14 @@
 .auth-main {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow-y: auto;
   padding: 3rem 1.5rem calc(3rem + env(safe-area-inset-bottom));
 }
 
+/* margin:auto (not align-items:center) so short viewports stay scrollable
+   at both ends instead of clipping the form. */
 .auth-panel {
+  margin: auto;
   width: 100%;
   max-width: 26.25rem;
 }
@@ -147,6 +150,13 @@
   text-align: center;
   font-size: 0.875rem;
   color: var(--pks-text-secondary);
+}
+
+.auth-fineprint {
+  font-size: 0.75rem;
+  color: var(--pks-text-muted);
+  text-align: center;
+  margin: 0.9rem 0 0;
 }
 
 .auth-footer-sep {
@@ -496,6 +506,10 @@
   .auth-main {
     padding: 1.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom));
     align-items: flex-start;
+  }
+
+  .auth-panel {
+    margin: 0 auto;
   }
 
   .auth-card {

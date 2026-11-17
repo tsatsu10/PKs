@@ -167,6 +167,9 @@ export default function Register() {
         >
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
+        <p className="auth-fineprint">
+          By creating an account you agree to the Terms and Privacy policy.
+        </p>
       </form>
     </AuthLayout>
   );
