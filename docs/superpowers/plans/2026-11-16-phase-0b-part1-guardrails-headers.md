@@ -1,6 +1,6 @@
 # Phase 0b part 1: guardrails and headers, implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** make the rest of Phase 0b measurable and safe. Lint gains React, jsx-a11y (with a shrinking baseline) and an import boundary. An axe smoke test reports violations per route and theme. The security headers and PWA items close: self-hosted font, theme script in a file, pinned `connect-src` (S14), COOP, HSTS preload, immutable `/assets`, PNG/maskable icons. The cover image stops shifting (P6).
 
@@ -43,18 +43,18 @@
 **Interfaces:**
 - Produces: the `lintText(code: string, filePath: string): Promise<string[]>` helper in `lintRules.test.ts` (returns rule ids). Tasks 2 and 3 add cases to this file.
 
-- [ ] **Step 1: Write the failing tests** in `src/test/lintRules.test.ts`. Use `new ESLint({ cwd: <frontend root> })` and `lintText(code, { filePath })`, and collect `messages.map(m => m.ruleId)`:
+- [x] **Step 1: Write the failing tests** in `src/test/lintRules.test.ts`. Use `new ESLint({ cwd: <frontend root> })` and `lintText(code, { filePath })`, and collect `messages.map(m => m.ruleId)`:
   - `it('flags an unused PascalCase variable in JSX files')`: `const Unused = 1; export default function A() { return null; }` with path `src/x.jsx` gives a result containing `no-unused-vars`.
   - `it('counts JSX usage as a use')`: `import Foo from './Foo'; export default function A() { return <Foo />; }` with path `src/x.jsx` has no `no-unused-vars`.
   - `it('allows a leading underscore')`: `const _skip = 1;` gives no `no-unused-vars`, in both `.jsx` and `.ts`.
-- [ ] **Step 2: Run** `npx vitest run src/test/lintRules.test.ts`. Expected: the first test FAILS (`^[A-Z_]` ignores `Unused`).
-- [ ] **Step 3: Install and configure.**
+- [x] **Step 2: Run** `npx vitest run src/test/lintRules.test.ts`. Expected: the first test FAILS (`^[A-Z_]` ignores `Unused`).
+- [x] **Step 3: Install and configure.**
   - `npm i -D eslint-plugin-react`.
   - In both the JS and TS blocks, add `react.configs.flat['jsx-runtime']` and the rule `'react/jsx-uses-vars': 'error'`, with `settings: { react: { version: 'detect' } }`.
   - Narrow `varsIgnorePattern` to `'^_'` in both blocks.
-- [ ] **Step 4: Run** `npx eslint .`, and fix each newly flagged unused variable by deleting it, or prefixing it with `_` if it is a deliberately unused binding.
-- [ ] **Step 5: Run** `npx vitest run src/test/lintRules.test.ts && npx eslint .`. Expected: PASS, and lint exits 0.
-- [ ] **Step 6: Commit** `chore(lint): eslint-plugin-react, unused vars only exempt with _`.
+- [x] **Step 4: Run** `npx eslint .`, and fix each newly flagged unused variable by deleting it, or prefixing it with `_` if it is a deliberately unused binding.
+- [x] **Step 5: Run** `npx vitest run src/test/lintRules.test.ts && npx eslint .`. Expected: PASS, and lint exits 0.
+- [x] **Step 6: Commit** `chore(lint): eslint-plugin-react, unused vars only exempt with _`.
 
 ### Task 2: jsx-a11y with a shrinking baseline
 
@@ -66,19 +66,19 @@
 **Interfaces:**
 - Produces: `export const a11yBaseline: string[]` (paths relative to `frontend/`, sorted). In `eslint.config.js`, files in this list get the jsx-a11y rules at `'off'`, and every other file gets `jsxA11y.flatConfigs.recommended` at error level. Parts 2–4 remove entries; part 4 ends with `[]`.
 
-- [ ] **Step 1: Write the failing tests** (add to `lintRules.test.ts`):
+- [x] **Step 1: Write the failing tests** (add to `lintRules.test.ts`):
   - `it('flags an image without alt outside the baseline')`: `export const A = () => <img src="x" />;` at `src/zz-new.jsx` gives a result containing `jsx-a11y/alt-text`.
   - `it('every baseline file still has a jsx-a11y violation')`: for each path in `a11yBaseline`, lint the real file with a config that forces jsx-a11y on (use `new ESLint({ overrideConfig: [{ files: ['**/*.{jsx,tsx}'], ...jsxA11y.flatConfigs.recommended }] })`) and expect at least one `jsx-a11y/*` message. The failure message is `${path} is clean now: remove it from eslint.a11y-baseline.js`.
-- [ ] **Step 2: Run** the test file. Expected: FAIL (the plugin is not installed or configured).
-- [ ] **Step 3: Install and configure.**
+- [x] **Step 2: Run** the test file. Expected: FAIL (the plugin is not installed or configured).
+- [x] **Step 3: Install and configure.**
   - `npm i -D eslint-plugin-jsx-a11y`.
   - Add a config block for `src/**/*.{jsx,tsx}`, spreading `jsxA11y.flatConfigs.recommended`, with `ignores: a11yBaseline`.
-- [ ] **Step 4: Generate the baseline.**
+- [x] **Step 4: Generate the baseline.**
   - Temporarily set the baseline to `[]` and run `npx eslint . -f json -o ../a11y.json`.
   - Write the sorted unique `filePath`s that have `jsx-a11y/*` messages (made relative to `frontend/`) into `eslint.a11y-baseline.js`, with the header comment `// Phase 0b: files allowed to fail jsx-a11y. Only remove entries; part 4 ends with [].`
   - Delete `a11y.json`.
-- [ ] **Step 5: Run** `npx vitest run src/test/lintRules.test.ts && npx eslint .`. Expected: PASS, and lint exits 0. Record the baseline length in the commit message.
-- [ ] **Step 6: Commit** `chore(lint): jsx-a11y with a baseline of N files (only shrinks)`.
+- [x] **Step 5: Run** `npx vitest run src/test/lintRules.test.ts && npx eslint .`. Expected: PASS, and lint exits 0. Record the baseline length in the commit message.
+- [x] **Step 6: Commit** `chore(lint): jsx-a11y with a baseline of N files (only shrinks)`.
 
 ### Task 3: components must not import features
 
@@ -91,12 +91,12 @@
 **Interfaces:**
 - Produces: the rule `no-restricted-imports` on `src/components/**`, with `patterns: [{ group: ['**/features/**'], message: 'components/ must not import features/; move shared code to lib/ or the component into its feature.' }]`.
 
-- [ ] **Step 1: Write the failing test.** `it('stops components from importing features')`: `import x from '../features/dashboard/lib/keyboardMap';` at `src/components/Z.jsx` gives a result containing `no-restricted-imports`. Also check that the same import at `src/pages/Z.jsx` does not.
-- [ ] **Step 2: Run.** Expected: FAIL.
-- [ ] **Step 3: Add the rule.**
-- [ ] **Step 4: Run** `npx eslint .`. Expected: 3 errors (`DashboardObjectCard.jsx:5,6`, `ShortcutsModal.jsx:3`). Fix them with the two moves (`git mv`), then update the import paths.
-- [ ] **Step 5: Run** `npx vitest run && npx eslint .`. Expected: the full suite passes and lint exits 0.
-- [ ] **Step 6: Commit** `chore(lint): components may not import features; move the card and keyboard map`.
+- [x] **Step 1: Write the failing test.** `it('stops components from importing features')`: `import x from '../features/dashboard/lib/keyboardMap';` at `src/components/Z.jsx` gives a result containing `no-restricted-imports`. Also check that the same import at `src/pages/Z.jsx` does not.
+- [x] **Step 2: Run.** Expected: FAIL.
+- [x] **Step 3: Add the rule.**
+- [x] **Step 4: Run** `npx eslint .`. Expected: 3 errors (`DashboardObjectCard.jsx:5,6`, `ShortcutsModal.jsx:3`). Fix them with the two moves (`git mv`), then update the import paths.
+- [x] **Step 5: Run** `npx vitest run && npx eslint .`. Expected: the full suite passes and lint exits 0.
+- [x] **Step 6: Commit** `chore(lint): components may not import features; move the card and keyboard map`.
 
 ### Task 4: axe smoke test (report mode)
 
@@ -108,14 +108,14 @@
 - Produces: `A11Y_ROUTES` (`/`, `/objects/<seeded id>`, `/search`, `/settings`, `/trash`, `/prompts`, plus `/login` in a fresh context without storage state), each run in `dark` and `light`. Set the theme with `localStorage.setItem('pks-theme', theme)` in an init script.
 - Produces: the env flag `A11Y_STRICT`. Unset means report mode: log a table and pass. `1` means fail on serious/critical. Part 4 sets it in `ci.yml`.
 
-- [ ] **Step 1: Write the test.**
+- [x] **Step 1: Write the test.**
   - For each route × theme, open the route, wait for `main` to be visible, and run `new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze()`.
   - Collect `{route, theme, serious, critical, ids}`.
   - `console.log` one `[axe]` line per route and theme, and attach the JSON with `test.info().attach('axe', …)`.
   - When `process.env.A11Y_STRICT === '1'`, `expect(serious + critical, ids.join(', ')).toBe(0)`.
-- [ ] **Step 2: Typecheck and lint** `npx tsc -p tsconfig.e2e.json --noEmit && npx eslint e2e`. Expected: clean.
-- [ ] **Step 3: Push, and confirm in the CI log** that the `e2e` job prints 14 `[axe]` lines and passes. Copy the table into the PR description as the 0b baseline.
-- [ ] **Step 4: Commit** `test(e2e): axe smoke report per route and theme`.
+- [x] **Step 2: Typecheck and lint** `npx tsc -p tsconfig.e2e.json --noEmit && npx eslint e2e`. Expected: clean.
+- [x] **Step 3: Push, and confirm in the CI log** that the `e2e` job prints 14 `[axe]` lines and passes. Copy the table into the PR description as the 0b baseline.
+- [x] **Step 4: Commit** `test(e2e): axe smoke report per route and theme`.
 
 ### Task 5: self-hosted font and theme script in a file
 
@@ -131,31 +131,31 @@
 **Interfaces:**
 - Produces: `securityConfig.test.ts` with the helpers `csp(): Map<string, string[]>` (parses the `Content-Security-Policy` value from `vercel.json`) and `header(source: string, key: string): string | undefined`. Task 6 adds cases.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `it('serves no Google Fonts')`: `index.html` doesn't contain `fonts.googleapis` or `fonts.gstatic`, and no CSP directive does either.
   - `it('has no inline scripts or handlers')`: `index.html` has no `<script>` without `src`, and no ` on[a-z]+=` attribute. CSP `script-src` has no `'unsafe-hashes'` and no `sha256-` entry.
   - `it('loads the theme before paint')`: `index.html` has `<script src="/theme-init.js"></script>` inside `<head>`, without `async`, `defer` or `type=`.
   - `it('keeps Turnstile allowed')`: `script-src`, `connect-src` and `frame-src` include `https://challenges.cloudflare.com`.
-- [ ] **Step 2: Run** `npx vitest run src/test/securityConfig.test.ts`. Expected: the first three FAIL.
-- [ ] **Step 3: Make the changes listed under Files.** The CSP keeps everything else verbatim. `style-src` becomes `'self' 'unsafe-inline'` (BlockNote and Mantine inject styles), `font-src` becomes `'self' data:`, and `script-src` becomes `'self' https://challenges.cloudflare.com`.
-- [ ] **Step 4: Run** `npx vitest run && npx eslint . && npm run build`. Expected: everything passes, and `dist/assets` contains a `plus-jakarta-sans*.woff2`.
-- [ ] **Step 5: Commit** `feat(security): self-host the font, theme script as a file, drop unsafe-hashes`.
+- [x] **Step 2: Run** `npx vitest run src/test/securityConfig.test.ts`. Expected: the first three FAIL.
+- [x] **Step 3: Make the changes listed under Files.** The CSP keeps everything else verbatim. `style-src` becomes `'self' 'unsafe-inline'` (BlockNote and Mantine inject styles), `font-src` becomes `'self' data:`, and `script-src` becomes `'self' https://challenges.cloudflare.com`.
+- [x] **Step 4: Run** `npx vitest run && npx eslint . && npm run build`. Expected: everything passes, and `dist/assets` contains a `plus-jakarta-sans*.woff2`.
+- [x] **Step 5: Commit** `feat(security): self-host the font, theme script as a file, drop unsafe-hashes`.
 
 ### Task 6: S14 and the remaining headers
 
 **Files:**
 - Modify: `frontend/vercel.json`, `frontend/src/test/securityConfig.test.ts`
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `it('pins connect-src to the project')`: `connect-src` equals exactly the global constraint list (order-insensitive), and no directive contains `*.supabase.co`.
   - `it('sends COOP and HSTS preload')`: on `/(.*)`, `Cross-Origin-Opener-Policy` is `same-origin`, and `Strict-Transport-Security` is `max-age=63072000; includeSubDomains; preload`.
   - `it('caches only hashed assets forever')`: a headers entry with `source: "/assets/(.*)"` has `Cache-Control: public, max-age=31536000, immutable`, and no other entry sets `Cache-Control`.
   - `it('has no popup flows that COOP would break')`: no file under `src` (excluding tests) contains `window.open(`.
-- [ ] **Step 2: Run.** Expected: the first three FAIL.
-- [ ] **Step 3: Edit `vercel.json`.**
-- [ ] **Step 4: Run** `npx vitest run src/test/securityConfig.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(security): pin connect-src (S14), COOP, HSTS preload, immutable assets`.
-- [ ] **Step 6: After the PR deploys**, check the Vercel preview with `curl -sI <preview>/` and `curl -sI <preview>/assets/<any>.js`, and paste both into the PR. Log in on the preview (Turnstile plus Supabase auth must work under the pinned `connect-src`).
+- [x] **Step 2: Run.** Expected: the first three FAIL.
+- [x] **Step 3: Edit `vercel.json`.**
+- [x] **Step 4: Run** `npx vitest run src/test/securityConfig.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(security): pin connect-src (S14), COOP, HSTS preload, immutable assets`.
+- [x] **Step 6: After the PR deploys**, check the Vercel preview with `curl -sI <preview>/` and `curl -sI <preview>/assets/<any>.js`, and paste both into the PR. Log in on the preview (Turnstile plus Supabase auth must work under the pinned `connect-src`).
 
 ### Task 7: PWA icons and manifest
 
@@ -169,15 +169,15 @@
 **Interfaces:**
 - Produces: the manifest `icons`. These are `pwa-192x192.png` (192x192, `image/png`, purpose `any`), `pwa-512x512.png` (512x512, purpose `any`), `maskable-icon-512x512.png` (512x512, purpose `maskable`) and `pks-logo.svg` (`any`, purpose `any`). The description is `'Your second brain. Capture, organize, and connect what you learn.'`.
 
-- [ ] **Step 1: Write the check** `scripts/check-pwa.mjs`. It reads `dist/manifest.webmanifest` and `dist/sw.js`, and exits 1 with a message unless:
+- [x] **Step 1: Write the check** `scripts/check-pwa.mjs`. It reads `dist/manifest.webmanifest` and `dist/sw.js`, and exits 1 with a message unless:
   - icons include 192 and 512 PNGs with purpose `any`, and a 512 PNG with purpose `maskable`;
   - every icon `src` exists in `dist/`;
   - the description doesn't contain "synthesize" (case-insensitive);
   - `sw.js` precaches at least one `.woff2` (Review focus 5).
-- [ ] **Step 2: Run** `npm run build && node scripts/check-pwa.mjs`. Expected: FAIL (no PNG icons).
-- [ ] **Step 3:** run `npm run icons`, then update `vite.config.js` and `index.html`.
-- [ ] **Step 4: Run** `npm run build && node scripts/check-pwa.mjs`. Expected: exit 0. Add `node scripts/check-pwa.mjs` as a step after "Build against the local stack" in the `e2e` job.
-- [ ] **Step 5: Commit** `feat(pwa): PNG and maskable icons, plain-language manifest`.
+- [x] **Step 2: Run** `npm run build && node scripts/check-pwa.mjs`. Expected: FAIL (no PNG icons).
+- [x] **Step 3:** run `npm run icons`, then update `vite.config.js` and `index.html`.
+- [x] **Step 4: Run** `npm run build && node scripts/check-pwa.mjs`. Expected: exit 0. Add `node scripts/check-pwa.mjs` as a step after "Build against the local stack" in the `e2e` job.
+- [x] **Step 5: Commit** `feat(pwa): PNG and maskable icons, plain-language manifest`.
 
 ### Task 8: P6, a cover image that doesn't shift
 
@@ -185,18 +185,18 @@
 - Modify: `frontend/src/features/object/ReadOnlyBody.tsx:13`, `frontend/src/features/object/ObjectPage.css` (`.detail-cover`, around lines 314–319)
 - Test: `frontend/src/features/object/ReadOnlyBody.test.tsx` (create it if it doesn't exist; follow `ObjectPage.test.tsx`'s render helpers)
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `it('reserves the cover box before the image loads')`: the rendered `img.detail-cover` has `decoding="async"` and the `width`/`height` attributes `1200`/`675`.
   - `it('hides a cover that fails to load')`: `fireEvent.error(img)` removes the img from the DOM, or its wrapper gets `hidden`.
-- [ ] **Step 2: Run** `npx vitest run src/features/object/ReadOnlyBody.test.tsx`. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run** `npx vitest run src/features/object/ReadOnlyBody.test.tsx`. Expected: FAIL.
+- [x] **Step 3: Implement.**
   - Use `useState` for `failed` and return null when it is set.
   - The `<img>` gets `width={1200} height={675} decoding="async" loading="lazy" onError={() => setFailed(true)}`.
   - The CSS gets `aspect-ratio: 16 / 9; width: 100%; height: auto; object-fit: cover;`.
-- [ ] **Step 4: Run** `npx vitest run && npx eslint .`. Expected: PASS.
-- [ ] **Step 5: Commit** `fix(object): cover image keeps its box and hides on error (P6)`.
+- [x] **Step 4: Run** `npx vitest run && npx eslint .`. Expected: PASS.
+- [x] **Step 5: Commit** `fix(object): cover image keeps its box and hides on error (P6)`.
 
 ### Finish
 
-- [ ] Open one PR for part 1. Wait for **every** check to finish before merging (`gh pr checks <n> --watch`; the repo has no branch protection).
-- [ ] After merging, record in the spec's "Verified status": S14, the fonts/CSP/headers/PWA items and P6 are done, along with the a11y baseline length and the axe baseline table.
+- [x] Open one PR for part 1. Wait for **every** check to finish before merging (`gh pr checks <n> --watch`; the repo has no branch protection).
+- [x] After merging, record in the spec's "Verified status": S14, the fonts/CSP/headers/PWA items and P6 are done, along with the a11y baseline length and the axe baseline table.
