@@ -38,6 +38,7 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@blocknote/server-util": "0.55.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.56.1",
