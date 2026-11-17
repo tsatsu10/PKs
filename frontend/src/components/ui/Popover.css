@@ -1,0 +1,21 @@
+.ui-popover {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-popover-panel {
+  position: absolute;
+  top: calc(100% + var(--pks-space-2));
+  z-index: 100;
+  min-width: 12rem;
+  max-width: min(22rem, 92vw);
+  padding: var(--pks-space-3);
+  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border-radius: var(--pks-radius-lg);
+  background: var(--pks-surface-sheet);
+  color: var(--pks-text-primary);
+  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+}
+
+.ui-popover-panel--start { inset-inline-start: 0; }
+.ui-popover-panel--end { inset-inline-end: 0; }
