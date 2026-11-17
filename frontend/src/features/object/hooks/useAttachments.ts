@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useNotifyError } from '../../../lib/useNotifyError';
 import { getErrorMessage } from '../../../lib/errors';
+import { openInNewTab } from '../../../lib/download';
 import { FILES_BUCKET, getStoragePath } from '../../../lib/storage';
 import { invalidateObjectLists } from '../../../data/objects';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,8 +10,6 @@ import { optimistic } from '../../../data/optimistic';
 import { qk } from '../../../data/keys';
 import { useUndoToast } from './useUndoToast';
 import type { ObjectRow, FileRow, SetError } from '../types';
-
-const POPUP_BLOCKED = 'Your browser blocked the download window. Allow pop-ups for this site, then try again.';
 
 type Options = { object: ObjectRow | null; userId: string | undefined; setError: SetError };
 
@@ -55,25 +54,18 @@ export function useAttachments({ object, userId, setError }: Options) {
   }
 
   /**
-   * Opens the tab synchronously, inside the click, then points it at the signed URL once it arrives.
-   * A window opened after an await is no longer tied to the click, and browsers block it (R16).
+   * Sign a short-lived URL and open it in a new tab. The anchor click is not a popup,
+   * so the await is safe (the old window.open flow had to open the tab inside the click; R16).
    */
   async function download(f: FileRow) {
     setError('');
-    const win = window.open('', '_blank');
-    if (!win) {
-      setError(POPUP_BLOCKED);
-      return;
-    }
-    win.opener = null;
     try {
       const path = f.storage_key || getStoragePath(userId as string, f.id, f.filename);
       const { data, error: err } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60);
       if (err) throw err;
       if (!data?.signedUrl) throw new Error('Download failed');
-      win.location.href = data.signedUrl;
+      openInNewTab(data.signedUrl);
     } catch (err) {
-      win.close();
       setError(getErrorMessage(err, 'Download failed'));
     }
   }

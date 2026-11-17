@@ -38,14 +38,17 @@ export default defineConfig({
       manifest: {
         name: 'PKS — Personal Knowledge System',
         short_name: 'PKS',
-        description: 'Your second brain. Capture, organize, and synthesize knowledge.',
+        description: 'Your second brain. Capture, organize, and connect what you learn.',
         start_url: '/',
         display: 'standalone',
         background_color: '#0a0a0f',
         theme_color: '#ec4899',
         orientation: 'portrait-primary',
         icons: [
-          { src: '/pks-logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/pks-logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
       workbox: {
@@ -54,18 +57,6 @@ export default defineConfig({
         // Emoji data is lazy-loaded by the editor's emoji picker; skip it.
         globIgnores: ['**/native-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }, cacheableResponse: { statuses: [0, 200] } },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: { cacheName: 'gstatic-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }, cacheableResponse: { statuses: [0, 200] } },
-          },
-        ],
       },
     }),
   ],

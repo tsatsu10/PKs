@@ -15,7 +15,6 @@ vi.mock('../../../lib/supabase', async () => {
 import { useAttachments } from './useAttachments';
 
 const FILE: FileRow = { id: 'f1', filename: 'a.pdf', mime_type: 'application/pdf', size_bytes: 10, storage_key: 'owner/f1/a.pdf' };
-const BLOCKED = 'Your browser blocked the download window. Allow pop-ups for this site, then try again.';
 
 function setup() {
   const client = createTestQueryClient();
@@ -26,8 +25,13 @@ function setup() {
   return { ...r, setError, files };
 }
 
-function fakeWindow() {
-  return { location: { href: '' }, close: vi.fn(), opener: {} as unknown } as unknown as Window & { close: ReturnType<typeof vi.fn> };
+/** Anchors the download flow clicks, recording whether each was attached to the document at click time. */
+function clickSpy() {
+  const clicks: { anchor: HTMLAnchorElement; attached: boolean }[] = [];
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click(this: HTMLAnchorElement) {
+    clicks.push({ anchor: this, attached: document.body.contains(this) });
+  });
+  return clicks;
 }
 
 beforeEach(() => {
@@ -37,41 +41,26 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('useAttachments', () => {
-  it('download opens the window before awaiting the signed URL', () => {
-    const win = fakeWindow();
-    const open = vi.spyOn(window, 'open').mockReturnValue(win);
-    sb.current!.bucket.createSignedUrl.mockReturnValue(new Promise(() => {}));
-    const { result } = setup();
-    void result.current.download(FILE);
-    expect(open).toHaveBeenCalledTimes(1);
-    expect(open).toHaveBeenCalledWith('', '_blank');
-  });
-
-  it('download sends the opened window to the signed URL', async () => {
-    const win = fakeWindow();
-    vi.spyOn(window, 'open').mockReturnValue(win);
+  it('download opens the signed URL in a new tab, clicked while attached', async () => {
+    const clicks = clickSpy();
     const { result } = setup();
     await act(() => result.current.download(FILE));
     expect(sb.current!.bucket.createSignedUrl).toHaveBeenCalledWith('owner/f1/a.pdf', 60);
-    expect(win.location.href).toBe('https://signed.example/file');
-    expect(win.opener).toBeNull();
+    expect(clicks).toHaveLength(1);
+    const { anchor, attached } = clicks[0];
+    expect(attached).toBe(true);
+    expect(anchor.href).toBe('https://signed.example/file');
+    expect(anchor.target).toBe('_blank');
+    expect(anchor.rel).toBe('noopener');
+    expect(document.body.contains(anchor)).toBe(false);
   });
 
-  it('download with a blocked popup shows the pop-up message', async () => {
-    vi.spyOn(window, 'open').mockReturnValue(null);
-    const { result, setError } = setup();
-    await act(() => result.current.download(FILE));
-    expect(setError).toHaveBeenLastCalledWith(BLOCKED);
-    expect(sb.current!.bucket.createSignedUrl).not.toHaveBeenCalled();
-  });
-
-  it('a failed signed URL closes the window and reports', async () => {
-    const win = fakeWindow();
-    vi.spyOn(window, 'open').mockReturnValue(win);
+  it('a failed signed URL opens nothing and reports', async () => {
+    const clicks = clickSpy();
     sb.current!.bucket.createSignedUrl.mockResolvedValue({ data: null, error: { code: 'PGRST000', message: 'down' } });
     const { result, setError } = setup();
     await act(() => result.current.download(FILE));
-    expect(win.close).toHaveBeenCalled();
+    expect(clicks).toHaveLength(0);
     expect(setError).toHaveBeenLastCalledWith(expect.stringMatching(/.+/));
   });
 

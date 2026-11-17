@@ -3,12 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase, isPasswordRecovery, clearPasswordRecovery } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
+import AuthField from '../components/auth/AuthField';
+import PasswordInput from '../components/auth/PasswordInput';
+import PasswordStrength from '../components/auth/PasswordStrength';
 import './Auth.css';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [confirmError, setConfirmError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [hasSession, setHasSession] = useState(null);
@@ -23,8 +27,9 @@ export default function ResetPassword() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setConfirmError('');
     if (password !== confirm) {
-      setError('Passwords do not match');
+      setConfirmError('Passwords don\u2019t match.');
       return;
     }
     if (password.length < 8) {
@@ -48,11 +53,13 @@ export default function ResetPassword() {
   if (done) {
     return (
       <AuthLayout
+        variant="card"
         title="Password updated"
-        hint="Your password has been set. Redirecting to dashboard…"
-        footer={<Link to="/">Go to dashboard</Link>}
+        subtitle="You can sign in with your new password. Redirecting home…"
       >
-        <p className="auth-message">You can sign in with your new password.</p>
+        <div className="auth-footer">
+          <Link to="/">Go to Home</Link>
+        </div>
       </AuthLayout>
     );
   }
@@ -60,76 +67,75 @@ export default function ResetPassword() {
   if (hasSession === false) {
     return (
       <AuthLayout
+        variant="card"
         title="Invalid or expired link"
-        hint="This reset link is invalid or has expired. Request a new one below."
-        footer={
-          <>
-            <Link to="/forgot-password">Send new reset link</Link>
-            <span className="auth-footer-sep" aria-hidden>·</span>
-            <Link to="/login">Sign in</Link>
-          </>
-        }
+        subtitle="This reset link is invalid or has expired. Request a new one below."
       >
-        <p className="auth-message">Use the button above to request a fresh link, or sign in if you remember your password.</p>
+        <p className="auth-message">
+          Use the button below to request a fresh link, or sign in if you remember your password.
+        </p>
+        <div className="auth-footer">
+          <Link to="/forgot-password">Send new reset link</Link>
+          <span className="auth-footer-sep" aria-hidden>
+            ·
+          </span>
+          <Link to="/login">Sign in</Link>
+        </div>
       </AuthLayout>
     );
   }
 
   if (hasSession === null) {
     return (
-      <AuthLayout title="Set new password" hint="Checking your link…">
-        <div className="auth-loading-logo" aria-hidden>
-          <img src="/pks-logo.svg" alt="" width="48" height="48" />
-        </div>
-        <p className="auth-message">Please wait…</p>
-      </AuthLayout>
+      <AuthLayout variant="card" title="Choose a new password" subtitle="Checking your link…" />
     );
   }
 
   return (
     <AuthLayout
-      title="Set new password"
-      hint="Enter your new password below (min 8 characters)."
-      footer={<Link to="/login">Back to sign in</Link>}
+      variant="card"
+      title="Choose a new password"
+      subtitle="You'll be signed out on other devices."
     >
-      <form className="form" onSubmit={handleSubmit} aria-describedby={error ? 'reset-error' : undefined} noValidate>
+      <form onSubmit={handleSubmit} aria-describedby={error ? 'reset-error' : undefined} noValidate>
         {error && (
           <div id="reset-error" className="auth-error" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
-        <div className="form-floating">
-          <input
+        <AuthField id="reset-password" label="New password">
+          <PasswordInput
             id="reset-password"
-            type="password"
-            className="form-floating-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder=" "
+            autoComplete="new-password"
             required
             minLength={8}
-            autoComplete="new-password"
-            aria-invalid={!!error}
+            invalid={!!error}
           />
-          <label htmlFor="reset-password" className="form-floating-label">New password (min 8 characters)</label>
-        </div>
-        <div className="form-floating">
-          <input
+          <PasswordStrength password={password} />
+        </AuthField>
+        <AuthField id="reset-confirm" label="Confirm password" error={confirmError || undefined}>
+          <PasswordInput
             id="reset-confirm"
-            type="password"
-            className="form-floating-input"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            placeholder=" "
-            required
-            minLength={8}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              if (confirmError) setConfirmError('');
+            }}
             autoComplete="new-password"
-            aria-invalid={!!error}
+            required
+            invalid={!!confirmError}
+            describedBy={confirmError ? 'reset-confirm-error' : undefined}
           />
-          <label htmlFor="reset-confirm" className="form-floating-label">Confirm password</label>
-        </div>
-        <button type="submit" disabled={submitting} aria-busy={submitting}>
-          {submitting ? 'Updating…' : 'Set password'}
+        </AuthField>
+        <button
+          type="submit"
+          className="auth-button auth-button-primary"
+          disabled={submitting}
+          aria-busy={submitting}
+        >
+          {submitting ? 'Saving…' : 'Save and sign in'}
         </button>
       </form>
     </AuthLayout>

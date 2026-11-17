@@ -96,7 +96,7 @@
   --bp-lg: 900px;
 
   /* Typography */
-  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--pks-font-sans);
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;

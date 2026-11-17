@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFocusTrap } from '@mantine/hooks';
-import { getAllShortcutRows } from '../features/dashboard/lib/keyboardMap';
+import { getAllShortcutRows } from '../lib/keyboardMap';
 import './ShortcutsModal.css';
 
 export default function ShortcutsModal({ open, onClose }) {

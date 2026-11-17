@@ -13,7 +13,7 @@ import TableViewRow from './Views/TableView';
 import { LinkedObjectsProvider } from '../context/LinkedObjectsContext';
 import ActivityPulse from './Sidebar/ActivityPulse';
 import { DashboardEmptyFirstRun, DashboardEmptyNoResults } from './Empty/DashboardEmptyStates';
-import DashboardObjectCard from '../../../components/DashboardObjectCard';
+import DashboardObjectCard from './DashboardObjectCard';
 import DashboardPagination from '../../../components/DashboardPagination';
 import DashboardCommandPalette from './DashboardCommandPalette';
 import DashboardModals from './DashboardModals';

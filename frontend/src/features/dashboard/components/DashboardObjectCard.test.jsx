@@ -3,12 +3,12 @@ import { createElement, useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import DashboardObjectCard from './DashboardObjectCard';
-import TimelineRow from '../features/dashboard/components/Views/TimelineRow';
-import TableViewRow from '../features/dashboard/components/Views/TableView';
+import TimelineRow from './Views/TimelineRow';
+import TableViewRow from './Views/TableView';
 
 // Every row (and its LinkedBar) calls usePrefetchObject on each render, so it doubles as a render counter.
 const renderProbe = vi.fn();
-vi.mock('../data/usePrefetchObject', () => ({
+vi.mock('../../../data/usePrefetchObject', () => ({
   usePrefetchObject: () => {
     renderProbe();
     return () => ({});

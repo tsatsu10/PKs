@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { downloadBlob, printHtml } from './download';
+import { downloadBlob, openInNewTab, printHtml } from './download';
 
 describe('downloadBlob', () => {
   beforeEach(() => {
@@ -23,21 +23,55 @@ describe('downloadBlob', () => {
   });
 });
 
+describe('openInNewTab', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('clicks an attached anchor with noopener, then removes it', () => {
+    let clickedWhileAttached = false;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click() {
+      clickedWhileAttached = document.body.contains(this) && this.target === '_blank' && this.rel === 'noopener';
+    });
+    openInNewTab('https://signed.example/file');
+    expect(clickedWhileAttached).toBe(true);
+    expect(document.querySelectorAll('a[target="_blank"]').length).toBe(0);
+  });
+});
+
 describe('printHtml', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('writes the HTML into a new window and prints it', () => {
-    const doc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
-    const win = { document: doc, focus: vi.fn(), print: vi.fn(), opener: 'x' };
-    vi.spyOn(window, 'open').mockReturnValue(win);
+  /** Appends printHtml's iframe to the body, giving it a mocked document and window. */
+  function mockIframe({ withDocument = true } = {}) {
+    const doc = withDocument ? { open: vi.fn(), write: vi.fn(), close: vi.fn() } : null;
+    const view = { focus: vi.fn(), print: vi.fn(), addEventListener: vi.fn() };
+    let frame;
+    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => {
+      frame = node;
+      if (withDocument) {
+        Object.defineProperty(node, 'contentDocument', { value: doc, configurable: true });
+        Object.defineProperty(node, 'contentWindow', { value: view, configurable: true });
+      }
+      return node;
+    });
+    return { get frame() { return frame; }, doc, view };
+  }
+
+  it('writes the HTML into an off-screen iframe and prints it', () => {
+    const mocked = mockIframe();
     expect(printHtml('<p>Hi</p>')).toBe(true);
+    const { frame, doc, view } = mocked;
+    expect(frame.style.position).toBe('fixed');
+    expect(frame.getAttribute('aria-hidden')).toBe('true');
+    expect(doc.open).toHaveBeenCalled();
     expect(doc.write).toHaveBeenCalledWith('<p>Hi</p>');
-    expect(win.print).toHaveBeenCalled();
-    expect(win.opener).toBeNull();
+    expect(doc.close).toHaveBeenCalled();
+    expect(view.focus).toHaveBeenCalled();
+    expect(view.print).toHaveBeenCalled();
+    expect(view.addEventListener).toHaveBeenCalledWith('afterprint', expect.any(Function), { once: true });
   });
 
-  it('returns false when the popup is blocked', () => {
-    vi.spyOn(window, 'open').mockReturnValue(null);
+  it('returns false when the iframe has no document', () => {
+    mockIframe({ withDocument: false });
     expect(printHtml('<p>Hi</p>')).toBe(false);
   });
 });

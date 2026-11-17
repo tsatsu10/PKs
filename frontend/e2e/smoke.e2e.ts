@@ -17,7 +17,7 @@ test.describe('signed out', () => {
   test('login with email and password', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill(E2E_EMAIL);
-    await page.getByLabel('Password').fill(E2E_PASSWORD);
+    await page.getByLabel('Password', { exact: true }).fill(E2E_PASSWORD);
     // The always-pass Turnstile test key enables the button once its token arrives.
     const submit = page.getByRole('button', { name: 'Sign in' });
     await expect(submit).toBeEnabled({ timeout: 20_000 });
