@@ -309,13 +309,16 @@
 
 .detail-cover-wrap {
   margin: 0 0 1rem 0;
+  aspect-ratio: 16 / 9;
 }
 
 .detail-cover {
   display: block;
-  max-width: 100%;
+  width: 100%;
   height: auto;
+  max-width: 100%;
   border-radius: 8px;
+  object-fit: cover;
 }
 
 .detail-reference-wrap {

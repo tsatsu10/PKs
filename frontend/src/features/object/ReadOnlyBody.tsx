@@ -1,6 +1,26 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import ContentView from './ContentView';
 import type { ObjectRow } from './types';
+
+/** 16:9 box the cover renders in, so the layout doesn't shift while the image loads (P6). */
+function CoverImage({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <figure className="detail-cover-wrap">
+      <img
+        src={src}
+        alt=""
+        className="detail-cover"
+        width={1200}
+        height={675}
+        decoding="async"
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    </figure>
+  );
+}
 
 /** The read view: title, cover, source, summary, the owner's Synthesize slot, and the content. */
 export default function ReadOnlyBody({ object, synthesize }: { object: ObjectRow; synthesize?: ReactNode }) {
@@ -8,11 +28,7 @@ export default function ReadOnlyBody({ object, synthesize }: { object: ObjectRow
   return (
     <>
       <h1 className="detail-title">{object.title}</h1>
-      {object.cover_url && (
-        <figure className="detail-cover-wrap">
-          <img src={object.cover_url} alt="" className="detail-cover" />
-        </figure>
-      )}
+      {object.cover_url && <CoverImage src={object.cover_url} />}
       {object.source && (
         <div className={isBookmark ? 'detail-bookmark-url' : 'detail-reference-wrap'}>
           <p className="detail-reference">
