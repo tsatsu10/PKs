@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import AuthLayout from '../components/AuthLayout';
+import AuthField from '../components/auth/AuthField';
 import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
@@ -37,53 +38,57 @@ export default function ForgotPassword() {
     }
   }
 
-  if (sent) {
-    return (
-      <AuthLayout
-        title="Check your email"
-        hint={
-          <>
-            If an account exists for <strong>{email}</strong>, we&apos;ve sent a link to reset your password.
-          </>
-        }
-        footer={<Link to="/login">Back to sign in</Link>}
-      >
-        <p className="auth-message">Check your inbox and spam folder. The link will expire in an hour.</p>
-      </AuthLayout>
-    );
-  }
-
   return (
     <AuthLayout
-      title="Reset password"
-      hint="Enter your email and we'll send you a link to set a new password."
-      footer={<Link to="/login">Back to sign in</Link>}
+      variant="card"
+      title="Reset your password"
+      subtitle="Enter your email and we'll send a reset link if an account exists."
     >
-      <form className="form" onSubmit={handleSubmit} aria-describedby={error ? 'forgot-error' : undefined} noValidate>
+      <form
+        onSubmit={handleSubmit}
+        aria-describedby={error ? 'forgot-error' : undefined}
+        noValidate
+      >
         {error && (
           <div id="forgot-error" className="auth-error" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
-        <div className="form-floating">
+        {sent && (
+          <p className="auth-success" role="status">
+            If <strong>{email.trim()}</strong> has an account, a link is on its way. It works for 1
+            hour.
+          </p>
+        )}
+        <AuthField id="forgot-email" label="Email" error={error || undefined}>
           <input
             id="forgot-email"
             type="email"
-            className="form-floating-input"
+            className="auth-input"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder=" "
-            required
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setSent(false);
+            }}
             autoComplete="email"
+            required
             aria-invalid={!!error}
+            aria-describedby={error ? 'forgot-error' : undefined}
           />
-          <label htmlFor="forgot-email" className="form-floating-label">Email</label>
-        </div>
+        </AuthField>
         <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
-        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
-          {submitting ? 'Sending…' : 'Send reset link'}
+        <button
+          type="submit"
+          className="auth-button auth-button-primary"
+          disabled={submitting || (captchaSiteKey && !captchaToken)}
+          aria-busy={submitting}
+        >
+          {submitting ? 'Sending…' : sent ? 'Send another link' : 'Send reset link'}
         </button>
       </form>
+      <div className="auth-footer">
+        <Link to="/login">← Back to sign in</Link>
+      </div>
     </AuthLayout>
   );
 }
