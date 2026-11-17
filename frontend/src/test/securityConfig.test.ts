@@ -28,8 +28,21 @@ export function csp(): Map<string, string[]> {
   )
 }
 
-describe('index.html and CSP', () => {
-  it('serves no Google Fonts', () => {
+/** All app source files, excluding tests and test support. */
+function srcFiles(dir = path.join(frontendRoot, 'src')): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'test' || entry.name === 'data') return []
+      return srcFiles(full)
+    }
+    const isSource = /\.[jt]sx?$/.test(entry.name)
+    const isTest = /\.test\.[jt]sx?$/.test(entry.name)
+    return isSource && !isTest ? [full] : []
+  })
+}
+
+describe('index.html and CSP', () => {  it('serves no Google Fonts', () => {
     expect(indexHtml).not.toContain('fonts.googleapis')
     expect(indexHtml).not.toContain('fonts.gstatic')
     for (const [directive, values] of csp()) {
@@ -59,5 +72,57 @@ describe('index.html and CSP', () => {
         'https://challenges.cloudflare.com',
       )
     }
+  })
+
+  it('pins connect-src to the project', () => {
+    const expected = [
+      "'self'",
+      'https://qtsxnipmbuvfflifvusn.supabase.co',
+      'wss://qtsxnipmbuvfflifvusn.supabase.co',
+      'https://challenges.cloudflare.com',
+    ]
+    expect([...(csp().get('connect-src') ?? [])].sort()).toEqual([...expected].sort())
+    for (const [directive, values] of csp()) {
+      expect(values.join(' '), directive).not.toContain('*.supabase.co')
+    }
+  })
+
+  it('sends COOP and HSTS preload', () => {
+    expect(header('/(.*)', 'Cross-Origin-Opener-Policy')).toBe('same-origin')
+    expect(header('/(.*)', 'Strict-Transport-Security')).toBe(
+      'max-age=63072000; includeSubDomains; preload',
+    )
+  })
+
+  it('caches only hashed assets forever', () => {
+    const entries = vercelJson.headers as HeaderEntry[]
+    const assets = entries.filter((e) => e.source === '/assets/(.*)')
+    expect(assets).toHaveLength(1)
+    expect(assets[0].headers.find((h) => h.key === 'Cache-Control')?.value).toBe(
+      'public, max-age=31536000, immutable',
+    )
+    for (const e of entries) {
+      if (e.source === '/assets/(.*)') continue
+      expect(e.headers.some((h) => h.key === 'Cache-Control'), e.source).toBe(false)
+    }
+  })
+
+  it('has no popup flows that COOP would break', () => {
+    // COOP same-origin severs cross-origin opener access, so window.open may only be
+    // used with a blank same-origin target ('') whose opener is dropped before any
+    // cross-origin navigation (the download and print flows today). A flow that opens
+    // a real URL, or keeps the opener handle across a cross-origin navigation, breaks
+    // under COOP and must be redesigned.
+    const offenders = srcFiles()
+      .map((file) => ({ file, code: fs.readFileSync(file, 'utf8') }))
+      .filter(({ code }) => code.includes('window.open('))
+      .filter(({ code }) => {
+        const calls = code.match(/window\.open\([^)]*\)/g) ?? []
+        const blankTarget = calls.every((c) => /window\.open\(\s*(''|"")\s*,/.test(c))
+        const nerfsOpener = /=>\s*null|;?\s*\w+\.opener = null/.test(code)
+        return !(blankTarget && nerfsOpener)
+      })
+      .map(({ file }) => path.relative(frontendRoot, file).replaceAll('\\', '/'))
+    expect(offenders).toEqual([])
   })
 })
