@@ -198,5 +198,5 @@
 
 ### Finish
 
-- [x] Open one PR for part 1. Wait for **every** check to finish before merging (`gh pr checks <n> --watch`; the repo has no branch protection).
-- [x] After merging, record in the spec's "Verified status": S14, the fonts/CSP/headers/PWA items and P6 are done, along with the a11y baseline length and the axe baseline table.
+- [ ] Open one PR for part 1. Wait for **every** check to finish before merging (`gh pr checks <n> --watch`; the repo has no branch protection).
+- [ ] After merging, record in the spec's "Verified status": S14, the fonts/CSP/headers/PWA items and P6 are done, along with the a11y baseline length and the axe baseline table.
