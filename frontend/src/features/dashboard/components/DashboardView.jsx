@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useMediaQuery } from '@mantine/hooks';
+import { ACTIVITY_INLINE_QUERY } from '../../../breakpoints';
 import { SkeletonList } from '../../../components/Skeleton';
 import QueryError from '../../../components/QueryError';
 import DashboardFilterPanel from '../../../components/DashboardFilterPanel';
@@ -12,6 +14,7 @@ import StreamBucketHeader from './Views/StreamBucketHeader';
 import TableViewRow from './Views/TableView';
 import { LinkedObjectsProvider } from '../context/LinkedObjectsContext';
 import ActivityPulse from './Sidebar/ActivityPulse';
+import ActivityDrawer from './ActivityDrawer';
 import { DashboardEmptyFirstRun, DashboardEmptyNoResults } from './Empty/DashboardEmptyStates';
 import DashboardObjectCard from './DashboardObjectCard';
 import DashboardPagination from '../../../components/DashboardPagination';
@@ -46,6 +49,7 @@ export default function DashboardView(props) {
     bulkSetStatus, dismissOnboarding, saveCurrentFilters, applySavedFilter, deleteSavedFilter,
     showBanner, bannerKind, retryList, listError
   } = props;
+  const activityInline = useMediaQuery(ACTIVITY_INLINE_QUERY, false, { getInitialValueInEffect: false });
 
   return (
 
@@ -181,6 +185,7 @@ export default function DashboardView(props) {
             className={`quick-filter-pill dashboard-activity-toggle${showActivityPanel ? ' active' : ''}`}
             onClick={() => setShowActivityPanel((v) => !v)}
             aria-expanded={showActivityPanel}
+            aria-haspopup={activityInline ? undefined : 'dialog'}
           >
             Activity
           </button>
@@ -517,14 +522,14 @@ export default function DashboardView(props) {
           </>
         )}
           </div>
-          <aside className={`dashboard-sidebar${showActivityPanel ? ' dashboard-sidebar--open-mobile' : ''}`} aria-label="Activity">
+          <ActivityDrawer open={showActivityPanel} onClose={() => setShowActivityPanel(false)}>
             <ActivityPulse
               userId={user?.id ?? null}
               heroStats={heroStats}
               dueSoonCount={heroStats?.due_next_7_days ?? 0}
               onTagFilter={handleTagFilterFromActivity}
             />
-          </aside>
+          </ActivityDrawer>
         </div>
         </LinkedObjectsProvider>
 
