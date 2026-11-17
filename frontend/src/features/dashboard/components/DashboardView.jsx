@@ -523,12 +523,15 @@ export default function DashboardView(props) {
         )}
           </div>
           <ActivityDrawer open={showActivityPanel} onClose={() => setShowActivityPanel(false)}>
-            <ActivityPulse
-              userId={user?.id ?? null}
-              heroStats={heroStats}
-              dueSoonCount={heroStats?.due_next_7_days ?? 0}
-              onTagFilter={handleTagFilterFromActivity}
-            />
+            {(dismiss) => (
+              <ActivityPulse
+                userId={user?.id ?? null}
+                heroStats={heroStats}
+                dueSoonCount={heroStats?.due_next_7_days ?? 0}
+                onTagFilter={(...args) => { handleTagFilterFromActivity(...args); dismiss(); }}
+                onNavigate={dismiss}
+              />
+            )}
           </ActivityDrawer>
         </div>
         </LinkedObjectsProvider>

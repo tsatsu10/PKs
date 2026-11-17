@@ -70,6 +70,24 @@ describe('Combobox', () => {
     expect(input.value).toBe('');
   });
 
+  it('ignores Enter and Escape while an IME is composing', () => {
+    const { onSelect, input } = renderCombobox();
+    fireEvent.change(input, { target: { value: 'ba' } });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Escape', isComposing: true });
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens the full list on click without selecting', () => {
+    const { onSelect, input } = renderCombobox();
+    fireEvent.click(input);
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('option')).toHaveLength(3);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('filters case-insensitively and caps results', () => {
     const many = Array.from({ length: 60 }, (_, i) => ({ value: String(i + 1), label: `Option ${i + 1}` }));
     const { input } = renderCombobox(many);

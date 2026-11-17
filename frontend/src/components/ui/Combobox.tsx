@@ -61,6 +61,8 @@ export default function Combobox({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // An IME uses Enter and Escape to confirm or cancel its own composition.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -134,6 +136,8 @@ export default function Combobox({
               setActive(any ? 0 : -1);
             }}
             onKeyDown={onKeyDown}
+            // A click or tap shows the list, so options can be browsed without typing or a keyboard.
+            onClick={() => { if (!open) openList(); }}
             onBlur={() => {
               setOpen(false);
               setActive(-1);

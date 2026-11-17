@@ -49,16 +49,17 @@ describe('Dialog', () => {
     expect(dialog).toHaveAccessibleDescription('Running against: Note');
   });
 
-  it('moves focus in and returns it on close', () => {
+  it('moves focus in and returns it on close', async () => {
     const { rerender } = renderPage(true);
     const dialog = screen.getByRole('dialog');
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(screen.getByLabelText('Prompt'));
     rerender(<Page open={false} />);
+    await Promise.resolve();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Trigger' }));
   });
 
-  it('cleans up on unmount', () => {
+  it('cleans up on unmount', async () => {
     // A trigger outside the React tree stays connected after the unmount, as a parent page's would.
     const trigger = document.createElement('button');
     trigger.textContent = 'Outside';
@@ -70,6 +71,7 @@ describe('Dialog', () => {
     );
     expect(root.hasAttribute('inert')).toBe(true);
     unmount();
+    await Promise.resolve();
     expect(root.hasAttribute('inert')).toBe(false);
     expect(document.body.style.overflow).toBe('scroll');
     expect(document.activeElement).toBe(trigger);
@@ -173,7 +175,34 @@ describe('Dialog', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('returns focus inside the lower dialog when the top one closes', () => {
+  it('restores focus after the page lock lifts when a dialog and its confirm unmount together', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Run prompt';
+    root.appendChild(trigger);
+    trigger.focus();
+    let inertAtFocus: boolean | null = null;
+    const realFocus = trigger.focus.bind(trigger);
+    trigger.focus = () => { inertAtFocus = root.hasAttribute('inert'); realFocus(); };
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const panel = (confirming: boolean) => (
+      <Dialog open onClose={() => {}} title="Run prompt">
+        <textarea aria-label="Output" />
+        <ConfirmDialog open={confirming} title="Discard?" message="Unsaved." confirmLabel="Discard" onConfirm={() => {}} onCancel={() => {}} />
+      </Dialog>
+    );
+    // As in the AI panel: the panel opens, then its confirm, then Discard unmounts both at once.
+    const { rerender, unmount } = render(panel(false), { container: host });
+    rerender(panel(true));
+    unmount();
+    await Promise.resolve();
+    // A real browser ignores focus() inside an inert #root, so the restore must wait for the lock to lift.
+    expect(inertAtFocus).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+    host.remove();
+  });
+
+  it('returns focus inside the lower dialog when the top one closes', async () => {
     function Stacked() {
       const [confirming, setConfirming] = useState(false);
       return (
@@ -196,6 +225,7 @@ describe('Dialog', () => {
     fireEvent.click(opener);
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Discard?' })).toBeNull();
+    await Promise.resolve();
     expect(document.activeElement).toBe(opener);
     expect(root.hasAttribute('inert')).toBe(true);
   });

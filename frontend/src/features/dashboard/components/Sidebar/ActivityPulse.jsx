@@ -7,7 +7,7 @@ import './ActivityPulse.css';
 /**
  * Right-rail activity: trending tags, recent links.
  */
-export default function ActivityPulse({ userId, heroStats, dueSoonCount = 0, onTagFilter }) {
+export default function ActivityPulse({ userId, heroStats, dueSoonCount = 0, onTagFilter, onNavigate }) {
   const { activity, error, retry } = useActivityPulse(userId);
 
   return (
@@ -21,7 +21,7 @@ export default function ActivityPulse({ userId, heroStats, dueSoonCount = 0, onT
       {dueSoonCount > 0 && (
         <div className="activity-pulse-card">
           <p className="activity-pulse-card-meta">{dueSoonCount} due in the next 7 days</p>
-          <Link to="/?due=soon" className="activity-pulse-link">View due soon →</Link>
+          <Link to="/?due=soon" className="activity-pulse-link" onClick={() => onNavigate?.()}>View due soon →</Link>
         </div>
       )}
 

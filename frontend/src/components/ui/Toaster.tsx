@@ -75,7 +75,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback((type: ToastType, message: string, opts: ToastOptions = {}) => {
     const ttlMs = opts.ttlMs !== undefined ? opts.ttlMs : type === 'error' ? null : TOAST_TTL_MS;
 
-    const existing = list.current.find((t) => t.type === type && t.message === message);
+    // Toasts with an action (Undo) are never merged: each one undoes a different thing.
+    const existing = opts.action
+      ? undefined
+      : list.current.find((t) => !t.action && t.type === type && t.message === message);
     if (existing) {
       clearTimer(existing.id);
       if (existing.ttlMs !== null) start(existing.id, existing.ttlMs);
@@ -83,12 +86,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }
 
     const id = Math.random().toString(36).slice(2);
-    let next = [...list.current, { id, type, message, action: opts.action, ttlMs }];
-    if (next.length > MAX_VISIBLE) {
+    let next = list.current;
+    if (next.length >= MAX_VISIBLE) {
+      // Make room among the toasts already showing, so the newcomer is always seen.
       const drop = next.find((t) => t.type !== 'error') ?? next[0];
       clearTimer(drop.id);
       next = next.filter((t) => t.id !== drop.id);
     }
+    next = [...next, { id, type, message, action: opts.action, ttlMs }];
     commit(next);
     if (ttlMs !== null) start(id, ttlMs);
     return id;

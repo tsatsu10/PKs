@@ -41,6 +41,32 @@ describe('ActivityDrawer', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('lets content dismiss the drawer after acting on the page', () => {
+    narrow();
+    const onClose = vi.fn();
+    render(
+      <ActivityDrawer open onClose={onClose}>
+        {(dismiss) => <button type="button" onClick={dismiss}>#ml</button>}
+      </ActivityDrawer>,
+      { container: root },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '#ml' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('content dismiss does nothing inline on wide screens', () => {
+    wide();
+    const onClose = vi.fn();
+    render(
+      <ActivityDrawer open={false} onClose={onClose}>
+        {(dismiss) => <button type="button" onClick={dismiss}>#ml</button>}
+      </ActivityDrawer>,
+      { container: root },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '#ml' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('stays inline on wide screens', () => {
     wide();
     render(<ActivityDrawer open={false} onClose={() => {}}><p>Pulse</p></ActivityDrawer>, { container: root });

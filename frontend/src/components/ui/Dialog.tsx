@@ -117,7 +117,11 @@ export default function Dialog({
     return () => {
       container.removeEventListener('keydown', onKeyDown);
       popDialog(id);
-      if (previous?.isConnected) previous.focus();
+      // Wait until every dialog in this commit has cleaned up: a parent and its confirm unmount
+      // together parent-first, and focus() into a still-inert #root does nothing in a browser.
+      queueMicrotask(() => {
+        if (previous?.isConnected) previous.focus();
+      });
     };
   }, [open, id, depth, container, initialFocusRef]);
 

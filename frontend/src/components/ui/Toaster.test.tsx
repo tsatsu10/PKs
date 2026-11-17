@@ -145,6 +145,35 @@ describe('Toaster', () => {
     for (const m of ['E2', 'E3', 'E4', 'E5']) expect(screen.getByText(m)).toBeInTheDocument();
   });
 
+  it('keeps every undo toast, even with the same message', () => {
+    mount();
+    const undoA = vi.fn();
+    const undoB = vi.fn();
+    let a = '';
+    let b = '';
+    act(() => {
+      a = api.addToast('success', 'Tag removed', { ttlMs: UNDO_TTL_MS, action: { label: 'Undo', onClick: undoA } });
+      b = api.addToast('success', 'Tag removed', { ttlMs: UNDO_TTL_MS, action: { label: 'Undo', onClick: undoB } });
+    });
+    expect(b).not.toBe(a);
+    const undos = screen.getAllByRole('button', { name: 'Undo' });
+    expect(undos).toHaveLength(2);
+    fireEvent.click(undos[1]);
+    expect(undoB).toHaveBeenCalledTimes(1);
+    expect(undoA).not.toHaveBeenCalled();
+  });
+
+  it('shows a new toast when four errors are already showing', () => {
+    mount();
+    act(() => {
+      for (const m of ['E1', 'E2', 'E3', 'E4']) api.addToast('error', m);
+      api.addToast('success', 'Moved to Trash', { ttlMs: UNDO_TTL_MS, action: { label: 'Undo', onClick: () => {} } });
+    });
+    expect(screen.getByText('Moved to Trash')).toBeInTheDocument();
+    expect(screen.queryByText('E1')).toBeNull();
+    for (const m of ['E2', 'E3', 'E4']) expect(screen.getByText(m)).toBeInTheDocument();
+  });
+
   it('does not stack identical toasts', () => {
     vi.useFakeTimers();
     mount();
