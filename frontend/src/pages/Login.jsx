@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { fetchProfile } from '../data/profile';
 import AuthLayout from '../components/AuthLayout';
+import AuthField from '../components/auth/AuthField';
+import PasswordInput from '../components/auth/PasswordInput';
 import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
@@ -94,56 +96,72 @@ export default function Login() {
     }
   }
 
+  const subtitle = sessionExpiredMessage
+    ? 'Your session expired. Please sign in again.'
+    : location.state?.from
+      ? 'Please sign in to continue.'
+      : 'Sign in to your knowledge base.';
+
   return (
     <AuthLayout
-      title="Sign in"
-      hint={sessionExpiredMessage ? 'Your session expired. Please sign in again.' : (location.state?.from ? 'Please sign in to continue.' : null)}
+      title="Welcome back"
+      subtitle={subtitle}
       footer={
         <>
-          <Link to="/forgot-password">Forgot password?</Link>
-          <span className="auth-footer-sep" aria-hidden>·</span>
-          Don&apos;t have an account? <Link to="/register">Register</Link>
+          New to PKS? <Link to="/register">Create an account</Link>
         </>
       }
     >
-      <form ref={formRef} className="form" onSubmit={handleSubmit} aria-describedby={error ? 'login-error' : undefined} noValidate>
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        aria-describedby={error ? 'login-error' : undefined}
+        noValidate
+      >
         {error && (
           <div id="login-error" className="auth-error" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
-        <div className="form-floating">
+        <AuthField id="login-email" label="Email" error={error || undefined}>
           <input
             ref={firstInputRef}
             id="login-email"
             type="email"
-            className="form-floating-input"
+            className="auth-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder=" "
-            required
             autoComplete="email"
+            required
             aria-invalid={!!error}
             aria-describedby={error ? 'login-error' : undefined}
           />
-          <label htmlFor="login-email" className="form-floating-label">Email</label>
-        </div>
-        <div className="form-floating">
-          <input
+        </AuthField>
+        <AuthField
+          id="login-password"
+          label="Password"
+          trailing={
+            <Link to="/forgot-password" className="auth-field-link">
+              Forgot password?
+            </Link>
+          }
+        >
+          <PasswordInput
             id="login-password"
-            type="password"
-            className="form-floating-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder=" "
-            required
             autoComplete="current-password"
-            aria-invalid={!!error}
+            required
+            invalid={!!error}
           />
-          <label htmlFor="login-password" className="form-floating-label">Password</label>
-        </div>
+        </AuthField>
         <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
-        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
+        <button
+          type="submit"
+          className="auth-button auth-button-primary"
+          disabled={submitting || (captchaSiteKey && !captchaToken)}
+          aria-busy={submitting}
+        >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

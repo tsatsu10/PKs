@@ -6,6 +6,10 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { fetchProfile } from '../data/profile';
 import AuthLayout from '../components/AuthLayout';
+import AuthField from '../components/auth/AuthField';
+import PasswordInput from '../components/auth/PasswordInput';
+import PasswordStrength from '../components/auth/PasswordStrength';
+import CheckInbox from '../components/auth/CheckInbox';
 import Turnstile from '../components/Turnstile';
 import './Auth.css';
 
@@ -15,6 +19,8 @@ export default function Register() {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resending, setResending] = useState(false);
   const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaKey, setCaptchaKey] = useState(0);
@@ -46,7 +52,7 @@ export default function Register() {
       if (err) throw new Error(getErrorMessage(err, 'Sign up failed'));
       if (!data.user) throw new Error('Sign up failed');
       if (!data.session?.access_token) {
-        setError('Account created. Check your email for a confirmation link, then sign in.');
+        setPendingEmail(email.trim());
         return;
       }
       const profile = await fetchProfile(data.user.id).catch(() => null);
@@ -73,68 +79,92 @@ export default function Register() {
     }
   }
 
+  /** Resend the sign-up confirmation email; the card owns the countdown. */
+  async function resendConfirmation() {
+    setResending(true);
+    try {
+      const { error: err } = await supabase.auth.resend({ type: 'signup', email: pendingEmail });
+      if (err) throw err;
+      return undefined;
+    } catch (err) {
+      return { error: getErrorMessage(err, 'Could not resend the email') };
+    } finally {
+      setResending(false);
+    }
+  }
+
+  if (pendingEmail) {
+    return (
+      <AuthLayout variant="card">
+        <CheckInbox email={pendingEmail} onResend={resendConfirmation} busy={resending} />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
-      title="Create account"
+      title="Create your account"
+      subtitle="Free to start. No credit card."
       footer={
         <>
           Already have an account? <Link to="/login">Sign in</Link>
         </>
       }
     >
-      <form ref={formRef} className="form" onSubmit={handleSubmit} aria-describedby={error ? 'register-error' : undefined} noValidate>
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        aria-describedby={error ? 'register-error' : undefined}
+        noValidate
+      >
         {error && (
           <div id="register-error" className="auth-error" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
-        <div className="form-floating">
+        <AuthField id="register-display-name" label="Name" hint="Optional — how your name appears on shares.">
           <input
             ref={firstInputRef}
+            id="register-display-name"
+            type="text"
+            className="auth-input"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            autoComplete="name"
+          />
+        </AuthField>
+        <AuthField id="register-email" label="Email" error={error || undefined}>
+          <input
             id="register-email"
             type="email"
-            className="form-floating-input"
+            className="auth-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder=" "
-            required
             autoComplete="email"
+            required
             aria-invalid={!!error}
             aria-describedby={error ? 'register-error' : undefined}
           />
-          <label htmlFor="register-email" className="form-floating-label">Email</label>
-        </div>
-        <div className="form-floating">
-          <input
-            id="register-display-name"
-            type="text"
-            className="form-floating-input"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder=" "
-            autoComplete="name"
-          />
-          <label htmlFor="register-display-name" className="form-floating-label">Display name (optional)</label>
-        </div>
-        <div className="form-floating">
-          <input
+        </AuthField>
+        <AuthField id="register-password" label="Password">
+          <PasswordInput
             id="register-password"
-            type="password"
-            className="form-floating-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder=" "
+            autoComplete="new-password"
             required
             minLength={8}
-            autoComplete="new-password"
-            aria-invalid={!!error}
-            aria-describedby="register-password-hint"
+            invalid={!!error}
           />
-          <label htmlFor="register-password" className="form-floating-label">Password (min 8 characters)</label>
-          <p className="field-hint" id="register-password-hint">Use at least 8 characters.</p>
-        </div>
+          <PasswordStrength password={password} />
+        </AuthField>
         <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
-        <button type="submit" disabled={submitting || (captchaSiteKey && !captchaToken)} aria-busy={submitting}>
+        <button
+          type="submit"
+          className="auth-button auth-button-primary"
+          disabled={submitting || (captchaSiteKey && !captchaToken)}
+          aria-busy={submitting}
+        >
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
