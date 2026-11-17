@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useToast, UNDO_TTL_MS } from '../../../context/ToastContext';
+import { useToast, UNDO_TTL_MS } from '../../../components/ui/Toaster';
 import { useNotifyError } from '../../../lib/useNotifyError';
 
 type ToastApi = {

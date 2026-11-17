@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 import { logAudit } from '../../../lib/audit';
 import { useNotifyError } from '../../../lib/useNotifyError';
-import { useToast } from '../../../context/ToastContext';
+import { useToast } from '../../../components/ui/Toaster';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import { fetchVersionSnapshot, fetchVersionSnapshotByNumber, invalidateObject, type VersionSnapshot } from '../../../data/objectDetail';
 import { restoreFromTrash } from '../../../data/trash';

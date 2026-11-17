@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import QueryError from '../../components/QueryError';
 import TypeMark from '../../components/TypeMark';
+import Combobox from '../../components/ui/Combobox';
 import { formatObjectTypeLabel } from '../../constants';
 import type { useLinks } from './hooks/useLinks';
 import type { LinkTarget, OutgoingLink, IncomingLink, SuggestedLink } from './types';
@@ -21,12 +22,13 @@ type Props = {
 
 function AddLinkSelect({ options, addLink }: { options: LinkTarget[]; addLink: (id: string) => unknown }) {
   return (
-    <select value="" onChange={(e) => { const v = e.target.value; if (v) addLink(v); e.target.value = ''; }} className="detail-links-add">
-      <option value="">+ Link to object</option>
-      {options.slice(0, 50).map((o) => (
-        <option key={o.id} value={o.id}>{o.title} ({formatObjectTypeLabel(o.type)})</option>
-      ))}
-    </select>
+    <Combobox
+      label="Link to object"
+      labelHidden
+      placeholder="Search objects…"
+      options={options.map((o) => ({ value: o.id, label: o.title, hint: formatObjectTypeLabel(o.type) }))}
+      onSelect={(id) => { addLink(id); }}
+    />
   );
 }
 

@@ -1,0 +1,85 @@
+.ui-toaster {
+  position: fixed;
+  inset-inline-end: var(--pks-space-5);
+  bottom: calc(var(--pks-space-5) + var(--mobile-nav-offset, 0px));
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pks-space-3);
+  width: min(360px, calc(100vw - 2 * var(--pks-space-5)));
+  pointer-events: none;
+}
+
+.ui-toast-region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pks-space-3);
+}
+
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-3);
+  padding: var(--pks-space-3) var(--pks-space-3) var(--pks-space-3) var(--pks-space-5);
+  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border-radius: var(--pks-radius-lg);
+  background: var(--pks-surface-sheet);
+  color: var(--pks-text-primary);
+  font-size: var(--pks-text-size-body);
+  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+  pointer-events: auto;
+  animation: ui-toast-in 0.2s ease-out;
+}
+
+.ui-toast--success {
+  border-color: var(--pks-status-success);
+  background: var(--pks-status-success-surface);
+}
+
+.ui-toast--error {
+  border-color: var(--pks-status-danger);
+  background: var(--pks-status-danger-surface);
+}
+
+.ui-toast-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-toast-action {
+  flex-shrink: 0;
+  min-height: var(--pks-size-min-target);
+  padding: var(--pks-space-1) var(--pks-space-3);
+  border: 1px solid currentColor;
+  border-radius: var(--pks-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--pks-text-weight-semibold);
+  cursor: pointer;
+}
+
+.ui-toast-action:hover,
+.ui-toast-action:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.ui-toast-action:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-toast-dismiss.ui-icon-button {
+  width: var(--pks-size-touch-target);
+  height: var(--pks-size-touch-target);
+  color: inherit;
+}
+
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translateY(var(--pks-space-3)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast { animation: none; }
+}

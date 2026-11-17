@@ -8,7 +8,7 @@ import { deliverWebhookEvent } from '../lib/webhooks';
 import { createNotification } from '../lib/notifications';
 import { getDraft, setDraft, clearDraft, DRAFT_KEYS } from '../lib/draftStorage';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import { slugify } from '../lib/slugify';
 import { useTaxonomy } from '../data/taxonomy';

@@ -1,0 +1,19 @@
+.ui-kbd-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pks-space-1);
+}
+
+.ui-kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: var(--pks-space-1) var(--pks-space-2);
+  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border-radius: var(--pks-radius-sm);
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-secondary);
+  font-family: var(--pks-font-mono);
+  font-size: var(--pks-text-size-sm);
+  line-height: 1.4;
+  text-align: center;
+}

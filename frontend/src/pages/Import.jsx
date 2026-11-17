@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { parseCsvRows } from '../lib/csv';
 import { invalidateObjectLists } from '../data/objects';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { OBJECT_TYPES } from '../constants';
 import './Import.css';

@@ -599,11 +599,6 @@
   color: var(--polar-faint);
 }
 
-.detail-links-add {
-  margin-top: 0.5rem;
-  display: block;
-}
-
 .links-add {
   margin-bottom: 1.25rem;
 }
@@ -852,79 +847,8 @@
   font-size: 0.8125rem;
 }
 
-/* —— Run prompt overlay (LLM-style panel) —— */
-.run-prompt-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  box-sizing: border-box;
-}
-
-.run-prompt-overlay-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(6px);
-}
-
-.run-prompt-overlay-panel {
-  position: relative;
-  width: 100%;
-  max-width: 720px;
-  max-height: calc(100vh - 3rem);
-  display: flex;
-  flex-direction: column;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-}
-
-.run-prompt-overlay-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--glass-border);
-  flex-shrink: 0;
-}
-
-.run-prompt-overlay-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--polar-white);
-  margin: 0;
-}
-
-.run-prompt-overlay-close {
-  width: 2.25rem;
-  height: 2.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-  color: var(--polar-muted);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.run-prompt-overlay-close:hover {
-  background: var(--panel-overlay);
-  color: var(--polar-white);
-}
-
+/* —— Run prompt dialog body (the Dialog primitive owns the chrome) —— */
 .run-prompt-overlay-body {
-  padding: 1.25rem 1.5rem;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1184,14 +1108,6 @@
   min-height: 8rem;
 }
 
-.run-prompt-overlay-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--glass-border);
-}
-
 .export-panel {
   margin-bottom: 1rem;
   padding: 1.25rem;
@@ -1440,30 +1356,6 @@
   }
   .share-list li {
     flex-wrap: wrap;
-  }
-  .run-prompt-overlay {
-    padding: 0.75rem;
-    align-items: flex-start;
-  }
-  .run-prompt-overlay-panel {
-    max-width: 100%;
-    max-height: calc(100dvh - 1.5rem - var(--mobile-nav-offset));
-    border-radius: 12px;
-  }
-  .run-prompt-overlay-body {
-    padding: 1rem;
-  }
-  .run-prompt-overlay-actions {
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 400px) {
-  .run-prompt-overlay {
-    padding: 0.75rem;
-  }
-  .run-prompt-overlay-body {
-    padding: 0.75rem 1rem;
   }
 }
 

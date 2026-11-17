@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createTestQueryClient } from '../test/queryTestUtils';
-import { ToastProvider } from '../context/ToastContext';
+import { ToastProvider } from '../components/ui/Toaster';
 import { deferred } from '../features/object/testUtils';
 
 const sb = vi.hoisted(() => ({ current: null }));

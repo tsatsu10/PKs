@@ -1,0 +1,27 @@
+.ui-card {
+  padding: var(--pks-space-5);
+  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+  border-radius: var(--pks-radius-lg);
+  background: var(--pks-surface-card);
+  color: var(--pks-text-primary);
+}
+
+.ui-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pks-space-3);
+  margin-bottom: var(--pks-space-4);
+}
+
+.ui-card-title {
+  margin: 0;
+  font-size: var(--pks-text-size-body-lg);
+  font-weight: var(--pks-text-weight-semibold);
+}
+
+.ui-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-2);
+}

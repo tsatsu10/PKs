@@ -1,0 +1,79 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pks-space-3);
+  min-width: var(--pks-size-min-target);
+  min-height: var(--pks-size-control-height);
+  padding: var(--pks-space-3) var(--pks-space-5);
+  border: 1px solid transparent;
+  border-radius: var(--pks-radius-md);
+  font-family: inherit;
+  font-size: var(--pks-text-size-body);
+  font-weight: var(--pks-text-weight-medium);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-button--sm {
+  min-height: var(--pks-size-min-target);
+  padding: var(--pks-space-2) var(--pks-space-4);
+  font-size: var(--pks-text-size-meta);
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-button:disabled {
+  opacity: var(--pks-opacity-disabled);
+  cursor: not-allowed;
+}
+
+.ui-button--primary {
+  background: var(--pks-accent-primary);
+  color: var(--pks-text-on-accent);
+}
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--pks-accent-primary-strong);
+}
+
+.ui-button--secondary {
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
+  border-color: color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+}
+.ui-button--secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pks-border-default) 30%, transparent);
+}
+
+.ui-button--ghost {
+  background: transparent;
+  color: var(--pks-text-secondary);
+}
+.ui-button--ghost:hover:not(:disabled) {
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
+}
+
+.ui-button--danger {
+  background: var(--pks-status-danger-fill);
+  color: var(--pks-text-on-accent);
+}
+.ui-button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pks-status-danger-fill) 85%, var(--pks-color-black));
+}
+
+@media (pointer: coarse) {
+  .ui-button,
+  .ui-button--sm {
+    min-width: var(--pks-size-touch-target);
+    min-height: var(--pks-size-touch-target);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button { transition: none; }
+}

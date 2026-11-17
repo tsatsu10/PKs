@@ -9,7 +9,7 @@ import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
 import { deliverWebhookEvent } from '../../../lib/webhooks';
 import { getErrorMessage } from '../../../lib/errors';
-import { useToast } from '../../../context/ToastContext';
+import { useToast } from '../../../components/ui/Toaster';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../../../constants';
 import type { ObjectRow, Named, OutgoingLink, IncomingLink, ExportInclude, SetError } from '../types';
 

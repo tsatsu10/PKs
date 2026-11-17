@@ -30,6 +30,32 @@ describe('Taxonomy', () => {
     expect(screen.getByText('ai')).toBeInTheDocument();
     expect(container.querySelector('button[aria-label^="Remove"]')).toBeNull();
     expect(screen.queryByRole('option', { name: '+ Add tag' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('adds a domain only on Enter, not on arrow', () => {
+    const addDomain = vi.fn();
+    render(
+      <Taxonomy {...base} isOwner availableDomains={[{ id: 'd2', name: 'Home' }, { id: 'd3', name: 'Health' }]}
+        actions={{ ...noopActions, addDomain }} />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Add domain' });
+    expect(input).toHaveAttribute('placeholder', 'Add domain…');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(addDomain).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(addDomain).toHaveBeenCalledTimes(1);
+    expect(addDomain).toHaveBeenCalledWith('d3');
+  });
+
+  it('adds a tag on option click', () => {
+    const addTag = vi.fn();
+    render(<Taxonomy {...base} isOwner actions={{ ...noopActions, addTag }} />);
+    const input = screen.getByRole('combobox', { name: 'Add tag' });
+    fireEvent.change(input, { target: { value: 'm' } });
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'ml' }));
+    expect(addTag).toHaveBeenCalledWith('t2');
   });
 
   it('a panel error shows QueryError with Retry calling retryPanel("tags")', () => {
@@ -58,6 +84,22 @@ describe('Links', () => {
     expect(removes).toHaveLength(2);
     fireEvent.click(removes[1]);
     expect(removeLink).toHaveBeenCalledWith('e2', false);
+  });
+
+  it('can link to an object beyond the first 50', () => {
+    const addLink = vi.fn();
+    const targets = Array.from({ length: 60 }, (_, i) => ({ id: `t${i + 1}`, title: `Target ${i + 1}`, type: 'note' }));
+    render(
+      <MemoryRouter>
+        <Links isOwner canLink outgoing={[]} incoming={[]} availableToLink={targets} suggested={[]} error={null}
+          onRetry={vi.fn()} links={{ addLink, removeLink: vi.fn() }} prefetch={prefetch} />
+      </MemoryRouter>,
+    );
+    const input = screen.getByRole('combobox', { name: 'Link to object' });
+    expect(input).toHaveAttribute('placeholder', 'Search objects…');
+    fireEvent.change(input, { target: { value: 'Target 60' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(addLink).toHaveBeenCalledWith('t60');
   });
 });
 

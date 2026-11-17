@@ -1,0 +1,43 @@
+.ui-tabs-list {
+  display: flex;
+  gap: var(--pks-space-2);
+  overflow-x: auto;
+  border-bottom: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+}
+
+.ui-tab {
+  min-height: var(--pks-size-control-height);
+  padding: var(--pks-space-3) var(--pks-space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--pks-text-muted);
+  font-family: inherit;
+  font-size: var(--pks-text-size-body);
+  font-weight: var(--pks-text-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-tab:hover {
+  color: var(--pks-text-primary);
+}
+
+.ui-tab[aria-selected="true"] {
+  border-bottom-color: var(--pks-accent-primary);
+  color: var(--pks-text-primary);
+}
+
+.ui-tab:focus-visible,
+.ui-tab-panel:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-tab-panel {
+  padding-top: var(--pks-space-4);
+}
+
+@media (pointer: coarse) {
+  .ui-tab { min-height: var(--pks-size-touch-target); }
+}

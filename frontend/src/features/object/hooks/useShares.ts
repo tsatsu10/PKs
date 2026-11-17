@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { useNotifyError } from '../../../lib/useNotifyError';
 import { getErrorMessage } from '../../../lib/errors';
 import { reportError } from '../../../lib/reportError';
-import { useToast } from '../../../context/ToastContext';
+import { useToast } from '../../../components/ui/Toaster';
 import { fetchShares, type ShareRow } from '../../../data/objectDetail';
 import { useUndoToast } from './useUndoToast';
 import type { ObjectRow, SetError } from '../types';

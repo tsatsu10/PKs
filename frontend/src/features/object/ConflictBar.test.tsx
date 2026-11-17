@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { ToastProvider } from '../../context/ToastContext';
+import { ToastProvider } from '../../components/ui/Toaster';
 import ConflictBar from './ConflictBar';
 import type { SaveQueue } from './save/saveQueue';
 
