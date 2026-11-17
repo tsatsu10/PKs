@@ -15,12 +15,14 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "tokens": "node scripts/build-tokens.mjs",
     "backfill:content": "node scripts/backfill-content-json.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "icons": "pwa-assets-generator"
   },
   "dependencies": {
     "@blocknote/core": "^0.55.0",
     "@blocknote/mantine": "^0.55.0",
     "@blocknote/react": "^0.55.0",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
     "@supabase/supabase-js": "^2.45.0",
@@ -38,6 +40,7 @@
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@blocknote/server-util": "0.55.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.56.1",
@@ -46,8 +49,11 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@vite-pwa/assets-generator": "^1.0.4",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "fake-indexeddb": "^6.2.7",

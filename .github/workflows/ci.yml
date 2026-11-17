@@ -121,6 +121,9 @@ jobs:
         env:
           # Cloudflare's always-pass test site key; config.toml holds the matching test secret.
           VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      - name: Check the built PWA artifacts
+        run: node scripts/check-pwa.mjs
+        working-directory: frontend
       - run: npm run test:e2e
         working-directory: frontend
       # Closing a tab races the browser tearing the page down; one pass can get lucky.
