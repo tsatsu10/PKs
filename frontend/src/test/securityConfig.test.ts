@@ -108,21 +108,12 @@ describe('index.html and CSP', () => {  it('serves no Google Fonts', () => {
   })
 
   it('has no popup flows that COOP would break', () => {
-    // COOP same-origin severs cross-origin opener access, so window.open may only be
-    // used with a blank same-origin target ('') whose opener is dropped before any
-    // cross-origin navigation (the download and print flows today). A flow that opens
-    // a real URL, or keeps the opener handle across a cross-origin navigation, breaks
-    // under COOP and must be redesigned.
+    // COOP same-origin severs cross-origin opener access, so src must not use window.open
+    // at all: downloads use an anchor click, printing uses a same-origin iframe. A future
+    // window.open flow breaks under COOP and must use one of those patterns instead.
     const offenders = srcFiles()
-      .map((file) => ({ file, code: fs.readFileSync(file, 'utf8') }))
-      .filter(({ code }) => code.includes('window.open('))
-      .filter(({ code }) => {
-        const calls = code.match(/window\.open\([^)]*\)/g) ?? []
-        const blankTarget = calls.every((c) => /window\.open\(\s*(''|"")\s*,/.test(c))
-        const nerfsOpener = /=>\s*null|;?\s*\w+\.opener = null/.test(code)
-        return !(blankTarget && nerfsOpener)
-      })
-      .map(({ file }) => path.relative(frontendRoot, file).replaceAll('\\', '/'))
+      .filter((file) => fs.readFileSync(file, 'utf8').includes('window.open('))
+      .map((file) => path.relative(frontendRoot, file).replaceAll('\\', '/'))
     expect(offenders).toEqual([])
   })
 })

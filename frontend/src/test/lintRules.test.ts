@@ -20,7 +20,9 @@ async function lintText(code: string, filePath: string): Promise<string[]> {
   return result.messages.map((m) => m.ruleId).filter((ruleId): ruleId is string => Boolean(ruleId))
 }
 
-describe('eslint guardrails', () => {
+// The first lintText call loads the ESLint config and plugins cold; under full-suite
+// parallel load that can exceed the default 5 s, so this file gets a generous timeout.
+describe('eslint guardrails', { timeout: 30_000 }, () => {
   it('flags an unused PascalCase variable in JSX files', async () => {
     const rules = await lintText(
       'const Unused = 1; export default function A() { return null; }',
