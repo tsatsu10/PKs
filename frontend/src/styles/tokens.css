@@ -68,7 +68,7 @@
   --pks-radius-sheet: 28px;
   --pks-radius-device: 44px;
   --pks-radius-full: 999px;
-  --pks-font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --pks-font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
   --pks-font-mono: "JetBrains Mono", ui-monospace, monospace;
   --pks-text-size-display-lg: 1.875rem;
   --pks-text-size-heading: 1.125rem;

@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import '@fontsource-variable/plus-jakarta-sans'
 import './styles/tokens.css'
 import './index.css'
 import { missingSupabaseConfig } from './lib/config'
