@@ -599,11 +599,6 @@
   color: var(--polar-faint);
 }
 
-.detail-links-add {
-  margin-top: 0.5rem;
-  display: block;
-}
-
 .links-add {
   margin-bottom: 1.25rem;
 }

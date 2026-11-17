@@ -1,4 +1,5 @@
 import QueryError from '../../components/QueryError';
+import Combobox from '../../components/ui/Combobox';
 import type { useTaxonomyActions } from './hooks/useTaxonomyActions';
 import type { PanelName } from './useObjectPage';
 import type { Named, SuggestedTag } from './types';
@@ -37,16 +38,13 @@ export default function Taxonomy({ isOwner, objectDomains, objectTags, available
               </span>
             ))}
             {isOwner && availableDomains.length > 0 && (
-              <select
-                className="chip-select"
-                value=""
-                onChange={(e) => { const v = e.target.value; if (v) addDomain(v); e.target.value = ''; }}
-              >
-                <option value="">+ Add domain</option>
-                {availableDomains.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+              <Combobox
+                label="Add domain"
+                labelHidden
+                placeholder="Add domain…"
+                options={availableDomains.map((d) => ({ value: d.id, label: d.name }))}
+                onSelect={addDomain}
+              />
             )}
           </div>
         )}
@@ -76,16 +74,13 @@ export default function Taxonomy({ isOwner, objectDomains, objectTags, available
               </span>
             )}
             {isOwner && availableTags.length > 0 && (
-              <select
-                className="chip-select"
-                value=""
-                onChange={(e) => { const v = e.target.value; if (v) addTag(v); e.target.value = ''; }}
-              >
-                <option value="">+ Add tag</option>
-                {availableTags.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+              <Combobox
+                label="Add tag"
+                labelHidden
+                placeholder="Add tag…"
+                options={availableTags.map((t) => ({ value: t.id, label: t.name }))}
+                onSelect={addTag}
+              />
             )}
           </div>
         )}
