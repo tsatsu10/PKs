@@ -85,7 +85,9 @@ describe('NotificationCenter', () => {
 describe('AppLayout hints (M11)', () => {
   it('shows the platform modifier in the command hint', async () => {
     renderWithClient(<MemoryRouter initialEntries={['/settings']}><AppLayout><p>Page</p></AppLayout></MemoryRouter>);
-    const hint = screen.getByRole('button', { name: /Search or jump/ });
+    // The name is the visible label alone; the shortcut is announced through aria-keyshortcuts.
+    const hint = screen.getByRole('button', { name: 'Search or jump…' });
+    expect(hint).toHaveAttribute('aria-keyshortcuts', modKey === '⌘' ? 'Meta+K' : 'Control+K');
     expect(hint).toHaveTextContent(modKey);
     expect(hint).toHaveTextContent('K');
     if (modKey !== '⌘') expect(document.body.textContent).not.toContain('⌘');

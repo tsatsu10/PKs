@@ -131,6 +131,24 @@ iframe {
   left: 0;
 }
 
+/* A checkbox and its text, used wherever a page lists options to tick. */
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--pks-text-size-sm);
+  color: var(--pks-text-secondary);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.checkbox-label input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--pks-accent-primary);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

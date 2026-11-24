@@ -175,11 +175,11 @@ export default function Journal() {
 
       <div className="journal-calendar-card">
         <div className="journal-calendar-nav">
-          <Button className="btn-icon journal-nav-btn" onClick={goPrevMonth} aria-label="Previous month">
+          <Button className="journal-nav-btn" onClick={goPrevMonth} aria-label="Previous month">
             ‹
           </Button>
           <h2 className="journal-calendar-title">{monthLabel}</h2>
-          <Button className="btn-icon journal-nav-btn" onClick={goNextMonth} aria-label="Next month">
+          <Button className="journal-nav-btn" onClick={goNextMonth} aria-label="Next month">
             ›
           </Button>
         </div>

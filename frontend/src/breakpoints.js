@@ -29,5 +29,8 @@ export function useIsMobile(threshold = BP.md) {
 
 export { BP };
 
+/** The app's mobile layout (bottom nav, collapsed headers): the same edge as the CSS `max-width: 768px` blocks. */
+export const MOBILE_QUERY = `(max-width: ${BP.md}px)`;
+
 /** At and above this width the dashboard activity panel is an inline sidebar; below it, a drawer (M9). */
 export const ACTIVITY_INLINE_QUERY = '(min-width: 1280px)';

@@ -9,6 +9,8 @@ export interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
+  /** While the confirmed action runs: Confirm ignores clicks (it stays focusable, so focus isn't lost). */
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,6 +23,7 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Cancel',
   danger = false,
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -37,7 +40,14 @@ export default function ConfirmDialog({
       footer={
         <>
           <Button ref={cancelRef} onClick={onCancel}>{cancelLabel}</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+            onClick={busy ? undefined : onConfirm}
+          >
+            {confirmLabel}
+          </Button>
         </>
       }
     >

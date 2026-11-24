@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
 import { useMediaQuery } from '@mantine/hooks';
+import { MOBILE_QUERY } from '../breakpoints';
 import Button, { ButtonLink } from '../components/ui/Button';
 import Chip from '../components/ui/Chip';
 import Combobox from '../components/ui/Combobox';
@@ -212,7 +213,7 @@ export default function ObjectNew() {
   const availableDomains = domains.filter((d) => !form.domainIds.includes(d.id));
   const availableTags = tags.filter((t) => !form.tagIds.includes(t.id));
 
-  const narrow = useMediaQuery('(max-width: 767px)', false, { getInitialValueInEffect: false });
+  const narrow = useMediaQuery(MOBILE_QUERY, false, { getInitialValueInEffect: false });
   const [editorHeight, setEditorHeight] = useState(560);
   useEffect(() => {
     // On a phone the properties and the submit bar follow the editor, so it starts short (M10).

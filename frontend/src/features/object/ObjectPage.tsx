@@ -38,6 +38,9 @@ import ExportPanel from './ExportPanel';
 import './ObjectPage.css';
 import '../../components/ui/Page.css';
 
+/** Empty space around the content: the hero, the editor area and the editor's own frame below its last block. */
+const EMPTY_AREA = '.detail-hero, .detail-editor-area, .blocknote-editor-wrapper, .bn-container';
+
 /** The object page (`/objects/:id`). The route remounts it per id, so no state carries over. */
 export default function ObjectPage() {
   const { id } = useParams();
@@ -93,9 +96,7 @@ export default function ObjectPage() {
   const editorRef = useRef<EditorHandle>(null);
   const onMainClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    if (target === e.currentTarget || target.classList.contains('detail-hero') || target.classList.contains('detail-editor-area')) {
-      editorRef.current?.focusEnd();
-    }
+    if (target === e.currentTarget || target.matches(EMPTY_AREA)) editorRef.current?.focusEnd();
   };
 
   const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setError });

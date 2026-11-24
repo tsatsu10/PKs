@@ -40,7 +40,7 @@ describe('Header (M6)', () => {
   });
 
   it('collapses header actions into a menu on narrow screens', () => {
-    stubMatchMedia((q) => q.includes('max-width: 767px'));
+    stubMatchMedia((q) => q.includes('max-width: 768px'));
     const { onToggleExport } = renderHeader();
     const more = screen.getByRole('button', { name: 'More actions' });
     expect(more).toHaveAttribute('aria-expanded', 'false');

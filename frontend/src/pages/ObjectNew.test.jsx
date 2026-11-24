@@ -106,7 +106,7 @@ describe('ObjectNew form (A6, M10, A11)', () => {
       return OK;
     };
   };
-  const narrow = () => stubMatchMedia((q) => q.includes('max-width: 767px'));
+  const narrow = () => stubMatchMedia((q) => q.includes('max-width: 768px'));
 
   afterEach(() => { vi.restoreAllMocks(); });
 

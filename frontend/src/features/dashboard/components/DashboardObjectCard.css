@@ -29,9 +29,9 @@
   background: linear-gradient(90deg, var(--pks-color-pink-500), var(--pks-color-indigo-500));
 }
 
+/* Rows have a fixed height: the cover gives up height (down to min-height) before the footer clips. */
 .object-card-cover-wrap {
   position: relative;
-  flex-shrink: 0;
   aspect-ratio: 16 / 10;
   min-height: 108px;
   overflow: hidden;
@@ -193,10 +193,16 @@
   -webkit-line-clamp: 2;
 }
 
-/* Above the stretched link, so its chips are their own targets. */
+/* Above the stretched link, so its chips are their own targets; the space around them still opens the card. */
 .object-card .linked-bar {
   position: relative;
   z-index: 1;
+  pointer-events: none;
+}
+
+.object-card .linked-bar-chip,
+.object-card .linked-bar-popover {
+  pointer-events: auto;
 }
 
 .object-card-footer {

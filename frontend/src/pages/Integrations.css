@@ -162,22 +162,6 @@
   margin-right: 0.25rem;
 }
 
-.integrations-page .checkbox-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: var(--pks-text-size-sm);
-  color: var(--pks-text-secondary);
-  cursor: pointer;
-  min-height: 24px;
-}
-
-.integrations-page .checkbox-label input {
-  width: 1.125rem;
-  height: 1.125rem;
-  accent-color: var(--pks-accent-primary);
-}
-
 .integration-webhook-url {
   display: block;
   font-size: 0.75rem;
@@ -211,10 +195,6 @@
   margin: 0 0 0.25rem 0;
   font-size: 1rem;
   color: var(--pks-text-secondary);
-}
-
-.webhook-edit-box.form label {
-  margin-bottom: var(--pks-space-7);
 }
 
 .webhook-edit-actions {

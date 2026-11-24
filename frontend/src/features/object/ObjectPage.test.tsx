@@ -27,7 +27,11 @@ vi.mock('./Editor', () => ({
     ref,
   ) {
     useImperativeHandle(ref, () => ({ focusEnd: ed.focusEnd }));
-    return <textarea aria-label="Content" defaultValue={initialMarkdown} onChange={(e) => onChange({ content: e.target.value, content_json: [] })} />;
+    return (
+      <div className="blocknote-editor-wrapper" data-testid="editor-frame">
+        <textarea aria-label="Content" defaultValue={initialMarkdown} onChange={(e) => onChange({ content: e.target.value, content_json: [] })} />
+      </div>
+    );
   }),
 }));
 vi.mock('../../components/BlockNoteViewer', () => ({
@@ -305,6 +309,11 @@ describe('ObjectPage', { timeout: 15_000 }, () => {
     expect(ed.focusEnd).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('Object content'));
     expect(ed.focusEnd).toHaveBeenCalledTimes(1);
+    // The editor's frame below its last block counts as empty space too.
+    fireEvent.click(screen.getByTestId('editor-frame'));
+    expect(ed.focusEnd).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('textbox', { name: 'Content' }));
+    expect(ed.focusEnd).toHaveBeenCalledTimes(2);
   });
 
   it('markdown export downloads a file named after the title', async () => {

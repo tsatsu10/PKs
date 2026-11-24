@@ -227,22 +227,6 @@
   margin-bottom: var(--pks-space-7);
 }
 
-.checkbox-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: var(--pks-text-size-sm);
-  color: var(--pks-text-secondary);
-  cursor: pointer;
-  min-height: 24px;
-}
-
-.checkbox-label input {
-  width: 1.125rem;
-  height: 1.125rem;
-  margin: 0;
-  accent-color: var(--pks-accent-primary);
-}
 .quick-capture-desc {
   font-size: 0.875rem;
   color: var(--pks-text-muted);
@@ -286,7 +270,7 @@
   gap: var(--pks-space-3);
 }
 
-/* Below 768px the only submit button: after the properties, always in reach (M10). */
+/* At 768px and below the only submit button: after the properties, always in reach (M10). */
 .object-form-submit-bar {
   position: sticky;
   bottom: var(--mobile-nav-offset);
@@ -312,10 +296,4 @@
 
 .notion-properties-row {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.entity-combobox-create {
-  display: flex;
-  align-items: center;
-  gap: var(--pks-space-3);
 }

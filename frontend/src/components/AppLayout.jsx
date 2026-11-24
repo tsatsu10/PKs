@@ -158,8 +158,10 @@ export default function AppLayout({ children }) {
               className="app-layout-command-hint"
               onClick={() => setCommandOpen(true)}
               title={`Open command palette (${modKey}+K)`}
+              aria-keyshortcuts={modKey === '⌘' ? 'Meta+K' : 'Control+K'}
             >
-              <Kbd keys={['mod', 'K']} />
+              {/* The shortcut is in aria-keyshortcuts; read aloud, the glyphs would lead the button's name. */}
+              <span aria-hidden="true"><Kbd keys={['mod', 'K']} /></span>
               <span>Search or jump…</span>
             </button>
           )}

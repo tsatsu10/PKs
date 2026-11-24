@@ -160,6 +160,7 @@ export default function DashboardModals({
         title={`Move ${plural(count)} to Trash?`}
         message={`You can restore ${count === 1 ? 'it' : 'them'} from Trash later.`}
         confirmLabel={busy ? 'Moving…' : 'Move to Trash'}
+        busy={busy}
         onConfirm={bulkDelete}
         onCancel={() => setBulkModal(null)}
       />

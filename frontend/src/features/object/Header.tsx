@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
+import { MOBILE_QUERY } from '../../breakpoints';
 import { MoreHorizontal, Pin } from 'lucide-react';
 import Breadcrumbs from '../../components/Breadcrumbs';
 import Button from '../../components/ui/Button';
@@ -24,11 +25,11 @@ type Props = {
 
 /**
  * Breadcrumbs, the link-search slot and the action buttons. Editing happens in place (no Edit/Save).
- * Below 768px the actions sit behind one "More actions" button, so the header stays one row (M6).
+ * At 768px and below (the app's mobile layout) the actions sit behind one "More actions" button, so the header stays one row (M6).
  */
 export default function Header({ object, isOwner, canEdit, canLink, linkSearch, actions, onToggleExport, onToggleShare, inert = false }: Props) {
   const { togglePin, pinning, duplicate, duplicating, remove, deleting, saveVersion, savingVersion } = actions;
-  const narrow = useMediaQuery('(max-width: 767px)', false, { getInitialValueInEffect: false });
+  const narrow = useMediaQuery(MOBILE_QUERY, false, { getInitialValueInEffect: false });
 
   const buttons = (after: () => void = () => {}) => {
     const run = (fn: () => void) => () => { fn(); after(); };

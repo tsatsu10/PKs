@@ -72,6 +72,31 @@ describe('text contrast meets WCAG AA (4.5:1)', () => {
   });
 });
 
+describe('rules that set both a text colour and a background token', () => {
+  // The list above covers the pairs the system intends; this covers the pairs rules actually use.
+  const pairs = allCss.flatMap(({ file, text }) =>
+    [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap((m) => {
+      const fg = m[2].match(/(?:^|[\s;])color:\s*var\((--pks-[\w-]+)\)\s*;/)?.[1];
+      const bg = m[2].match(/background(?:-color)?:\s*var\((--pks-[\w-]+)\)\s*;/)?.[1];
+      return fg && bg ? [{ where: `${file.slice(SRC.length + 1)}: ${m[1].trim().split(/\n/).pop()}`, fg, bg }] : [];
+    }));
+
+  it('finds the pairs', () => {
+    expect(pairs.length).toBeGreaterThan(20);
+  });
+
+  it.each(THEMES)('meet 4.5:1 in the %s theme', (_name, theme) => {
+    // Translucent tokens (rgba) depend on what is under them; only solid pairs are measured.
+    const solid = (name) => { try { return t(theme, name); } catch { return null; } };
+    const bad = pairs
+      .filter((p) => solid(p.fg) && solid(p.bg))
+      .map((p) => ({ ...p, r: ratio(t(theme, p.fg), t(theme, p.bg)) }))
+      .filter((p) => p.r < 4.5)
+      .map((p) => `${p.where} (${p.fg} on ${p.bg}: ${p.r.toFixed(2)})`);
+    expect(bad).toEqual([]);
+  });
+});
+
 describe('stylesheet hygiene', () => {
   it('every var() without a fallback refers to a defined custom property', () => {
     const defined = new Set(allCss.flatMap(({ text }) => [...text.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1])));
@@ -104,22 +129,8 @@ describe('stylesheet hygiene', () => {
         .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
     expect(offenders).toEqual([]);
   });
-  it('no .btn-primary rule re-applies the low-contrast accent gradient', () => {
-    const offenders = allCss.flatMap(({ file, text }) =>
-      [...text.matchAll(/([^{}]*\.btn-primary[^{}]*)\{([^}]*)\}/g)]
-        .filter((m) => /--accent-gradient|color:\s*var\(--polar-white\)/.test(m[2]))
-        .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
-    expect(offenders).toEqual([]);
-  });
   it('no media query uses var(), which browsers ignore', () => {
     const offenders = allCss.filter(({ text }) => /@media[^{]*var\(/.test(text)).map(({ file }) => file.slice(SRC.length + 1));
-    expect(offenders).toEqual([]);
-  });
-  it('no rule pairs the low-contrast accent gradient with a text color', () => {
-    const offenders = allCss.flatMap(({ file, text }) =>
-      [...text.matchAll(/([^{}]*)\{([^}]*)\}/g)]
-        .filter((m) => /var\(--accent-gradient\)/.test(m[2]) && /(?:^|[^-])color:/.test(m[2]))
-        .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
     expect(offenders).toEqual([]);
   });
 });

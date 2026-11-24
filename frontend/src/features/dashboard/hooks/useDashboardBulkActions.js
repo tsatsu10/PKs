@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
@@ -119,12 +119,17 @@ export function useDashboardBulkActions({
     fetchFilteredIds, clearSelection,
   ]);
 
+  // State updates land a render late; the ref stops a double-click from starting a second run.
+  const bulkRunning = useRef(false);
   const runBulk = useCallback(async (fn) => {
+    if (bulkRunning.current) return;
+    bulkRunning.current = true;
     setBulkActionLoading(true);
     setError('');
     try {
       await fn();
     } finally {
+      bulkRunning.current = false;
       setBulkActionLoading(false);
     }
   }, [setError]);

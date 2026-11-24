@@ -36,6 +36,11 @@
   margin-bottom: 1rem;
 }
 
+/* Room below the last block to click into the editor. */
+.detail-editor-area {
+  padding-bottom: 6rem;
+}
+
 .detail-meta-inline {
   display: flex;
   flex-wrap: wrap;
@@ -99,7 +104,7 @@
   color: var(--pks-status-danger);
 }
 
-/* Sticky only at 768px and wider; below that the actions collapse into a menu (M6). */
+/* Sticky only above 768px; at 768px and below the actions collapse into a menu (M6). */
 .object-detail-header--sticky {
   position: sticky;
   top: 0;
@@ -304,7 +309,7 @@
 .detail-synthesize-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--pks-accent-link);
+  color: var(--pks-accent-ai-text);
 }
 
 .detail-synthesize-select {
@@ -681,7 +686,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
-  margin-bottom: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
   font-size: 0.875rem;
 }
 
@@ -709,37 +716,33 @@
   text-transform: capitalize;
 }
 
-.version-history {
-  border-top: 1px solid var(--pks-border-divider);
-  padding-top: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-.version-history h2 {
-  font-size: 1rem;
-  margin: 0 0 0.75rem 0;
-  color: var(--pks-text-muted);
-}
-
-.version-history .muted {
-  color: var(--pks-text-muted);
-  font-size: 0.875rem;
+/* The owner's version list (the card's id is version-history, the conflict bar's anchor). */
+.version-history-list {
   margin: 0;
-}
-
-.version-history ul {
-  list-style: none;
   padding: 0;
-  margin: 0;
+  list-style: none;
 }
 
-.version-history li {
+.version-history-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.25rem 0.75rem;
   padding: 0.35rem 0;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--pks-border-divider);
+}
+
+.version-history-meta {
+  color: var(--pks-text-muted);
+}
+
+.version-history-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .version-num {
@@ -975,11 +978,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.export-include {
-  border: 0;
-  padding: 0;
 }
 
 .chips {
