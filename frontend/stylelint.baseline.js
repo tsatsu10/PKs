@@ -10,14 +10,5 @@ export const cssBaseline = [
   "src/components/ShortcutsModal.css",
   "src/components/TypeMark.css",
   "src/index.css",
-  "src/pages/AuditLogs.css",
-  "src/pages/Auth.css",
-  "src/pages/Import.css",
-  "src/pages/Integrations.css",
-  "src/pages/Journal.css",
-  "src/pages/Notifications.css",
-  "src/pages/PasteBin.css",
-  "src/pages/Search.css",
-  "src/pages/Settings.css",
-  "src/pages/Trash.css"
+  "src/pages/Auth.css"
 ]

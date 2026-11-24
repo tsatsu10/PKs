@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useWindowListVirtualizer } from '../lib/useWindowListVirtualizer';
 import { useAuth } from '../context/AuthContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import DashboardFilterPanel from '../components/DashboardFilterPanel';
@@ -12,6 +12,10 @@ import { useSearchResults } from '../data/objects';
 import { usePrefetchObject } from '../data/usePrefetchObject';
 import { SkeletonList } from '../components/Skeleton';
 import './Search.css';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import { Search as SearchIcon, SearchX } from 'lucide-react';
+import EmptyState from '../components/ui/EmptyState';
 
 export default function Search() {
   const { user } = useAuth();
@@ -39,9 +43,10 @@ export default function Search() {
   const loadingMore = results.isFetchingNextPage;
   const hasMore = !!results.hasNextPage;
 
-  const listVirtualizer = useVirtualizer({
+  // The results scroll with the page, not in their own box (M5).
+  const { virtualizer: listVirtualizer, scrollMargin } = useWindowListVirtualizer({
+    listRef: listScrollRef,
     count: objects.length,
-    getScrollElement: () => listScrollRef.current,
     estimateSize: () => 72,
     overscan: 5,
   });
@@ -73,10 +78,9 @@ export default function Search() {
   }
 
   return (
-    <div className="search-page">
+    <Page title="Search objects" width="narrow" className="search-page">
       <header className="search-header">
         <Breadcrumbs items={[{ label: 'Search', to: '/search' }]} />
-        <h1 className="search-title">Search objects</h1>
         <p className="search-desc">Search across titles, summary, content, and tags.</p>
         <form onSubmit={handleSubmit} className="search-form">
           <input
@@ -86,17 +90,17 @@ export default function Search() {
             placeholder="Type to search…"
             className="search-input"
             aria-label="Search"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- the search page exists to type into this field
             autoFocus
           />
-          <button type="submit" className="btn btn-primary">Search</button>
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button type="submit" variant="primary">Search</Button>
+          <Button
+           
             onClick={() => setShowFilters((v) => !v)}
             aria-expanded={showFilters}
           >
             {showFilters ? 'Hide filters' : 'Filters'}
-          </button>
+          </Button>
         </form>
         {showFilters && (
           <DashboardFilterPanel
@@ -156,8 +160,8 @@ export default function Search() {
       ) : (
         <>
           {objects.length > 0 && (
-            <div ref={listScrollRef} className="search-results-scroll" style={{ maxHeight: 'calc(100vh - 260px)', overflow: 'auto' }} role="list" aria-label="Search results">
-              <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+            <div ref={listScrollRef} className="search-results-scroll" role="list" aria-label="Search results">
+              <div role="presentation" style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                 {listVirtualizer.getVirtualItems().map((virtualRow) => {
                   const o = objects[virtualRow.index];
                   return (
@@ -169,9 +173,11 @@ export default function Search() {
                         left: 0,
                         width: '100%',
                         height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
+                        transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                       }}
                       role="listitem"
+                      aria-posinset={virtualRow.index + 1}
+                      aria-setsize={hasMore ? -1 : objects.length}
                     >
                       <Link to={`/objects/${o.id}`} className="search-result-link" {...prefetch(o.id)}>
                         <TypeMark type={o.type} size="sm" className="search-result-type-mark" />
@@ -187,25 +193,27 @@ export default function Search() {
             </div>
           )}
           {!loading && objects.length === 0 && query.trim() && (
-            <section className="search-empty-state empty-state" aria-label="No results">
-              <p className="empty-state-title">No results</p>
-              <p className="empty-state-desc">No objects found. Try different keywords or filters.</p>
-              <Link to="/objects/new" className="btn btn-primary">Create new object</Link>
-            </section>
+            <EmptyState
+              icon={SearchX}
+              title="No results"
+              description="No objects found. Try different keywords or filters."
+              action={<ButtonLink to="/objects/new" variant="primary">Create new object</ButtonLink>}
+            />
           )}
           {!loading && objects.length === 0 && !query.trim() && (
-            <section className="search-empty-state empty-state" aria-label="No query">
-              <p className="empty-state-desc">Enter a search query above to find objects.</p>
-              <Link to="/" className="btn btn-secondary">Go to Dashboard</Link>
-            </section>
+            <EmptyState
+              icon={SearchIcon}
+              title="Enter a search query above to find objects."
+              action={<ButtonLink to="/">Go to Dashboard</ButtonLink>}
+            />
           )}
           {hasMore && (
-            <button type="button" className="btn btn-secondary search-load-more" onClick={loadMore} disabled={loadingMore}>
+            <Button className="search-load-more" onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

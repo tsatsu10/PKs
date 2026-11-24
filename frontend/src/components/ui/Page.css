@@ -38,3 +38,11 @@
 @media (min-width: 768px) {
   .ui-page { padding: var(--pks-space-7); }
 }
+
+.ui-page-error {
+  margin-bottom: var(--pks-space-5);
+  padding: var(--pks-space-3) var(--pks-space-4);
+  border-radius: var(--pks-radius-md);
+  background: var(--pks-status-danger-surface);
+  color: var(--pks-status-danger);
+}

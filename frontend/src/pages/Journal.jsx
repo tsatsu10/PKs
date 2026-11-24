@@ -8,6 +8,8 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import QueryError from '../components/QueryError';
 import { useJournalMonth, useJournalDay, invalidateJournal } from '../data/journal';
 import './Journal.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -123,19 +125,19 @@ export default function Journal() {
 
   if (view === 'entry') {
     return (
-      <div className="journal-page" >
+      <Page title="Journal" className="journal-page">
         <header className="journal-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Journal' }, { label: selectedDate ?? '' }]} />
           <div className="journal-header-actions">
-            <button type="button" className="btn btn-secondary journal-back-btn" onClick={backToCalendar}>
+            <Button className="journal-back-btn" onClick={backToCalendar}>
               ‹ Back to calendar
-            </button>
-            <button type="button" className="btn btn-primary" onClick={handleSaveEntry} disabled={saving}>
+            </Button>
+            <Button variant="primary" onClick={handleSaveEntry} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
         </header>
-        {error && <div className="form-error" role="alert">{error}</div>}
+        {error && <div className="ui-page-error" role="alert">{error}</div>}
         <div className="journal-entry-block">
           <h2 className="journal-entry-date-title">{selectedDate && new Date(selectedDate + 'T12:00:00').toLocaleDateString('default', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
           {dayQ.error ? (
@@ -153,7 +155,7 @@ export default function Journal() {
             />
           )}
         </div>
-      </div>
+      </Page>
     );
   }
 
@@ -163,7 +165,7 @@ export default function Journal() {
   const isViewingCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth();
 
   return (
-    <div className="journal-page" >
+    <Page title="Journal" className="journal-page">
       <header className="journal-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Journal' }]} />
         {!loadingDates && entryDates.size > 0 && (
@@ -173,22 +175,21 @@ export default function Journal() {
 
       <div className="journal-calendar-card">
         <div className="journal-calendar-nav">
-          <button type="button" className="btn btn-icon journal-nav-btn" onClick={goPrevMonth} aria-label="Previous month">
+          <Button className="btn-icon journal-nav-btn" onClick={goPrevMonth} aria-label="Previous month">
             ‹
-          </button>
+          </Button>
           <h2 className="journal-calendar-title">{monthLabel}</h2>
-          <button type="button" className="btn btn-icon journal-nav-btn" onClick={goNextMonth} aria-label="Next month">
+          <Button className="btn-icon journal-nav-btn" onClick={goNextMonth} aria-label="Next month">
             ›
-          </button>
+          </Button>
         </div>
         {isViewingCurrentMonth && (
-          <button
-            type="button"
-            className="btn btn-secondary journal-today-btn"
+          <Button
+            className="journal-today-btn"
             onClick={() => handleDayClick(todayStr)}
           >
             Today
-          </button>
+          </Button>
         )}
 
         {loadingDates ? (
@@ -226,6 +227,6 @@ export default function Journal() {
 
         <p className="journal-legend">Click a date to write. Dots show days with entries.</p>
       </div>
-    </div>
+    </Page>
   );
 }

@@ -1,37 +1,13 @@
-.integrations-page {
-  min-height: 100vh;
-  width: 100%;
-  background: var(--space-black);
-  color: var(--polar-white);
-  padding: 1.5rem;
-  background-image:
-    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.06), transparent 50%);
-}
 
-.integrations-page > * {
-  max-width: 640px;
-  margin-left: auto;
-  margin-right: auto;
-}
 
 .integrations-header {
   margin-bottom: 1.5rem;
 }
 
-.integrations-header h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.25rem 0;
-}
-
 .integrations-desc {
   font-size: 0.875rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   margin: 0;
-}
-
-.integrations-page .form-error {
-  border-radius: var(--input-radius);
-  margin-bottom: 1rem;
 }
 
 .integrations-add,
@@ -45,7 +21,7 @@
 .integrations-api h2 {
   font-size: 1rem;
   margin: 0 0 0.75rem 0;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
 }
 
 .integrations-form {
@@ -71,13 +47,10 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--pks-border-divider);
 }
 
 @media (max-width: 768px) {
-  .integrations-page {
-    padding: 1rem;
-  }
   .integration-item {
     flex-wrap: wrap;
   }
@@ -112,13 +85,13 @@
 
 .integration-name {
   font-weight: 500;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
 }
 
 .integration-type {
   display: block;
   font-size: 0.8125rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
 }
 
 .toggle-label {
@@ -126,19 +99,19 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8125rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   cursor: pointer;
 }
 
 .integrations-list .muted {
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
   font-size: 0.875rem;
   margin: 0;
 }
 
 .api-desc {
   font-size: 0.875rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   margin: 0 0 0.75rem 0;
 }
 
@@ -146,7 +119,7 @@
   margin: 0;
   padding-left: 1.25rem;
   font-size: 0.875rem;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
   line-height: 1.6;
 }
 
@@ -155,11 +128,11 @@
 }
 
 .api-bullets code {
-  background: var(--glass-bg);
+  background: var(--pks-surface-card);
   padding: 0.15rem 0.4rem;
   border-radius: 8px;
   font-size: 0.8125rem;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--pks-border-divider);
 }
 
 .webhook-config {
@@ -168,7 +141,7 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 0.75rem 0;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--pks-border-divider);
   margin-top: 0.25rem;
 }
 
@@ -185,7 +158,7 @@
 
 .webhook-events > span {
   font-size: 0.875rem;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
   margin-right: 0.25rem;
 }
 
@@ -193,8 +166,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: var(--label-size);
-  color: var(--label-color);
+  font-size: var(--pks-text-size-sm);
+  color: var(--pks-text-secondary);
   cursor: pointer;
   min-height: 24px;
 }
@@ -202,21 +175,20 @@
 .integrations-page .checkbox-label input {
   width: 1.125rem;
   height: 1.125rem;
-  accent-color: var(--cosmic-pink);
+  accent-color: var(--pks-accent-primary);
 }
 
 .integration-webhook-url {
   display: block;
   font-size: 0.75rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
   margin-top: 0.2rem;
 }
 
 .webhook-edit-overlay {
   position: fixed;
   inset: 0;
-  background: var(--panel-overlay-strong);
-  backdrop-filter: blur(8px);
+  background: var(--pks-surface-card);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,9 +196,8 @@
 }
 
 .webhook-edit-box {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
+  background: var(--pks-surface-card);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 16px;
   padding: 1.25rem;
   max-width: 420px;
@@ -234,17 +205,16 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  box-shadow: var(--modal-shadow);
 }
 
 .webhook-edit-box h3 {
   margin: 0 0 0.25rem 0;
   font-size: 1rem;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
 }
 
 .webhook-edit-box.form label {
-  margin-bottom: var(--form-section-gap);
+  margin-bottom: var(--pks-space-7);
 }
 
 .webhook-edit-actions {

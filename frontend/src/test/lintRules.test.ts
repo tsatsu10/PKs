@@ -138,3 +138,19 @@ describe('css guardrails', { timeout: 60_000 }, () => {
     expect(JSON.parse(runCheckCss('--unused', '--json'))).toEqual([])
   })
 })
+
+describe('page roots (M5)', () => {
+  it('has no full-viewport page roots', () => {
+    const walk = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)],
+      )
+    const bad = ['pages', 'features']
+      .flatMap((d) => walk(path.join(frontendRoot, 'src', d)))
+      // Auth pages sit outside AppLayout and own the whole viewport.
+      .filter((f) => f.endsWith('.css') && !f.endsWith('Auth.css'))
+      .filter((f) => /min-height:\s*100d?vh/.test(fs.readFileSync(f, 'utf8')))
+      .map((f) => path.relative(frontendRoot, f))
+    expect(bad).toEqual([])
+  })
+})

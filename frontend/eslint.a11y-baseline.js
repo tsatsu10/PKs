@@ -6,6 +6,4 @@ export const a11yBaseline = [
   "src/features/dashboard/components/DashboardCommandPalette.jsx",
   "src/features/object/InPlaceFields.tsx",
   "src/features/object/ObjectPage.tsx",
-  "src/pages/PasteBin.jsx",
-  "src/pages/Search.jsx",
 ]

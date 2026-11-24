@@ -7,8 +7,7 @@
   padding: 1.5rem;
 }
 
-.object-detail > .object-detail-header,
-.object-detail > .form-error {
+.object-detail > .object-detail-header {
   max-width: 1100px;
   margin-left: auto;
   margin-right: auto;
@@ -224,14 +223,6 @@
 .object-detail .btn-secondary:hover {
   background: var(--pks-surface-raised);
   color: var(--pks-text-primary);
-}
-
-.object-detail .form-error {
-  border-radius: 10px;
-  margin-bottom: 1rem;
-}
-
-.object-detail .btn-danger:hover:not(:disabled) {
 }
 
 .detail-meta {

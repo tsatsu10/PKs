@@ -8,6 +8,7 @@ import QueryError from '../components/QueryError';
 import LoadMore from '../components/LoadMore';
 import { useAuditLogs } from '../data/auditLogs';
 import './AuditLogs.css';
+import Page from '../components/ui/Page';
 
 export default function AuditLogs() {
   const { user } = useAuth();
@@ -22,10 +23,9 @@ export default function AuditLogs() {
   }
 
   return (
-    <div className="audit-logs-page" >
+    <Page title="Audit logs" width="narrow" className="audit-logs-page">
       <header className="audit-logs-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Audit logs' }]} />
-        <h1>Audit logs</h1>
         <p className="audit-logs-desc">History of key actions on your knowledge objects.</p>
         <div className="audit-logs-filters">
           <label>
@@ -81,6 +81,6 @@ export default function AuditLogs() {
         <LoadMore query={query} />
         </>
       )}
-    </div>
+    </Page>
   );
 }

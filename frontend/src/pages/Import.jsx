@@ -9,6 +9,8 @@ import { useToast } from '../components/ui/Toaster';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { OBJECT_TYPES } from '../constants';
 import './Import.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
 
 /** Allowlist: coerce type to a valid knowledge_object_type or 'note'. */
 function normalizeImportType(value) {
@@ -142,10 +144,9 @@ export default function Import() {
   }
 
   return (
-    <div className="import-page">
+    <Page title="Import objects" width="narrow" className="import-page">
       <header className="import-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Import' }]} />
-        <h1 className="import-title">Import objects</h1>
         <p className="import-desc">Import from Markdown (sections with ##) or CSV (columns: title, content, optional type).</p>
       </header>
 
@@ -175,14 +176,14 @@ export default function Import() {
             Created {result.created} of {result.total} object(s).{result.failed ? ` ${result.failed} failed.` : ''}
           </p>
         )}
-        <button type="button" className="btn btn-primary" onClick={handleImport} disabled={importing || (!text.trim() && !file)}>
+        <Button variant="primary" onClick={handleImport} disabled={importing || (!text.trim() && !file)}>
           {importing ? 'Importing…' : 'Import'}
-        </button>
+        </Button>
       </section>
 
       <p className="import-footer">
         <Link to="/" className="import-back">← Back to Dashboard</Link>
       </p>
-    </div>
+    </Page>
   );
 }

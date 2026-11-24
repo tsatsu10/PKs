@@ -9,6 +9,8 @@ import QueryError from '../components/QueryError';
 import { SkeletonList } from '../components/Skeleton';
 import { useIntegrationsList, invalidateIntegrations } from '../data/integrations';
 import './Integrations.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
 
 export default function Integrations() {
   const { user } = useAuth();
@@ -133,26 +135,24 @@ export default function Integrations() {
 
   if (loading) {
     return (
-      <div className="integrations-page" >
+      <Page title="Integrations" width="narrow" className="integrations-page">
         <header className="integrations-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
-          <h1>Integrations</h1>
         </header>
         <div role="status" aria-live="polite">
           <SkeletonList lines={5} />
         </div>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="integrations-page" >
+    <Page title="Integrations" width="narrow" className="integrations-page">
       <header className="integrations-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
-        <h1>Integrations</h1>
         <p className="integrations-desc">Send webhooks to your own services when you create an object, finish a prompt run or export an object. Enable or disable each one.</p>
       </header>
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
 
       <section className="integrations-add">
         <h2>Add integration</h2>
@@ -191,7 +191,7 @@ export default function Integrations() {
           {form.type === 'webhook' && (
             <p className="settings-desc">Each request is signed: verify <code>X-PKS-Signature-256: v1=&lt;hex&gt;</code> as HMAC-SHA256 of <code>&lt;X-PKS-Timestamp&gt;.&lt;body&gt;</code> with your secret, and reject timestamps older than 5 minutes.</p>
           )}
-          <button type="submit" className="btn btn-primary" disabled={adding}>{adding ? 'Adding…' : 'Add'}</button>
+          <Button type="submit" variant="primary" disabled={adding}>{adding ? 'Adding…' : 'Add'}</Button>
         </form>
       </section>
 
@@ -210,12 +210,12 @@ export default function Integrations() {
                   <span className="integration-type">{i.type}</span>
                   {i.type === 'webhook' && i.config?.url && <span className="integration-webhook-url" title={i.config.url}>{i.config.url.slice(0, 40)}{i.config.url.length > 40 ? '…' : ''}</span>}
                 </div>
-                {i.type === 'webhook' && <button type="button" className="btn btn-small" onClick={() => openEditConfig(i)}>Configure</button>}
+                {i.type === 'webhook' && <Button size="sm" onClick={() => openEditConfig(i)}>Configure</Button>}
                 <label className="toggle-label">
                   <input type="checkbox" checked={i.enabled} onChange={(e) => toggleEnabled(i.id, e.target.checked)} />
                   {i.enabled ? 'On' : 'Off'}
                 </label>
-                <button type="button" className="btn btn-danger btn-small" onClick={() => handleDelete(i.id)}>Remove</button>
+                <Button variant="danger" size="sm" onClick={() => handleDelete(i.id)}>Remove</Button>
                 {editingConfigId === i.id && (
                   <div className="webhook-edit-overlay">
                     <div className="webhook-edit-box form">
@@ -232,8 +232,8 @@ export default function Integrations() {
                       </div>
                       <label>Secret (optional) <input type="password" value={editConfig.secret} onChange={(e) => setEditConfig((c) => ({ ...c, secret: e.target.value }))} placeholder="Leave blank or ******** to keep" autoComplete="off" /></label>
                       <div className="webhook-edit-actions">
-                        <button type="button" className="btn btn-primary" onClick={saveEditConfig}>Save</button>
-                        <button type="button" className="btn" onClick={() => { setEditingConfigId(null); setEditConfig({ url: '', events: [], secret: '' }); }}>Cancel</button>
+                        <Button variant="primary" onClick={saveEditConfig}>Save</Button>
+                        <Button onClick={() => { setEditingConfigId(null); setEditConfig({ url: '', events: [], secret: '' }); }}>Cancel</Button>
                       </div>
                     </div>
                   </div>
@@ -253,6 +253,6 @@ export default function Integrations() {
           <li><strong>Export:</strong> Build TXT/MD in the app or replicate the export logic client-side.</li>
         </ul>
       </section>
-    </div>
+    </Page>
   );
 }
