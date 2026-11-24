@@ -12,6 +12,7 @@
   font-size: var(--pks-text-size-body);
   font-weight: var(--pks-text-weight-medium);
   line-height: 1.2;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }

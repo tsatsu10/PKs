@@ -1,5 +1,6 @@
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 export const modKey = isMac ? '⌘' : 'Ctrl';
+export const altKey = isMac ? '⌥' : 'Alt';
 
 /** Dashboard + global shortcuts for ShortcutsModal (single source of truth). */
 export const DASHBOARD_SHORTCUTS = [

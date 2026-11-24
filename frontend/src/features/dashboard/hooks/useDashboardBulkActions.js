@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { createNotification } from '../../../lib/notifications';
 import { logAudit } from '../../../lib/audit';
@@ -39,7 +39,6 @@ export function useDashboardBulkActions({
   const [bulkType, setBulkType] = useState('note');
   const [bulkStatus, setBulkStatus] = useState('active');
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  const modalPreviousFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -119,52 +118,6 @@ export function useDashboardBulkActions({
     addToast, setError, user?.id, exportScope, selectedIds, exportTemplate, exportFormat,
     fetchFilteredIds, clearSelection,
   ]);
-
-  const anyModalOpen = showExportModal || bulkModal != null;
-
-  useEffect(() => {
-    if (anyModalOpen) {
-      modalPreviousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setTimeout(() => {
-        const first = document.querySelector(
-          '.dashboard-modal-overlay .dashboard-modal select, .dashboard-modal-overlay .dashboard-modal button:not([disabled])'
-        );
-        if (first instanceof HTMLElement) first.focus();
-      }, 0);
-    } else {
-      const prev = modalPreviousFocusRef.current;
-      modalPreviousFocusRef.current = null;
-      if (prev) setTimeout(() => prev.focus(), 0);
-    }
-  }, [anyModalOpen]);
-
-  useEffect(() => {
-    if (!anyModalOpen) return;
-    function onKeyDown(e) {
-      if (e.key !== 'Tab') return;
-      const overlay = document.querySelector('.dashboard-modal-overlay');
-      if (!overlay || !overlay.contains(document.activeElement)) return;
-      const focusable = overlay.querySelectorAll(
-        'a[href], button:not([disabled]), select, input, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      const list = Array.from(focusable).filter((el) => el instanceof HTMLElement && el.offsetParent != null);
-      if (list.length === 0) return;
-      const first = list[0];
-      const last = list[list.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey) {
-        if (active === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [anyModalOpen]);
 
   const runBulk = useCallback(async (fn) => {
     setBulkActionLoading(true);

@@ -1,5 +1,9 @@
 import { OBJECT_TYPES, OBJECT_STATUSES, formatObjectTypeLabel } from '../constants';
 import EntityComboBox from './EntityComboBox';
+import Button from './ui/Button';
+import Field from './ui/Field';
+import Input from './ui/Input';
+import Select from './ui/Select';
 
 /**
  * Filter panel for dashboard search: type, status, domain, tag, date range.
@@ -28,64 +32,39 @@ export default function DashboardFilterPanel({
   onApply,
   onClear,
 }) {
+  const date = (label, value, set) => (
+    <Field label={label}>
+      {(f) => <Input id={f.id} type="date" value={value} onChange={(e) => set(e.target.value)} />}
+    </Field>
+  );
   return (
-    <div className="filter-panel" role="group" aria-label="Search filters">
-      <label>
-        Type
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option value="">Any</option>
-          {OBJECT_TYPES.map((t) => (
-            <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Status
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Any</option>
-          {OBJECT_STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-      <EntityComboBox
-        label="Domain"
-        value={domainFilter}
-        onChange={setDomainFilter}
-        options={domains}
-        onCreate={onCreateDomain}
-        createLabel="New domain"
-      />
-      <EntityComboBox
-        label="Tag"
-        value={tagFilter}
-        onChange={setTagFilter}
-        options={tags}
-        onCreate={onCreateTag}
-        createLabel="New tag"
-      />
-      <label>
-        Updated from
-        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="Updated from" />
-      </label>
-      <label>
-        Updated to
-        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="Updated to" />
-      </label>
-      <label>
-        Due from
-        <input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} aria-label="Due from" />
-      </label>
-      <label>
-        Due to
-        <input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} aria-label="Due to" />
-      </label>
-      <button type="button" className="btn btn-secondary" onClick={onApply}>
-        Apply
-      </button>
-      <button type="button" className="btn btn-secondary" onClick={onClear}>
-        Clear
-      </button>
+    <div className="filter-panel" role="group" aria-label="Filters">
+      <Field label="Type">
+        {(f) => (
+          <Select id={f.id} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">Any</option>
+            {OBJECT_TYPES.map((t) => <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>)}
+          </Select>
+        )}
+      </Field>
+      <Field label="Status">
+        {(f) => (
+          <Select id={f.id} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Any</option>
+            {OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        )}
+      </Field>
+      <EntityComboBox label="Domain" value={domainFilter} onChange={setDomainFilter} options={domains} onCreate={onCreateDomain} createLabel="New domain" />
+      <EntityComboBox label="Tag" value={tagFilter} onChange={setTagFilter} options={tags} onCreate={onCreateTag} createLabel="New tag" />
+      {date('Updated from', dateFrom, setDateFrom)}
+      {date('Updated to', dateTo, setDateTo)}
+      {date('Due from', dueFrom, setDueFrom)}
+      {date('Due to', dueTo, setDueTo)}
+      <div className="filter-panel-actions">
+        <Button variant="primary" onClick={onApply}>Apply</Button>
+        <Button onClick={onClear}>Clear</Button>
+      </div>
     </div>
   );
 }

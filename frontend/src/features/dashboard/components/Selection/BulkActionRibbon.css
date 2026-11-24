@@ -9,11 +9,9 @@
   gap: 0.65rem;
   width: min(720px, calc(100vw - 2rem));
   padding: 0.65rem 0.85rem;
-  background: var(--glass-bg);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--glass-border);
+  background: var(--pks-surface-card);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -36,7 +34,7 @@
 .bulk-action-ribbon-count {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   white-space: nowrap;
 }
 
@@ -46,14 +44,6 @@
   gap: 0.35rem;
   flex: 1;
   min-width: 0;
-}
-
-.bulk-action-ribbon-danger {
-  color: var(--error-text);
-}
-
-.bulk-action-ribbon-dismiss {
-  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {

@@ -1,3 +1,6 @@
+import { X } from 'lucide-react';
+import Button from '../../../../components/ui/Button';
+import IconButton from '../../../../components/ui/IconButton';
 import './BulkActionRibbon.css';
 
 /**
@@ -20,23 +23,15 @@ export default function BulkActionRibbon({
     <div className="bulk-action-ribbon" role="toolbar" aria-label={`Bulk actions for ${count} selected`}>
       <span className="bulk-action-ribbon-count">{count} selected</span>
       <div className="bulk-action-ribbon-actions">
-        {onSelectAllPage && (
-          <button type="button" className="btn btn-secondary btn-small" onClick={onSelectAllPage}>
-            All on page
-          </button>
-        )}
-        <button type="button" className="btn btn-secondary btn-small" onClick={onAddTag}>Tag…</button>
-        <button type="button" className="btn btn-secondary btn-small" onClick={onAddDomain}>Domain…</button>
-        <button type="button" className="btn btn-secondary btn-small" onClick={onSetStatus}>Status…</button>
-        <button type="button" className="btn btn-secondary btn-small" onClick={onChangeType}>Type…</button>
-        <button type="button" className="btn btn-secondary btn-small" onClick={onExport}>Export…</button>
-        <button type="button" className="btn btn-secondary btn-small bulk-action-ribbon-danger" onClick={onDelete}>
-          Trash
-        </button>
+        {onSelectAllPage && <Button size="sm" onClick={onSelectAllPage}>All on page</Button>}
+        <Button size="sm" onClick={onAddTag}>Tag…</Button>
+        <Button size="sm" onClick={onAddDomain}>Domain…</Button>
+        <Button size="sm" onClick={onSetStatus}>Status…</Button>
+        <Button size="sm" onClick={onChangeType}>Type…</Button>
+        <Button size="sm" onClick={onExport}>Export…</Button>
+        <Button size="sm" variant="danger" onClick={onDelete}>Trash</Button>
       </div>
-      <button type="button" className="btn btn-ghost btn-small bulk-action-ribbon-dismiss" onClick={onClear} aria-label="Clear selection">
-        ✕
-      </button>
+      <IconButton label="Clear selection" icon={X} onClick={onClear} />
     </div>
   );
 }

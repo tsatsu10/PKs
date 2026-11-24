@@ -14,7 +14,7 @@
 .dashboard-hero-v2-date {
   margin: 0 0 0.25rem;
   font-size: 0.8125rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
 }
 
 .dashboard-hero-v2-greeting {
@@ -22,13 +22,13 @@
   font-size: clamp(1.35rem, 2.5vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
 }
 
 .dashboard-hero-v2-hint {
   margin: 0.5rem 0 0;
   font-size: 0.875rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
 }
 
 @media (max-width: 720px) {

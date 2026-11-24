@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 import Dialog from '../../../components/ui/Dialog';
 import { ACTIVITY_INLINE_QUERY } from '../../../breakpoints';
@@ -12,6 +13,9 @@ const noop = () => {};
  */
 export default function ActivityDrawer({ open, onClose, children }) {
   const inline = useMediaQuery(ACTIVITY_INLINE_QUERY, false, { getInitialValueInEffect: false });
+  useEffect(() => {
+    if (inline && open) onClose();
+  }, [inline, open, onClose]);
   const content = typeof children === 'function' ? children(inline ? noop : () => onClose()) : children;
   if (inline) {
     return (

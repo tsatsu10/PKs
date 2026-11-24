@@ -18,6 +18,9 @@ import DashboardPagination from '../../../components/DashboardPagination';
 import DashboardCommandPalette from './DashboardCommandPalette';
 import DashboardModals from './DashboardModals';
 import Page from '../../../components/ui/Page';
+import Button from '../../../components/ui/Button';
+import Kbd from '../../../components/ui/Kbd';
+import { Plus, X } from 'lucide-react';
 
 export default function DashboardView(props) {
   const {
@@ -80,7 +83,7 @@ export default function DashboardView(props) {
                 <span className="dashboard-banner-text">
                   Run prompt: <strong>{runPromptTemplate.name}</strong>. Open an object to run this prompt.
                 </span>
-                <button type="button" className="btn btn-ghost btn-small" onClick={dismissRunPromptBanner} aria-label="Dismiss">Dismiss</button>
+                <Button variant="ghost" size="sm" onClick={dismissRunPromptBanner}>Dismiss</Button>
               </>
             ) : (
               <>
@@ -90,7 +93,7 @@ export default function DashboardView(props) {
                   <li>Use <strong>More filters</strong> to add a domain or tag without leaving the dashboard.</li>
                   <li><Link to="/quick">Try Quick capture</Link> to capture a thought in seconds.</li>
                 </ol>
-                <button type="button" className="btn btn-secondary btn-small" onClick={dismissOnboarding}>Got it</button>
+                <Button size="sm" onClick={dismissOnboarding}>Got it</Button>
               </>
             )}
           </div>
@@ -143,13 +146,13 @@ export default function DashboardView(props) {
           <div className="dashboard-actions-right">
             {viewMode === 'table' && (
               <div className="density-toggle" role="group" aria-label="Table density">
-                <button type="button" className={`btn btn-secondary btn-small ${listDensity === 'compact' ? 'active' : ''}`} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'}>Compact</button>
-                <button type="button" className={`btn btn-secondary btn-small ${listDensity === 'comfortable' ? 'active' : ''}`} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'}>Comfy</button>
+                <Button size="sm" variant={listDensity === 'compact' ? 'primary' : 'secondary'} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'}>Compact</Button>
+                <Button size="sm" variant={listDensity === 'comfortable' ? 'primary' : 'secondary'} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'}>Comfy</Button>
               </div>
             )}
-            <button type="button" className="btn btn-secondary btn-small" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
+            <Button size="sm" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
               Export
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -249,7 +252,7 @@ export default function DashboardView(props) {
                         <button type="button" className="dashboard-saved-filters-apply" role="menuitem" onClick={() => applySavedFilter(s)}>
                           {s.name}
                         </button>
-                        <button type="button" className="dashboard-saved-filters-delete" aria-label={`Delete ${s.name}`} onClick={() => deleteSavedFilter(s.id)}>×</button>
+                        <button type="button" className="dashboard-saved-filters-delete" aria-label={`Delete ${s.name}`} onClick={() => deleteSavedFilter(s.id)}><X size={16} aria-hidden="true" /></button>
                       </div>
                     ))}
                   </div>
@@ -272,8 +275,8 @@ export default function DashboardView(props) {
                 aria-label="Name for saved filters"
                 onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentFilters(); if (e.key === 'Escape') setShowSaveFilterModal(false); }}
               />
-              <button type="button" className="btn btn-primary btn-small" onClick={saveCurrentFilters}>Save</button>
-              <button type="button" className="btn btn-ghost btn-small" onClick={() => { setShowSaveFilterModal(false); setSaveFilterName(''); }}>Cancel</button>
+              <Button variant="primary" size="sm" onClick={saveCurrentFilters}>Save</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setShowSaveFilterModal(false); setSaveFilterName(''); }}>Cancel</Button>
             </div>
           )}
 
@@ -342,11 +345,11 @@ export default function DashboardView(props) {
             type="button"
             className="dashboard-quick-add-trigger"
             onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
-            aria-label="Add new object (or press /)"
+            aria-keyshortcuts="/"
           >
-            <span className="dashboard-quick-add-icon">+</span>
+            <Plus size={20} aria-hidden="true" className="dashboard-quick-add-icon" />
             <span className="dashboard-quick-add-label">Add new object</span>
-            <span className="dashboard-quick-add-hint">or press /</span>
+            <Kbd keys={['/']} />
           </button>
         ) : (
           <DashboardQuickAddForm
@@ -369,7 +372,7 @@ export default function DashboardView(props) {
             onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
             aria-label="Add new object"
           >
-            +
+            <Plus size={24} aria-hidden="true" />
           </button>
         )}
 

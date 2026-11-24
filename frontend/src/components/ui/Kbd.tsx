@@ -1,5 +1,7 @@
 import { useMediaQuery } from '@mantine/hooks';
-import { modKey } from '../../lib/keyboardMap';
+import { altKey, modKey } from '../../lib/keyboardMap';
+
+const PLATFORM_KEYS: Record<string, string> = { mod: modKey, alt: altKey };
 import './Kbd.css';
 
 export interface KbdProps {
@@ -13,7 +15,7 @@ export default function Kbd({ keys }: KbdProps) {
   return (
     <span className="ui-kbd-group">
       {keys.map((k, i) => (
-        <kbd key={`${k}-${i}`} className="ui-kbd">{k === 'mod' ? modKey : k}</kbd>
+        <kbd key={`${k}-${i}`} className="ui-kbd">{PLATFORM_KEYS[k] ?? k}</kbd>
       ))}
     </span>
   );

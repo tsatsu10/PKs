@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import TypeMark from '../../../../components/TypeMark';
 import { formatObjectTypeLabel } from '../../../../constants';
 import { formatRelativeTime } from '../../lib/relativeTime';
-import HotkeyHint from '../../primitives/HotkeyHint';
+import Kbd from '../../../../components/ui/Kbd';
 import './Trailhead.css';
 
 const KIND_LABEL = {
@@ -12,9 +12,9 @@ const KIND_LABEL = {
 };
 
 /**
- * @param {{ kind: 'resume' | 'pending' | 'spark', object: object, shortcutKey?: string, to: string }} props
+ * @param {{ kind: 'resume' | 'pending' | 'spark', object: object, shortcutDigit?: string, to: string }} props
  */
-export default function Trailhead({ kind, object, shortcutKey, to }) {
+export default function Trailhead({ kind, object, shortcutDigit, to }) {
   if (!object) return null;
 
   const metaParts = [
@@ -44,7 +44,7 @@ export default function Trailhead({ kind, object, shortcutKey, to }) {
       </span>
       <span className="trailhead-cta">
         Open
-        {shortcutKey && <HotkeyHint keys={[shortcutKey]} />}
+        {shortcutDigit && <Kbd keys={['alt', shortcutDigit]} />}
       </span>
     </Link>
   );
