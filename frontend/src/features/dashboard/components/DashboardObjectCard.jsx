@@ -52,6 +52,8 @@ function DashboardObjectCard({
   compact = false,
   objectIndex = 0,
   runPromptSuffix = '',
+  setSize,
+  posInSet,
 }) {
   const typeLabel = formatObjectTypeLabel(obj.type);
   const summary = obj.snippet || obj.summary;
@@ -62,6 +64,9 @@ function DashboardObjectCard({
   return (
     <article
       ref={rowRef}
+      role={posInSet ? 'listitem' : undefined}
+      aria-setsize={posInSet ? setSize : undefined}
+      aria-posinset={posInSet}
       className={`object-card-wrapper${compact ? ' object-card-wrapper--compact' : ''}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >

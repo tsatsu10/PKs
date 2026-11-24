@@ -123,7 +123,7 @@ export function useDashboardKeyboard({
       } else {
         scrollRow = nextIndex;
       }
-      listVirtualizer.scrollToIndex(scrollRow, { align: 'start', behavior: 'auto' });
+      listVirtualizer.scrollToIndex(scrollRow, { align: 'auto', behavior: 'auto' });
       setTimeout(() => {
         const rowEl = listEl.querySelector(`[data-object-index="${nextIndex}"]`);
         const link = rowEl?.querySelector?.('.object-card, .timeline-row, .table-view-row');
