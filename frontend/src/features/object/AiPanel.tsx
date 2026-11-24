@@ -24,9 +24,7 @@ export function SynthesizeCta({ run }: { run: Run }) {
           ))}
         </select>
       )}
-      <button type="button" className="btn btn-primary detail-synthesize-btn" onClick={run.openRunPanel}>
-        Run prompt
-      </button>
+      <Button variant="primary" onClick={run.openRunPanel}>Run prompt</Button>
     </div>
   );
 }
@@ -248,10 +246,10 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
       </div>
       <ConfirmDialog
         open={confirmDiscard}
-        title="Discard the AI output?"
-        message="The generated text hasn't been saved."
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
+        title={generatingAI ? 'Stop generating?' : 'Discard the AI output?'}
+        message={generatingAI ? 'The response in progress will be lost.' : "The generated text hasn't been saved."}
+        confirmLabel={generatingAI ? 'Stop and close' : 'Discard'}
+        cancelLabel={generatingAI ? 'Keep waiting' : 'Keep editing'}
         danger
         onConfirm={discardAndClose}
         onCancel={keepEditing}

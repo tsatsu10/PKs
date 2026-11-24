@@ -1,3 +1,4 @@
+import Button from '../../components/ui/Button';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -151,13 +152,13 @@ export default function ObjectPage() {
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
         inert={creating}
       />
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="detail-error" role="alert">{error}</div>}
       {create.status === 'failed' && (
         // The editor stays usable: its edits wait in the save queue until the object exists.
         <div className="conflict-bar" role="alert">
           <p className="conflict-bar-text">Couldn&apos;t create this object: {getErrorMessage(create.error)}</p>
           <div className="conflict-bar-actions">
-            <button type="button" className="btn btn-primary btn-small" onClick={create.retry}>Retry</button>
+            <Button variant="primary" size="sm" onClick={create.retry}>Retry</Button>
           </div>
         </div>
       )}

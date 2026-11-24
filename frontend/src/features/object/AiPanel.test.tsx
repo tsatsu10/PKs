@@ -93,4 +93,14 @@ describe('RunPromptPanel', () => {
     expect(screen.getByLabelText('Provider').tagName).toBe('SELECT');
     expect(screen.getByLabelText('AI model').tagName).toBe('SELECT');
   });
+
+  it('offers to stop generating', () => {
+    const { run } = renderPanel({ generatingAI: true, confirmDiscard: true });
+    const confirm = screen.getByRole('dialog', { name: 'Stop generating?' });
+    expect(confirm).toHaveAccessibleDescription('The response in progress will be lost.');
+    fireEvent.click(screen.getByRole('button', { name: 'Keep waiting' }));
+    expect(run.keepEditing).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop and close' }));
+    expect(run.discardAndClose).toHaveBeenCalledTimes(1);
+  });
 });

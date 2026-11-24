@@ -1,3 +1,5 @@
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import QueryError from '../../components/QueryError';
 import { HISTORY_ANCHOR } from './ConflictBar';
 import type { VersionRow, PromptRun, PromptTemplate } from './types';
@@ -29,8 +31,7 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
   return (
     <>
       {(versions.length > 0 || versionsError) && (
-        <div className="detail-section-card" id={HISTORY_ANCHOR}>
-          <h3 className="detail-section-card-title">Version history</h3>
+        <Card as="section" title="Version history" id={HISTORY_ANCHOR}>
           {versionsError ? (
             <QueryError what="version history" error={versionsError} onRetry={onRetryVersions} />
           ) : (
@@ -39,15 +40,14 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
                 <li key={v.id}>
                   <span className="version-history-meta">v{v.version} · {new Date(v.created_at).toLocaleString()}</span>
                   <span className="version-history-title">{v.title || 'Untitled'}</span>
-                  <button type="button" className="btn btn-secondary btn-small" onClick={() => restoreVersion(v)} disabled={restoringVersion === v.id}>{restoringVersion === v.id ? 'Restoring…' : 'Restore'}</button>
+                  <Button size="sm" onClick={() => restoreVersion(v)} disabled={restoringVersion === v.id}>{restoringVersion === v.id ? 'Restoring…' : 'Restore'}</Button>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       )}
-      <div className="detail-section-card">
-        <h3 className="detail-section-card-title">Prompt runs</h3>
+      <Card as="section" title="Prompt runs">
         {runsError ? (
           <QueryError what="prompt runs" error={runsError} onRetry={onRetryRuns} />
         ) : (
@@ -64,7 +64,7 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
             </ul>
           </>
         )}
-      </div>
+      </Card>
     </>
   );
 }
@@ -72,8 +72,7 @@ function OwnerHistory({ isOwner, versions, versionsError, onRetryVersions, promp
 function ReadonlyHistory({ isOwner, versions, versionsError, onRetryVersions }: Props) {
   if (isOwner && versions.length > 0) return null;
   return (
-    <div className="detail-section-card" id={HISTORY_ANCHOR}>
-      <h3 className="detail-section-card-title">Version history</h3>
+    <Card as="section" title="Version history" id={HISTORY_ANCHOR}>
       {versionsError ? (
         <QueryError what="version history" error={versionsError} onRetry={onRetryVersions} />
       ) : versions.length === 0 ? (
@@ -89,6 +88,6 @@ function ReadonlyHistory({ isOwner, versions, versionsError, onRetryVersions }: 
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

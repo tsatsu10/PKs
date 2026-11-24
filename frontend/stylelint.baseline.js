@@ -10,7 +10,6 @@ export const cssBaseline = [
   "src/components/QueryError.css",
   "src/components/ShortcutsModal.css",
   "src/components/TypeMark.css",
-  "src/features/object/ObjectPage.css",
   "src/index.css",
   "src/pages/AuditLogs.css",
   "src/pages/Auth.css",
