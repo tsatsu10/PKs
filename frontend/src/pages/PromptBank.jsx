@@ -9,6 +9,17 @@ import { useNotifyError } from '../lib/useNotifyError';
 import QueryError from '../components/QueryError';
 import { usePromptsList, invalidatePrompts } from '../data/prompts';
 import { OBJECT_TYPES, RUN_PROMPT_STORAGE_KEY } from '../constants';
+import { ClipboardList, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Chip from '../components/ui/Chip';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import EmptyState from '../components/ui/EmptyState';
+import Field from '../components/ui/Field';
+import IconButton from '../components/ui/IconButton';
+import Input, { Textarea } from '../components/ui/Input';
+import Page from '../components/ui/Page';
+import Spinner from '../components/ui/Spinner';
 import './PromptBank.css';
 
 export default function PromptBank() {
@@ -34,6 +45,10 @@ export default function PromptBank() {
   const [tagFilter, setTagFilter] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [saving, setSaving] = useState(false);
+  /** The form as it was when the editor opened, to tell whether anything changed. */
+  const [baseline, setBaseline] = useState('');
+  /** What to do once the user agrees to drop unsaved edits. */
+  const [pendingAction, setPendingAction] = useState(null);
 
   const allTags = useMemo(() => {
     const set = new Set();
@@ -57,16 +72,20 @@ export default function PromptBank() {
     );
   }, [templates, searchQuery, tagFilter]);
 
+  function startEditing(id, next) {
+    setEditingId(id);
+    setForm(next);
+    setBaseline(JSON.stringify(next));
+  }
+
   function openNew() {
-    setEditingId('new');
-    setForm({ name: '', description: '', applies_to_types: [], tags: [], prompt_text: '' });
+    startEditing('new', { name: '', description: '', applies_to_types: [], tags: [], prompt_text: '' });
     setTagInput('');
     setError('');
   }
 
   function openEdit(t) {
-    setEditingId(t.id);
-    setForm({
+    startEditing(t.id, {
       name: t.name,
       description: t.description || '',
       applies_to_types: t.applies_to_types || [],
@@ -193,66 +212,44 @@ export default function PromptBank() {
 
   if (loading) {
     return (
-      <div className="prompt-bank-page" >
-        <div className="prompt-bank-loading">
-          <div className="prompt-bank-spinner" aria-hidden="true" />
-          <p role="status" aria-live="polite">Loading…</p>
-        </div>
-      </div>
+      <Page title="Prompt Bank">
+        <Spinner />
+      </Page>
     );
   }
 
-  return (
-    <div className="prompt-bank-page" >
-      <header className="prompt-bank-hero">
-        <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Prompt Bank' }]} />
-        <h1 className="prompt-bank-title">Prompt Bank</h1>
-        <p className="prompt-bank-desc">
-          Your library of prompts from different situations and use cases. Save them here, copy when you need them, or run one on a knowledge object.
-        </p>
-      </header>
+  const editing = editingId !== undefined;
+  const dirty = editing && JSON.stringify(form) !== baseline;
+  /** Run `action` now, or after the user agrees to drop unsaved edits. */
+  const guard = (action) => {
+    if (dirty) setPendingAction(() => action);
+    else action();
+  };
+  const field = (key) => ({ value: form[key], onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) });
 
-      {error && (
-        <div className="prompt-bank-error" role="alert">
-          {error}
-        </div>
-      )}
+  return (
+    <Page title="Prompt Bank" actions={<Button variant="primary" onClick={() => guard(openNew)}><Plus size={16} aria-hidden="true" />Save new prompt</Button>}>
+      <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Prompt Bank' }]} />
+      <p className="prompt-bank-desc">
+        Your library of prompts from different situations and use cases. Save them here, copy when you need them, or run one on a knowledge object.
+      </p>
+
+      {error && <div className="prompt-bank-error" role="alert">{error}</div>}
 
       <div className="prompt-bank-layout">
         <aside className="prompt-bank-sidebar">
-          <button type="button" className="btn btn-primary prompt-bank-new" onClick={openNew}>
-            + Save new prompt
-          </button>
           {templates.length > 0 && (
             <>
-              <div className="prompt-bank-search-wrap">
-                <input
-                  type="search"
-                  className="prompt-bank-search"
-                  placeholder="Search prompts…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Search prompts"
-                />
-              </div>
+              <Field label="Search prompts" labelHidden>
+                {(f) => <Input id={f.id} type="search" placeholder="Search prompts…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />}
+              </Field>
               {allTags.length > 0 && (
-                <div className="prompt-bank-tag-filters">
-                  <button
-                    type="button"
-                    className={`prompt-bank-tag-pill ${!tagFilter ? 'active' : ''}`}
-                    onClick={() => setTagFilter('')}
-                  >
-                    All
-                  </button>
+                <div className="prompt-bank-tag-filters" role="group" aria-label="Filter by tag">
+                  <Button size="sm" variant={!tagFilter ? 'primary' : 'secondary'} aria-pressed={!tagFilter} onClick={() => setTagFilter('')}>All</Button>
                   {allTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`prompt-bank-tag-pill ${tagFilter === tag ? 'active' : ''}`}
-                      onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-                    >
+                    <Button key={tag} size="sm" variant={tagFilter === tag ? 'primary' : 'secondary'} aria-pressed={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>
                       {tag}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}
@@ -262,218 +259,135 @@ export default function PromptBank() {
           {listQ.error ? (
             <QueryError what="prompts" error={listQ.error} onRetry={() => listQ.refetch()} />
           ) : templates.length === 0 ? (
-            <section className="prompt-bank-empty empty-state" aria-label="No prompts">
-              <div className="prompt-bank-empty-icon" aria-hidden="true">💬</div>
-              <p className="empty-state-title">No prompts yet</p>
-              <p className="empty-state-desc">
-                Save prompts you collect so you can copy them anytime or run them on a knowledge object.
-              </p>
-              <button type="button" className="btn btn-primary" onClick={openNew}>
-                Save your first prompt
-              </button>
-            </section>
+            <EmptyState
+              icon={MessageSquare}
+              title="No prompts yet"
+              description="Save prompts you collect so you can copy them anytime or run them on a knowledge object."
+              action={<Button variant="primary" onClick={openNew}>Save your first prompt</Button>}
+            />
           ) : (
-            <ul className="prompt-bank-list" role="list">
+            <ul className="prompt-bank-list">
               {filteredTemplates.map((t) => {
-                const isActive = editingId === t.id;
-                const typesLabel = (t.applies_to_types || []).length
-                  ? (t.applies_to_types || []).join(', ')
-                  : 'all types';
+                const types = (t.applies_to_types || []).length ? t.applies_to_types.join(', ') : 'all types';
                 return (
-                  <li key={t.id} className="prompt-bank-list-item">
-                    <div
-                      className={`prompt-bank-card ${isActive ? 'prompt-bank-card-active' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openEdit(t)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          openEdit(t);
-                        }
-                      }}
-                      aria-pressed={isActive}
-                    >
-                      <div className="prompt-bank-card-head">
-                        <span className="prompt-bank-card-name">{t.name}</span>
-                        <span className="prompt-bank-card-types">{typesLabel}</span>
+                  <li key={t.id} className={`prompt-bank-card${editingId === t.id ? ' prompt-bank-card-active' : ''}`}>
+                    {/* The row's main button selects it; its actions are siblings, never nested (A7). */}
+                    <button type="button" className="prompt-bank-card-main" aria-current={editingId === t.id ? 'true' : undefined} onClick={() => guard(() => openEdit(t))}>
+                      <span className="prompt-bank-card-name">{t.name}</span>
+                      <span className="prompt-bank-card-types">{types}</span>
+                      {t.description && <span className="prompt-bank-card-desc">{t.description}</span>}
+                    </button>
+                    {(t.tags || []).length > 0 && (
+                      <div className="prompt-bank-card-tags">
+                        {t.tags.map((tag) => <Chip key={tag}>{tag}</Chip>)}
                       </div>
-                      {(t.tags || []).length > 0 && (
-                        <div className="prompt-bank-card-tags">
-                          {(t.tags || []).map((tag) => (
-                            <span key={tag} className="prompt-bank-tag-chip">{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                      {t.description && (
-                        <p className="prompt-bank-card-desc">{t.description}</p>
-                      )}
-                      <div className="prompt-bank-card-actions">
-                        <button
-                          type="button"
-                          className="prompt-bank-card-btn prompt-bank-card-copy"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyPrompt(t);
-                          }}
-                        >
-                          Copy prompt
-                        </button>
-                        <button
-                          type="button"
-                          className="prompt-bank-card-btn prompt-bank-card-use"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUseOnObject(t);
-                          }}
-                        >
-                          Use on object
-                        </button>
-                        <button
-                          type="button"
-                          className="prompt-bank-card-btn prompt-bank-card-danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmId(t.id);
-                          }}
-                          aria-label="Delete prompt"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    )}
+                    <div className="prompt-bank-card-actions">
+                      <Button size="sm" variant="ghost" onClick={() => handleCopyPrompt(t)}>Copy prompt</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleUseOnObject(t)}>Use on object</Button>
+                      <IconButton label={`Delete ${t.name}`} icon={Trash2} iconSize={16} onClick={() => setDeleteConfirmId(t.id)} />
                     </div>
                   </li>
                 );
               })}
               {filteredTemplates.length === 0 && (searchQuery.trim() || tagFilter) && (
-                <li className="prompt-bank-list-empty">
-                  <p>{emptyListMessage}</p>
-                </li>
+                <li className="prompt-bank-list-empty">{emptyListMessage}</li>
               )}
             </ul>
           )}
         </aside>
 
-        <div className="prompt-bank-main" aria-label="Prompt bank">
-          {editingId === 'new' || editingId ? (
-            <div className="prompt-bank-editor">
-              <div className="prompt-bank-editor-header">
-                <h2>{editingId === 'new' ? 'Save new prompt' : 'Edit prompt'}</h2>
-                <div className="prompt-bank-editor-actions">
-                  <button type="button" className="btn btn-ghost" onClick={closeEditor} disabled={saving}>
-                    Cancel
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
+        <div className="prompt-bank-main">
+          {editing ? (
+            <Card
+              as="section"
+              titleLevel={2}
+              title={editingId === 'new' ? 'Save new prompt' : 'Edit prompt'}
+              actions={
+                <>
+                  <Button variant="ghost" onClick={() => guard(closeEditor)} disabled={saving}>Cancel</Button>
+                  <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                </>
+              }
+            >
               <div className="prompt-bank-editor-body">
-                <label className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Name</span>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. Executive summary"
-                    required
-                  />
-                </label>
-                <label className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Description (optional)</span>
-                  <input
-                    type="text"
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    placeholder="When you use this prompt"
-                  />
-                </label>
-                <div className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Tags</span>
-                  <div className="prompt-bank-tags-editor">
-                    <div className="prompt-bank-tags-chips">
-                      {(form.tags || []).map((tag) => (
-                        <span key={tag} className="prompt-bank-editor-tag">
-                          {tag}
-                          <button type="button" className="prompt-bank-editor-tag-remove" onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="prompt-bank-tags-input-row">
-                      <input
-                        type="text"
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-                        placeholder="Add a tag (e.g. summarization, writing)"
-                        className="prompt-bank-tag-input"
-                      />
-                      <button type="button" className="btn btn-secondary btn-small" onClick={addTag} disabled={!tagInput.trim()}>
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Use on object types (empty = any)</span>
-                  <div className="prompt-bank-checkbox-group">
-                    {OBJECT_TYPES.map((type) => (
-                      <label key={type} className="prompt-bank-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={form.applies_to_types.includes(type)}
-                          onChange={() => toggleAppliesTo(type)}
-                        />
-                        <span>{type}</span>
-                      </label>
+                <Field label="Name">
+                  {(f) => <Input id={f.id} type="text" {...field('name')} placeholder="e.g. Executive summary" required />}
+                </Field>
+                <Field label="Description (optional)">
+                  {(f) => <Input id={f.id} type="text" {...field('description')} placeholder="When you use this prompt" />}
+                </Field>
+                <div>
+                  <div className="prompt-bank-tags-chips">
+                    {(form.tags || []).map((tag) => (
+                      <Chip key={tag} onRemove={() => removeTag(tag)} removeLabel={`Remove tag ${tag}`}>{tag}</Chip>
                     ))}
                   </div>
+                  <Field label="Tags">
+                    {(f) => (
+                      <div className="prompt-bank-tags-input-row">
+                        <Input
+                          id={f.id}
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                          placeholder="Add a tag (e.g. summarization, writing)"
+                        />
+                        <Button size="sm" onClick={addTag} disabled={!tagInput.trim()}>Add</Button>
+                      </div>
+                    )}
+                  </Field>
                 </div>
-                <label className="prompt-bank-field">
-                  <span className="prompt-bank-field-label">Prompt text</span>
-                  <textarea
-                    value={form.prompt_text}
-                    onChange={(e) => setForm((f) => ({ ...f, prompt_text: e.target.value }))}
-                    placeholder="Paste or write the prompt. When run on an object, the app will send the object title and content with this prompt to AI (if enabled)."
-                    rows={8}
-                  />
-                </label>
+                <fieldset className="prompt-bank-checkbox-group">
+                  <legend>Use on object types (empty = any)</legend>
+                  {OBJECT_TYPES.map((type) => (
+                    <label key={type} className="prompt-bank-checkbox">
+                      <input type="checkbox" checked={form.applies_to_types.includes(type)} onChange={() => toggleAppliesTo(type)} />
+                      <span>{type}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <Field label="Prompt text">
+                  {(f) => (
+                    <Textarea
+                      id={f.id}
+                      {...field('prompt_text')}
+                      placeholder="Paste or write the prompt. When run on an object, the app will send the object title and content with this prompt to AI (if enabled)."
+                      rows={8}
+                    />
+                  )}
+                </Field>
               </div>
-            </div>
+            </Card>
           ) : (
-            <div className="prompt-bank-welcome">
-              <div className="prompt-bank-welcome-icon" aria-hidden="true">📋</div>
-              <p className="prompt-bank-welcome-text">
-                {templates.length === 0
-                  ? 'Save a prompt to get started.'
-                  : 'Select a prompt to edit, or use Copy / Use on object from the list.'}
-              </p>
-              {templates.length > 0 && (
-                <button type="button" className="btn btn-secondary" onClick={openNew}>
-                  Save new prompt
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={ClipboardList}
+              title={templates.length === 0 ? 'Save a prompt to get started.' : 'Select a prompt to edit, or use Copy / Use on object from the list.'}
+            />
           )}
         </div>
       </div>
 
-      {deleteConfirmId && (
-        <div className="prompt-bank-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="prompt-bank-delete-title">
-          <div className="prompt-bank-modal">
-            <h2 id="prompt-bank-delete-title">Delete this prompt?</h2>
-            <p className="prompt-bank-modal-desc">This cannot be undone.</p>
-            <div className="prompt-bank-modal-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirmId(null)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-danger" onClick={() => handleDelete(deleteConfirmId)}>
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <ConfirmDialog
+        open={pendingAction !== null}
+        danger
+        title="Discard your changes?"
+        message="Your edits haven't been saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={() => { const action = pendingAction; setPendingAction(null); action?.(); }}
+        onCancel={() => setPendingAction(null)}
+      />
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        danger
+        title="Delete this prompt?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => handleDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
+    </Page>
   );
 }

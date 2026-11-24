@@ -7,7 +7,5 @@ export const a11yBaseline = [
   "src/features/object/InPlaceFields.tsx",
   "src/features/object/ObjectPage.tsx",
   "src/pages/PasteBin.jsx",
-  "src/pages/PromptBank.jsx",
   "src/pages/Search.jsx",
-  "src/pages/Templates.jsx"
 ]

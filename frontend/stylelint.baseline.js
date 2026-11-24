@@ -17,9 +17,7 @@ export const cssBaseline = [
   "src/pages/Journal.css",
   "src/pages/Notifications.css",
   "src/pages/PasteBin.css",
-  "src/pages/PromptBank.css",
   "src/pages/Search.css",
   "src/pages/Settings.css",
-  "src/pages/Templates.css",
   "src/pages/Trash.css"
 ]
