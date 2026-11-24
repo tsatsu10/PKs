@@ -25,7 +25,6 @@ function TableViewRow({
   return (
     <div
       className={`table-view-row-wrap${selected ? ' table-view-row-wrap--selected' : ''}${compact ? ' table-view-row-wrap--compact' : ''}`}
-      role="listitem"
       data-object-index={objectIndex}
     >
       <label className={`table-view-checkbox${selectionMode ? ' is-visible' : ''}`}>

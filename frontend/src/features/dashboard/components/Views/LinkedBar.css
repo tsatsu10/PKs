@@ -12,7 +12,7 @@
 
 .linked-bar-prefix {
   font-size: 0.75rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
   flex-shrink: 0;
 }
 
@@ -31,19 +31,19 @@
   max-width: 10rem;
   padding: 0.1rem 0.4rem;
   font-size: 0.6875rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--glass-border);
+  background: var(--pks-surface-raised);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 999px;
-  transition: border-color var(--dur-fast, 160ms) var(--ease-out-quint, ease),
-    background var(--dur-fast, 160ms) ease;
+  transition: border-color var(--dur-fast) var(--ease-out-quint),
+    background var(--dur-fast) ease;
 }
 
 .linked-bar-chip:hover {
-  border-color: rgba(236, 72, 153, 0.35);
-  background: rgba(236, 72, 153, 0.08);
-  color: var(--polar-white);
+  border-color: var(--pks-accent-primary);
+  background: var(--pks-accent-selected-surface);
+  color: var(--pks-text-primary);
 }
 
 .linked-bar-chip-title {
@@ -55,7 +55,7 @@
 .linked-bar-chip--more {
   cursor: pointer;
   font-weight: 600;
-  color: var(--cosmic-pink);
+  color: var(--pks-accent-primary);
 }
 
 .linked-bar-overflow-wrap {
@@ -70,16 +70,15 @@
   min-width: 12rem;
   max-width: 16rem;
   padding: 0.5rem 0.65rem;
-  background: var(--surface-elevated);
-  border: 1px solid var(--glass-border);
+  background: var(--pks-surface-raised);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 10px;
-  box-shadow: var(--modal-shadow);
 }
 
 .linked-bar-popover-hint {
   margin: 0 0 0.35rem;
   font-size: 0.6875rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
 }
 
 .linked-bar-popover-list {
@@ -94,10 +93,10 @@
   gap: 0.35rem;
   padding: 0.25rem 0;
   font-size: 0.8125rem;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   text-decoration: none;
 }
 
 .linked-bar-popover-link:hover {
-  color: var(--cosmic-pink);
+  color: var(--pks-accent-primary);
 }

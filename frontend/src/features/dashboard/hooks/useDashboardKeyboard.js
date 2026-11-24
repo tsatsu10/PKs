@@ -126,7 +126,7 @@ export function useDashboardKeyboard({
       listVirtualizer.scrollToIndex(scrollRow, { align: 'auto', behavior: 'auto' });
       setTimeout(() => {
         const rowEl = listEl.querySelector(`[data-object-index="${nextIndex}"]`);
-        const link = rowEl?.querySelector?.('.object-card, .timeline-row, .table-view-row');
+        const link = rowEl?.querySelector?.('.object-card-link, .timeline-row, .table-view-row');
         const toFocus = link instanceof HTMLElement ? link : rowEl;
         if (toFocus instanceof HTMLElement) toFocus.focus();
       }, 50);

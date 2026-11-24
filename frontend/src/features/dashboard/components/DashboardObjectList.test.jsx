@@ -85,6 +85,13 @@ describe('DashboardObjectList', () => {
     expect(first).toHaveAttribute('aria-setsize', '1000');
   });
 
+  it.each(['table', 'card'])('does not nest list items in %s view', (viewMode) => {
+    render(<Harness count={30} viewMode={viewMode} />);
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(item.querySelector('[role="listitem"]')).toBeNull();
+    }
+  });
+
   it('counts positions across pages', () => {
     render(<Harness count={50} positionOffset={50} totalCount={120} />);
     const first = screen.getAllByRole('listitem')[0];

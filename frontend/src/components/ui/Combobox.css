@@ -12,10 +12,10 @@
   padding: var(--pks-space-2);
   overflow-y: auto;
   list-style: none;
-  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: var(--pks-radius-md);
   background: var(--pks-surface-sheet);
-  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) var(--pks-scrim);
 }
 
 .ui-combobox-list[hidden] {

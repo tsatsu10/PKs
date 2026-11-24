@@ -7,20 +7,28 @@
 }
 
 .table-view-row-wrap--selected {
-  background: rgba(236, 72, 153, 0.06);
+  background: var(--pks-accent-selected-surface);
 }
 
 .table-view-checkbox {
   display: flex;
   align-items: center;
   padding-left: 0.25rem;
-  opacity: 0;
 }
 
-.table-view-checkbox.is-visible,
-.table-view-row-wrap:hover .table-view-checkbox,
-.table-view-row-wrap:focus-within .table-view-checkbox {
-  opacity: 1;
+/* Hidden until hover only where hover exists; always shown on touch (M8). */
+@media (hover: hover) {
+  .table-view-checkbox {
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+
+  .table-view-checkbox.is-visible,
+  .table-view-row-wrap--selected .table-view-checkbox,
+  .table-view-row-wrap:hover .table-view-checkbox,
+  .table-view-row-wrap:focus-within .table-view-checkbox {
+    opacity: 1;
+  }
 }
 
 .table-view-row {
@@ -45,7 +53,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.75rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   min-width: 0;
 }
 
@@ -57,7 +65,7 @@
 
 .table-view-title .title-cluster-text {
   font-weight: 600;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -75,7 +83,7 @@
   .table-view-summary {
     display: block;
     font-size: 0.75rem;
-    color: var(--polar-dim);
+    color: var(--pks-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

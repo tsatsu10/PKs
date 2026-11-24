@@ -1,0 +1,230 @@
+.object-card-wrapper {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  animation: dashboard-list-item-appear 0.28s ease-out both;
+}
+
+/* The title link's ::after stretches over this box, so the whole card opens the object (A7). */
+.object-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--pks-border-divider);
+  border-radius: var(--pks-radius-lg);
+  background: var(--pks-surface-card);
+  transition: border-color var(--dur-fast) ease, transform var(--dur-base) ease;
+}
+
+.object-card:hover,
+.object-card--selected {
+  border-color: var(--pks-accent-primary);
+}
+
+.object-card-accent {
+  height: 3px;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
+}
+
+.object-card-cover-wrap {
+  position: relative;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 10;
+  min-height: 108px;
+  overflow: hidden;
+}
+
+.object-card-cover,
+.object-card-cover-fallback {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+}
+
+.object-card-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pks-surface-raised);
+}
+
+.object-card-cover-fallback-icon {
+  transform: scale(1.65);
+}
+
+.object-card-topbar {
+  position: absolute;
+  top: var(--pks-space-3);
+  right: var(--pks-space-9);
+  left: var(--pks-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pks-space-2);
+  pointer-events: none;
+}
+
+.object-card-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pks-space-2);
+  max-width: 100%;
+  padding: var(--pks-space-1) var(--pks-space-3);
+  border-radius: var(--pks-radius-full);
+  background: var(--pks-surface-card);
+  color: var(--pks-text-primary);
+  font-size: var(--pks-text-size-xs);
+  font-weight: var(--pks-text-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.object-card-type-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Above the stretched link. */
+.object-card-checkbox {
+  position: absolute;
+  z-index: 1;
+  top: var(--pks-space-3);
+  right: var(--pks-space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--pks-size-min-target);
+  min-height: var(--pks-size-min-target);
+  border-radius: var(--pks-radius-sm);
+  background: var(--pks-surface-card);
+  cursor: pointer;
+}
+
+.object-card-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--pks-accent-primary);
+  cursor: pointer;
+}
+
+/* Hidden until hover only where hover exists; always shown on touch (M8). */
+@media (hover: hover) {
+  .object-card-checkbox {
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .object-card:hover .object-card-checkbox,
+  .object-card:focus-within .object-card-checkbox,
+  .object-card--selected .object-card-checkbox,
+  .object-card-checkbox.is-visible {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .object-card-checkbox {
+    min-width: var(--pks-size-touch-target);
+    min-height: var(--pks-size-touch-target);
+  }
+}
+
+.object-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--pks-space-3);
+  min-height: 0;
+  padding: var(--pks-space-5);
+}
+
+.object-card-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pks-space-2);
+  margin: 0;
+  color: var(--pks-text-primary);
+  font-size: var(--pks-text-size-body-lg);
+  font-weight: var(--pks-text-weight-semibold);
+  line-height: 1.35;
+}
+
+.object-card-pin {
+  flex-shrink: 0;
+  margin-top: var(--pks-space-1);
+  color: var(--pks-accent-primary);
+}
+
+.object-card-link {
+  display: -webkit-box;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.object-card-link::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+}
+
+.object-card-link:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
+  outline-offset: 2px;
+}
+
+.object-card-summary {
+  display: -webkit-box;
+  flex: 1;
+  overflow: hidden;
+  margin: 0;
+  color: var(--pks-text-muted);
+  font-size: var(--pks-text-size-sm);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Above the stretched link, so its chips are their own targets. */
+.object-card .linked-bar {
+  position: relative;
+  z-index: 1;
+}
+
+.object-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pks-space-3);
+  margin-top: auto;
+  padding-top: var(--pks-space-3);
+  border-top: 1px solid var(--pks-border-divider);
+  color: var(--pks-text-muted);
+  font-size: var(--pks-text-size-xs);
+}
+
+.object-card-meta-group,
+.object-card-due {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-3);
+  min-width: 0;
+}
+
+.object-card-version {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .object-card,
+  .object-card-checkbox { transition: none; }
+}

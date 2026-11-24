@@ -115,6 +115,25 @@ describe('css guardrails', { timeout: 60_000 }, () => {
     }
   })
 
+  it('shows selection without hover on touch', () => {
+    // M8: a selection checkbox may hide until hover only where hover exists.
+    const files = [
+      'src/features/dashboard/components/DashboardObjectCard.css',
+      'src/features/dashboard/components/Views/StreamView.css',
+      'src/features/dashboard/components/Views/TableView.css',
+      'src/pages/Dashboard.css',
+    ]
+    const bad: string[] = []
+    for (const rel of files) {
+      const css = fs.readFileSync(path.join(frontendRoot, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      const outsideHover = css.replace(/@media \(hover: hover\)\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '')
+      for (const m of outsideHover.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (/checkbox/.test(m[1]) && /opacity:\s*0\s*(;|$)/.test(m[2])) bad.push(rel + ': ' + m[1].trim())
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
   it('has no unreferenced classes outside the allowlist', () => {
     expect(JSON.parse(runCheckCss('--unused', '--json'))).toEqual([])
   })

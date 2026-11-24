@@ -52,6 +52,7 @@ export default function DashboardObjectList({
                       to={`/objects/${rowObj.id}${runPromptSuffix}`}
                       selected={selectedIds.has(rowObj.id)}
                       onToggleSelect={toggleSelect}
+                      selectionMode={selectionMode}
                       animationDelay={Math.min(startIdx + colIdx, 12) * 25}
                       compact={compact}
                       objectIndex={startIdx + colIdx}

@@ -2,7 +2,7 @@
   display: flex;
   gap: var(--pks-space-2);
   overflow-x: auto;
-  border-bottom: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+  border-bottom: 1px solid var(--pks-border-divider);
 }
 
 .ui-tab {

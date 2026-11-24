@@ -1,11 +1,15 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
+import { AlertCircle, Clock, Pin } from 'lucide-react';
 import { formatObjectTypeLabel } from '../../../constants';
 import TypeMark from '../../../components/TypeMark';
+import Badge from '../../../components/ui/Badge';
 import LinkedBar from './Views/LinkedBar';
 import { useRowVisibility } from '../hooks/useRowVisibility';
 import { usePrefetchObject } from '../../../data/usePrefetchObject';
 import './Views/LinkedBar.css';
+import './DashboardObjectCard.css';
+import '../../../components/ui/Spinner.css'; // .ui-visually-hidden
 
 function formatRelativeTime(iso) {
   if (!iso) return '';
@@ -20,16 +24,16 @@ function formatRelativeTime(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function dueBadgeClass(dueAt) {
-  if (!dueAt) return '';
+/** 'overdue' before today, 'soon' within 7 days, otherwise 'later'. */
+function dueState(dueAt) {
   const due = new Date(dueAt);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
   const days = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-  if (days < 0) return 'object-card-due--overdue';
-  if (days <= 7) return 'object-card-due--soon';
-  return 'object-card-due--later';
+  if (days < 0) return 'overdue';
+  if (days <= 7) return 'soon';
+  return 'later';
 }
 
 function formatDueLabel(dueAt) {
@@ -42,12 +46,14 @@ function formatDueLabel(dueAt) {
 /**
  * Knowledge object card for dashboard grid view.
  * Memoised: give it only stable props (strings, booleans, stable callbacks).
+ * Only the title is a link; it stretches over the card, and the checkbox and linked chips sit above it (A7).
  */
 function DashboardObjectCard({
   obj,
   to,
   selected,
   onToggleSelect,
+  selectionMode = false,
   animationDelay = 0,
   compact = false,
   objectIndex = 0,
@@ -58,6 +64,7 @@ function DashboardObjectCard({
   const typeLabel = formatObjectTypeLabel(obj.type);
   const summary = obj.snippet || obj.summary;
   const status = obj.status && obj.status !== 'active' ? obj.status : null;
+  const due = obj.due_at ? dueState(obj.due_at) : null;
   const rowRef = useRowVisibility(obj.id);
   const prefetch = usePrefetchObject();
 
@@ -70,14 +77,11 @@ function DashboardObjectCard({
       className={`object-card-wrapper${compact ? ' object-card-wrapper--compact' : ''}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <Link
-        to={to}
-        {...prefetch(obj.id)}
+      <div
         className={`object-card${selected ? ' object-card--selected' : ''}`}
         data-type={obj.type || 'note'}
         data-status={obj.status || 'active'}
         data-object-index={objectIndex}
-        aria-label={`${obj.title}, ${typeLabel}, version ${obj.current_version}`}
       >
         <div className="object-card-accent" aria-hidden="true" />
 
@@ -89,66 +93,56 @@ function DashboardObjectCard({
               <TypeMark type={obj.type} size="lg" className="object-card-cover-fallback-icon" />
             </span>
           )}
-          <div className="object-card-cover-scrim" aria-hidden="true" />
-
           <div className="object-card-topbar">
             <span className="object-card-type-pill" title={typeLabel}>
-              <TypeMark type={obj.type} size="sm" className="object-card-type-icon" />
+              <TypeMark type={obj.type} size="sm" />
               <span className="object-card-type-label">{typeLabel}</span>
             </span>
-            {status && (
-              <span className={`object-card-status object-card-status--${status}`}>{status}</span>
-            )}
+            {status && <Badge tone={status === 'draft' ? 'warning' : 'neutral'}>{status}</Badge>}
           </div>
-
-          <label
-            className="object-card-checkbox"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          >
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={() => onToggleSelect(obj.id)}
-              onClick={(e) => e.stopPropagation()}
-              aria-label={`Select ${obj.title}`}
-            />
-          </label>
         </div>
+
+        <label className={`object-card-checkbox${selectionMode ? ' is-visible' : ''}`}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(obj.id)}
+            aria-label={`Select ${obj.title}`}
+          />
+        </label>
 
         <div className="object-card-body">
           <h3 className="object-card-title">
-            {obj.is_pinned && <span className="object-card-pin" aria-label="Pinned">📌</span>}
-            <span className="object-card-title-text">{obj.title}</span>
+            {obj.is_pinned && (
+              <>
+                <Pin size={16} aria-hidden="true" className="object-card-pin" />
+                <span className="ui-visually-hidden">Pinned</span>
+              </>
+            )}
+            <Link to={to} className="object-card-link" {...prefetch(obj.id)}>{obj.title}</Link>
           </h3>
 
-          {summary && (
-            <p className="object-card-summary">{summary}</p>
-          )}
+          {summary && <p className="object-card-summary">{summary}</p>}
 
           <LinkedBar objectId={obj.id} runPromptSuffix={runPromptSuffix} compact={compact} />
 
           <footer className="object-card-footer">
             <div className="object-card-meta-group">
-              <time className="object-card-meta" dateTime={obj.updated_at}>
-                {formatRelativeTime(obj.updated_at)}
-              </time>
+              <time dateTime={obj.updated_at}>{formatRelativeTime(obj.updated_at)}</time>
               <span className="object-card-version" title={`Version ${obj.current_version}`}>
                 v{obj.current_version}
               </span>
             </div>
-            {obj.due_at && (
-              <span
-                className={`object-card-due ${dueBadgeClass(obj.due_at)}`}
-                title={`Due ${formatDueLabel(obj.due_at)}`}
-              >
-                Due {formatDueLabel(obj.due_at)}
+            {due && (
+              <span className="object-card-due">
+                {due === 'overdue' && <Badge tone="danger" icon={AlertCircle}>Overdue</Badge>}
+                {due === 'soon' && <Badge tone="warning" icon={Clock}>Due soon</Badge>}
+                <span>Due {formatDueLabel(obj.due_at)}</span>
               </span>
             )}
           </footer>
         </div>
-
-        <span className="object-card-open-hint" aria-hidden="true">Open</span>
-      </Link>
+      </div>
     </article>
   );
 }

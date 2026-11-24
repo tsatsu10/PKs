@@ -17,7 +17,7 @@
 .ui-dialog-backdrop {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+  background: var(--pks-scrim);
 }
 
 .ui-dialog-panel {
@@ -26,11 +26,11 @@
   flex-direction: column;
   width: 100%;
   max-height: calc(100dvh - 2 * var(--pks-space-5) - var(--mobile-nav-offset, 0px));
-  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: var(--pks-radius-xl);
   background: var(--pks-surface-sheet);
   color: var(--pks-text-primary);
-  box-shadow: 0 var(--pks-space-5) var(--pks-space-10) color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+  box-shadow: 0 var(--pks-space-5) var(--pks-space-10) var(--pks-scrim);
   animation: ui-dialog-in 0.16s ease-out;
 }
 
@@ -87,7 +87,7 @@
   justify-content: flex-end;
   gap: var(--pks-space-3);
   padding: var(--pks-space-4) var(--pks-space-5);
-  border-top: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+  border-top: 1px solid var(--pks-border-divider);
 }
 
 @keyframes ui-dialog-in {
