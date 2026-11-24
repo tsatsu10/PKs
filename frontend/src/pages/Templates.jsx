@@ -5,7 +5,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useNotifyError } from '../lib/useNotifyError';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import QueryError from '../components/QueryError';
 import OptionsInput from '../components/OptionsInput';
 import { useTemplatesList, invalidateTemplates } from '../data/templates';

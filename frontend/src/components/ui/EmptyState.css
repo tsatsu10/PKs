@@ -1,0 +1,29 @@
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pks-space-3);
+  padding: var(--pks-space-8) var(--pks-space-5);
+  text-align: center;
+  color: var(--pks-text-secondary);
+}
+
+.ui-empty-icon {
+  color: var(--pks-text-muted);
+}
+
+.ui-empty-title {
+  margin: 0;
+  color: var(--pks-text-primary);
+  font-size: var(--pks-text-size-body-lg);
+  font-weight: var(--pks-text-weight-semibold);
+}
+
+.ui-empty-description {
+  max-width: 36ch;
+  font-size: var(--pks-text-size-body);
+}
+
+.ui-empty-action {
+  margin-top: var(--pks-space-3);
+}

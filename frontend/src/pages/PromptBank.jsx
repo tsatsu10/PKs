@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import { supabase } from '../lib/supabase';
 import { useNotifyError } from '../lib/useNotifyError';
 import QueryError from '../components/QueryError';

@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../../../context/AuthContext';
 import { logAudit } from '../../../lib/audit';
 import { deliverWebhookEvent } from '../../../lib/webhooks';
-import { useToast } from '../../../context/ToastContext';
+import { useToast } from '../../../components/ui/Toaster';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, RUN_PROMPT_STORAGE_KEY } from '../../../constants';
 import { getErrorMessage } from '../../../lib/errors';
 import { useDashboardSearch, createEmptyFiltersOverride } from '../../../hooks/useDashboardSearch';

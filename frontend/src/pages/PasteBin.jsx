@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import { useNotifyError } from '../lib/useNotifyError';
 import Breadcrumbs from '../components/Breadcrumbs';
 import QueryError from '../components/QueryError';

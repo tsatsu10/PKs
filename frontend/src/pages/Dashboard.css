@@ -138,21 +138,6 @@
   }
 }
 
-.dashboard-sidebar--open-mobile {
-  display: block;
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: var(--mobile-nav-offset, 0px);
-  z-index: 40;
-  width: min(20rem, 92vw);
-  padding: 1rem;
-  overflow-y: auto;
-  background: var(--space-black-soft);
-  border-left: 1px solid var(--glass-border);
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
-}
-
 .dashboard-sr-only {
   position: absolute;
   width: 1px;
@@ -185,12 +170,6 @@
 
 @media (min-width: 1024px) and (max-width: 1279px) {
   .dashboard-layout {
-    display: block;
-  }
-  .dashboard-sidebar {
-    display: none;
-  }
-  .dashboard-sidebar.dashboard-sidebar--open-mobile {
     display: block;
   }
 }

@@ -28,3 +28,6 @@ export function useIsMobile(threshold = BP.md) {
 }
 
 export { BP };
+
+/** At and above this width the dashboard activity panel is an inline sidebar; below it, a drawer (M9). */
+export const ACTIVITY_INLINE_QUERY = '(min-width: 1280px)';

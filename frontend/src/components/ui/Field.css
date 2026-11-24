@@ -1,0 +1,26 @@
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pks-space-2);
+  min-width: 0;
+}
+
+.ui-field-label {
+  color: var(--pks-text-secondary);
+  font-size: var(--pks-text-size-meta);
+  font-weight: var(--pks-text-weight-medium);
+}
+
+.ui-field-hint,
+.ui-field-error {
+  margin: 0;
+  font-size: var(--pks-text-size-sm);
+}
+
+.ui-field-hint {
+  color: var(--pks-text-muted);
+}
+
+.ui-field-error {
+  color: var(--pks-status-danger);
+}

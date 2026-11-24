@@ -1,0 +1,46 @@
+.ui-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--pks-size-control-height);
+  height: var(--pks-size-control-height);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--pks-radius-md);
+  background: transparent;
+  color: var(--pks-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-icon-button:hover:not(:disabled) {
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
+}
+
+.ui-icon-button--secondary {
+  background: var(--pks-surface-raised);
+  border-color: color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+}
+
+.ui-icon-button:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-icon-button:disabled {
+  opacity: var(--pks-opacity-disabled);
+  cursor: not-allowed;
+}
+
+@media (pointer: coarse) {
+  .ui-icon-button {
+    width: var(--pks-size-touch-target);
+    height: var(--pks-size-touch-target);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-icon-button { transition: none; }
+}

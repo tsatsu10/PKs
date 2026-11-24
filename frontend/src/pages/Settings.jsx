@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { AI_PROVIDERS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
 import { validateApiKeyForProvider } from '../lib/aiProviders';
 import { useTheme } from '../context/ThemeContext';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../components/ui/Toaster';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { useNotifyError } from '../lib/useNotifyError';
