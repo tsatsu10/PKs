@@ -8,6 +8,9 @@ import NotificationCenter from './NotificationCenter';
 import CommandPalette from './CommandPalette';
 import ShortcutsModal from './ShortcutsModal';
 import { NAV_GROUPS } from '../constants/navigation';
+import { Bell, ChevronLeft, ChevronRight, Command, Home, Keyboard, LogOut, Menu, Moon, Plus, Settings, Sun } from 'lucide-react';
+import Kbd from './ui/Kbd';
+import { modKey } from '../lib/keyboardMap';
 import './AppLayout.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'pks-sidebar-collapsed';
@@ -154,9 +157,9 @@ export default function AppLayout({ children }) {
               type="button"
               className="app-layout-command-hint"
               onClick={() => setCommandOpen(true)}
-              title="Open command palette (Ctrl+K)"
+              title={`Open command palette (${modKey}+K)`}
             >
-              <span className="app-layout-command-kbd">⌘K</span>
+              <Kbd keys={['mod', 'K']} />
               <span>Search or jump…</span>
             </button>
           )}
@@ -194,20 +197,20 @@ export default function AppLayout({ children }) {
         <div className="app-layout-sidebar-bottom">
           <div className="app-layout-sidebar-actions">
             <button type="button" onClick={cycleTheme} className="app-layout-icon-btn" aria-label={resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'} title={resolvedTheme === 'dark' ? 'Light' : 'Dark'}>
-              <span aria-hidden>{resolvedTheme === 'dark' ? '☀' : '☽'}</span>
+              {resolvedTheme === 'dark' ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
             </button>
             <NotificationCenter />
             <button type="button" onClick={() => setShortcutsOpen(true)} className="app-layout-icon-btn" aria-label="Keyboard shortcuts" title="Shortcuts (?)">
-              <span aria-hidden>?</span>
+              <Keyboard size={20} aria-hidden="true" />
             </button>
-            <button type="button" onClick={() => setCommandOpen(true)} className="app-layout-icon-btn" aria-label="Command palette" title="Command palette (⌘K)">
-              <span aria-hidden>⌘</span>
+            <button type="button" onClick={() => setCommandOpen(true)} className="app-layout-icon-btn" aria-label="Command palette" title={`Command palette (${modKey}+K)`}>
+              <Command size={20} aria-hidden="true" />
             </button>
           </div>
           <div className="app-layout-sidebar-user">
             {showLabels && <span className="app-layout-user-email" aria-hidden>{user?.email}</span>}
             <button type="button" onClick={() => { closeMobileMenu(); logout(); }} className="app-layout-logout" aria-label="Sign out" title={showLabels ? undefined : 'Sign out'}>
-              <span className="app-layout-nav-icon" aria-hidden>⎋</span>
+              <LogOut size={20} aria-hidden="true" className="app-layout-nav-icon" />
               {showLabels && <span className="app-layout-nav-label">Sign out</span>}
             </button>
           </div>
@@ -219,7 +222,7 @@ export default function AppLayout({ children }) {
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
         >
-          {collapsed ? '▶' : '◀'}
+          {collapsed ? <ChevronRight size={16} aria-hidden="true" /> : <ChevronLeft size={16} aria-hidden="true" />}
         </button>
       </aside>
       <div
@@ -237,26 +240,26 @@ export default function AppLayout({ children }) {
             aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen(true)}
           >
-            ☰
+            <Menu size={24} aria-hidden="true" />
           </button>
         </div>
         {children}
       </main>
       <nav className="app-layout-bottom-nav" aria-label="Mobile navigation">
         <Link to="/" className={`app-layout-bottom-link ${location.pathname === '/' ? 'active' : ''}`} aria-current={location.pathname === '/' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>⌂</span>
+          <Home size={20} aria-hidden="true" className="app-layout-bottom-icon" />
           <span className="app-layout-bottom-label">Home</span>
         </Link>
         <Link to="/objects/new" className={`app-layout-bottom-link ${location.pathname === '/objects/new' ? 'active' : ''}`} aria-current={location.pathname === '/objects/new' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>+</span>
+          <Plus size={20} aria-hidden="true" className="app-layout-bottom-icon" />
           <span className="app-layout-bottom-label">New</span>
         </Link>
         <Link to="/notifications" className={`app-layout-bottom-link ${location.pathname === '/notifications' ? 'active' : ''}`} aria-current={location.pathname === '/notifications' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>◉</span>
+          <Bell size={20} aria-hidden="true" className="app-layout-bottom-icon" />
           <span className="app-layout-bottom-label">Alerts</span>
         </Link>
         <Link to="/settings" className={`app-layout-bottom-link ${location.pathname === '/settings' ? 'active' : ''}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
-          <span className="app-layout-bottom-icon" aria-hidden>⚙</span>
+          <Settings size={20} aria-hidden="true" className="app-layout-bottom-icon" />
           <span className="app-layout-bottom-label">Settings</span>
         </Link>
       </nav>

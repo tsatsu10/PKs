@@ -354,30 +354,6 @@ button:focus-visible {
 }
 
 /* Empty state block: centered message + CTA */
-.empty-state {
-  text-align: center;
-  padding: var(--space-16, 2rem) var(--space-8, 1rem);
-  border-radius: var(--radius-lg, 16px);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-}
-.empty-state-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--polar-white);
-  margin: 0 0 var(--space-4, 0.5rem) 0;
-}
-.empty-state-desc {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 var(--space-6, 0.75rem) 0;
-  max-width: 40ch;
-  margin-left: auto;
-  margin-right: auto;
-}
-.empty-state .btn {
-  margin-top: var(--space-4, 0.5rem);
-}
 
 /* Form design system: base control styles (use in page-specific forms via same class names or scoping) */
 

@@ -1,8 +1,7 @@
 .command-palette-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--backdrop-overlay);
-  backdrop-filter: blur(4px);
+  background: var(--pks-scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -15,10 +14,9 @@
 .command-palette {
   width: 100%;
   max-width: min(480px, calc(100vw - 2rem));
-  background: var(--surface-elevated);
-  border: 1px solid var(--glass-border);
+  background: var(--pks-surface-raised);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 16px;
-  box-shadow: var(--modal-shadow);
   overflow: hidden;
 }
 
@@ -27,25 +25,25 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--pks-border-divider);
 }
 
 .command-palette-icon {
   font-size: 0.875rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
 }
 
 .command-palette-input {
   flex: 1;
   background: none;
   border: none;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   font-size: 1rem;
   outline: none;
 }
 
 .command-palette-input::placeholder {
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
 }
 
 .command-palette-list {
@@ -62,15 +60,15 @@
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   cursor: pointer;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
   font-size: 0.9375rem;
   transition: background 0.1s ease, color 0.1s ease;
 }
 
 .command-palette-item:hover,
 .command-palette-item.highlight {
-  background: var(--hover-overlay);
-  color: var(--polar-white);
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
 }
 
 .command-palette-item-icon {
@@ -81,6 +79,6 @@
   margin: 0;
   padding: 0.35rem 1rem;
   font-size: 0.6875rem;
-  color: var(--polar-faint);
-  border-top: 1px solid var(--glass-border);
+  color: var(--pks-text-muted);
+  border-top: 1px solid var(--pks-border-divider);
 }

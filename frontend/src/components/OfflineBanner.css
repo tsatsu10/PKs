@@ -5,7 +5,7 @@
   padding: 0.5rem 1rem;
   text-align: center;
   font-size: 0.875rem;
-  background: var(--surface-elevated);
-  border-bottom: 1px solid var(--glass-border);
-  color: var(--polar-white);
+  background: var(--pks-surface-raised);
+  border-bottom: 1px solid var(--pks-border-divider);
+  color: var(--pks-text-primary);
 }

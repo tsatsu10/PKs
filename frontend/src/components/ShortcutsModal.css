@@ -1,91 +1,16 @@
-.shortcuts-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--backdrop-overlay);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-  z-index: 10001;
-}
-
-.shortcuts-modal {
-  width: 100%;
-  max-width: min(400px, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  background: var(--surface-elevated);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: var(--modal-shadow);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.shortcuts-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.shortcuts-modal-header h2 {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--polar-white);
-}
-
-.shortcuts-modal-close {
-  background: none;
-  border: none;
-  color: var(--polar-muted);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0.25rem;
-}
-
-.shortcuts-modal-close:hover {
-  color: var(--polar-white);
-}
-
 .shortcuts-modal-list {
+  display: grid;
+  gap: var(--pks-space-3);
   margin: 0;
-  padding: 0.75rem 1.25rem 1rem;
+  padding: 0;
   list-style: none;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
 }
 
 .shortcuts-modal-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--hover-overlay);
-}
-
-.shortcuts-modal-row:last-child {
-  border-bottom: none;
-}
-
-.shortcuts-modal-keys {
-  flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-family: ui-monospace, monospace;
-  background: var(--hover-overlay-strong);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
-  color: var(--polar-muted);
-}
-
-.shortcuts-modal-desc {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  align-items: baseline;
+  gap: var(--pks-space-4);
+  color: var(--pks-text-secondary);
+  font-size: var(--pks-text-size-sm);
 }
