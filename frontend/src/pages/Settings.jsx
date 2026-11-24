@@ -23,6 +23,8 @@ import './Settings.css';
 import Button from '../components/ui/Button';
 import Page from '../components/ui/Page';
 import ThemePicker from '../components/ThemePicker';
+import '../components/ui/Input.css';
+import '../components/ui/Field.css';
 
 export default function Settings() {
   const { user, refreshUser, profileLoaded } = useAuth();
@@ -395,15 +397,15 @@ export default function Settings() {
         <h2 id="account-heading" className="page-section-title">Account</h2>
         <p className="settings-desc page-section-desc">Your display name and timezone. Used across the app for dates and identification.</p>
         {profileError && <div className="ui-page-error" role="alert">{profileError}</div>}
-        <form onSubmit={saveProfile} className="settings-form form">
+        <form onSubmit={saveProfile} className="settings-form">
           <label>
             Email
             <input type="text" value={user?.email ?? ''} readOnly disabled className="settings-input-readonly" aria-describedby="account-email-hint" />
             <span id="account-email-hint" className="settings-desc">Email cannot be changed here. Use your auth provider or contact support.</span>
           </label>
-          <label>
+          <label className="ui-field">
             Display name
-            <input
+            <input className="ui-input"
               type="text"
               value={profileDisplayName}
               onChange={(e) => setProfileDisplayName(e.target.value)}
@@ -412,9 +414,9 @@ export default function Settings() {
               aria-label="Display name"
             />
           </label>
-          <label>
+          <label className="ui-field">
             Timezone
-            <input
+            <input className="ui-input"
               type="text"
               value={profileTimezone}
               onChange={(e) => setProfileTimezone(e.target.value)}
@@ -455,10 +457,10 @@ export default function Settings() {
         <p className="settings-desc page-section-desc">Enter your current password, then choose a new one (min 8 characters).</p>
         {passwordError && <div className="ui-page-error" role="alert">{passwordError}</div>}
         {passwordSuccess && <p className="settings-muted" role="status">Password updated. You can sign in with the new password next time.</p>}
-        <form onSubmit={changePassword} className="settings-form form">
-          <label>
+        <form onSubmit={changePassword} className="settings-form">
+          <label className="ui-field">
             Current password
-            <input
+            <input className="ui-input"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -468,9 +470,9 @@ export default function Settings() {
               aria-label="Current password"
             />
           </label>
-          <label>
+          <label className="ui-field">
             New password
-            <input
+            <input className="ui-input"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -481,9 +483,9 @@ export default function Settings() {
               aria-label="New password"
             />
           </label>
-          <label>
+          <label className="ui-field">
             Confirm new password
-            <input
+            <input className="ui-input"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -510,8 +512,8 @@ export default function Settings() {
       <section className="settings-section page-section">
         <h2 className="page-section-title">AI API keys</h2>
         <p className="settings-desc page-section-desc">Add your own DeepSeek or Claude API key and give it a name. You can then choose it in the Run prompt dropdown instead of the server default. Keys are write-only: they can't be read back, only removed.</p>
-        <form onSubmit={addAiProvider} className="settings-form form">
-          <select
+        <form onSubmit={addAiProvider} className="settings-form">
+          <select className="ui-select"
             value={aiProviderType}
             onChange={(e) => setAiProviderType(e.target.value)}
             disabled={addingAiProvider}
@@ -521,7 +523,7 @@ export default function Settings() {
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
           </select>
-          <input
+          <input className="ui-input"
             type="text"
             value={aiProviderName}
             onChange={(e) => setAiProviderName(e.target.value)}
@@ -529,7 +531,7 @@ export default function Settings() {
             disabled={addingAiProvider}
             aria-label="Provider name"
           />
-          <input
+          <input className="ui-input"
             type="password"
             value={aiProviderKey}
             onChange={(e) => setAiProviderKey(e.target.value)}
@@ -563,8 +565,8 @@ export default function Settings() {
         <h2 className="page-section-title">Domains</h2>
         <p className="settings-desc page-section-desc">Domains group your knowledge by area (e.g. Health, Tech, Projects).</p>
         {taxonomy.error && <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />}
-        <form onSubmit={addDomain} className="settings-form form">
-          <input
+        <form onSubmit={addDomain} className="settings-form">
+          <input className="ui-input"
             type="text"
             value={newDomain}
             onChange={(e) => setNewDomain(e.target.value)}
@@ -624,8 +626,8 @@ export default function Settings() {
       <section className="settings-section page-section">
         <h2 className="page-section-title">Tags</h2>
         <p className="settings-desc page-section-desc">Tags are labels you can attach to any object (e.g. urgent, draft).</p>
-        <form onSubmit={addTag} className="settings-form form">
-          <input
+        <form onSubmit={addTag} className="settings-form">
+          <input className="ui-input"
             type="text"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}

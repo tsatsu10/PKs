@@ -157,7 +157,7 @@ export default function Import() {
         </div>
         <div className="import-inputs">
           <label className="import-file-label">
-            <span className="btn btn-secondary">Choose file</span>
+            <span className="ui-button ui-button--secondary ui-button--md">Choose file</span>
             <input type="file" accept=".md,.csv,.txt" onChange={onFileChange} className="import-file-input" />
           </label>
           <span className="import-or">or paste below</span>

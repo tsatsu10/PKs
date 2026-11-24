@@ -11,6 +11,8 @@ import { useIntegrationsList, invalidateIntegrations } from '../data/integration
 import './Integrations.css';
 import Button from '../components/ui/Button';
 import Page from '../components/ui/Page';
+import '../components/ui/Input.css';
+import '../components/ui/Field.css';
 
 export default function Integrations() {
   const { user } = useAuth();
@@ -156,22 +158,22 @@ export default function Integrations() {
 
       <section className="integrations-add">
         <h2>Add integration</h2>
-        <form onSubmit={handleAdd} className="integrations-form form">
-          <label>
+        <form onSubmit={handleAdd} className="integrations-form">
+          <label className="ui-field">
             Name
-            <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Notion import" required />
+            <input className="ui-input" type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Notion import" required />
           </label>
-          <label>
+          <label className="ui-field">
             Type
-            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+            <select className="ui-select" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
               {INTEGRATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </label>
           {form.type === 'webhook' && (
             <div className="webhook-config">
-              <label>
+              <label className="ui-field">
                 Webhook URL
-                <input type="url" value={form.webhookUrl} onChange={(e) => setForm((f) => ({ ...f, webhookUrl: e.target.value }))} placeholder="https://..." required />
+                <input className="ui-input" type="url" value={form.webhookUrl} onChange={(e) => setForm((f) => ({ ...f, webhookUrl: e.target.value }))} placeholder="https://..." required />
               </label>
               <div className="webhook-events">
                 <span>Events</span>
@@ -182,9 +184,9 @@ export default function Integrations() {
                   </label>
                 ))}
               </div>
-              <label>
+              <label className="ui-field">
                 Secret (optional, for HMAC signing)
-                <input type="password" value={form.webhookSecret} onChange={(e) => setForm((f) => ({ ...f, webhookSecret: e.target.value }))} placeholder="Leave blank to skip signing" autoComplete="off" />
+                <input className="ui-input" type="password" value={form.webhookSecret} onChange={(e) => setForm((f) => ({ ...f, webhookSecret: e.target.value }))} placeholder="Leave blank to skip signing" autoComplete="off" />
               </label>
             </div>
           )}
@@ -218,9 +220,9 @@ export default function Integrations() {
                 <Button variant="danger" size="sm" onClick={() => handleDelete(i.id)}>Remove</Button>
                 {editingConfigId === i.id && (
                   <div className="webhook-edit-overlay">
-                    <div className="webhook-edit-box form">
+                    <div className="webhook-edit-box">
                       <h3>Webhook config</h3>
-                      <label>URL <input type="url" value={editConfig.url} onChange={(e) => setEditConfig((c) => ({ ...c, url: e.target.value }))} placeholder="https://..." /></label>
+                      <label className="ui-field">URL <input className="ui-input" type="url" value={editConfig.url} onChange={(e) => setEditConfig((c) => ({ ...c, url: e.target.value }))} placeholder="https://..." /></label>
                       <div className="webhook-events">
                         <span>Events</span>
                         {WEBHOOK_EVENTS.map((ev) => (
@@ -230,7 +232,7 @@ export default function Integrations() {
                           </label>
                         ))}
                       </div>
-                      <label>Secret (optional) <input type="password" value={editConfig.secret} onChange={(e) => setEditConfig((c) => ({ ...c, secret: e.target.value }))} placeholder="Leave blank or ******** to keep" autoComplete="off" /></label>
+                      <label className="ui-field">Secret (optional) <input className="ui-input" type="password" value={editConfig.secret} onChange={(e) => setEditConfig((c) => ({ ...c, secret: e.target.value }))} placeholder="Leave blank or ******** to keep" autoComplete="off" /></label>
                       <div className="webhook-edit-actions">
                         <Button variant="primary" onClick={saveEditConfig}>Save</Button>
                         <Button onClick={() => { setEditingConfigId(null); setEditConfig({ url: '', events: [], secret: '' }); }}>Cancel</Button>

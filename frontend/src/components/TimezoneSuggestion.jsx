@@ -1,4 +1,5 @@
 import { browserTimeZone } from '../lib/timezone';
+import Button from './ui/Button';
 
 /**
  * Stored timezones are never rewritten (an old Accra default can't be told apart from a chosen
@@ -19,7 +20,7 @@ export default function TimezoneSuggestion({ stored, value, onUse }) {
         ) : (
           <>
             Your browser says {zone}. Use it?{' '}
-            <button type="button" className="btn btn-ghost btn-small" onClick={() => onUse(zone)}>Use it</button>
+            <Button variant="ghost" size="sm" onClick={() => onUse(zone)}>Use it</Button>
           </>
         )}
       </p>
@@ -29,7 +30,7 @@ export default function TimezoneSuggestion({ stored, value, onUse }) {
   return (
     <p className="settings-timezone-suggestion">
       Your browser says {zone}. Use it?{' '}
-      <button type="button" className="btn btn-ghost btn-small" onClick={() => onUse(zone)}>Use it</button>
+      <Button variant="ghost" size="sm" onClick={() => onUse(zone)}>Use it</Button>
     </p>
   );
 }

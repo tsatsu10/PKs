@@ -1,217 +1,206 @@
-/* PKS design system — inspired by Meeting Assistant (Behance): Space Black, Polar White, Cosmic Pink, Midnight Purple, glass, motion */
+/*
+ * Global base: reset, element defaults and the few utilities every page shares.
+ * Colours, spacing, radii and type come from styles/tokens.css (generated) and styles/derived.css.
+ * Controls, cards and dialogs are in components/ui; nothing here styles a class a primitive owns.
+ */
 
-:root,
-[data-theme="dark"] {
-  /* Palette (dark) */
-  --space-black: #0a0a0f;
-  --space-black-soft: #0f172a;
-  --midnight: #1e1e2e;
-  --midnight-purple: #2d2a4a;
-  --surface: #1a1a24;
-  --surface-elevated: #252532;
-  --glass-bg: rgba(30, 30, 46, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --polar-white: #f8fafc;
-  --polar-muted: #cbd5e1;
-  --polar-dim: #94a3b8;
-  --polar-faint: #8391a7;
-  --cosmic-pink: #ec4899;
-  --cosmic-pink-dim: #be185d;
-  --cosmic-pink-glow: rgba(236, 72, 153, 0.35);
-  --midnight-purple-accent: #6366f1;
-  --midnight-purple-glow: rgba(99, 102, 241, 0.25);
-  --accent-gradient: linear-gradient(135deg, var(--cosmic-pink) 0%, var(--midnight-purple-accent) 100%);
-  /* Solid-contrast gradient for filled buttons (white text passes AA on both stops) */
-  --accent-strong-start: #be185d;
-  --accent-strong-end: #4338ca;
-  --on-accent: #ffffff;
-  /* Height of the fixed mobile bottom nav; 0 on desktop, set in AppLayout.css */
-  --mobile-nav-offset: 0px;
-  --danger: #dc2626;
-  --danger-bg: rgba(220, 38, 38, 0.15);
-  --success: #22c55e;
-
-  /* Form design system */
-  --input-bg: rgba(10, 10, 15, 0.65);
-  --input-border: var(--glass-border);
-  --input-border-hover: rgba(255, 255, 255, 0.12);
-  --input-focus-border: var(--cosmic-pink);
-  --input-focus-ring: 0 0 0 3px var(--cosmic-pink-glow);
-  --input-color: var(--polar-white);
-  --input-placeholder: var(--polar-faint);
-  --input-radius: 12px;
-  --input-padding-y: 0.75rem;
-  --input-padding-x: 1rem;
-  --input-min-height: 48px;
-  --input-error-border: rgba(220, 38, 38, 0.5);
-  --input-error-ring: rgba(220, 38, 38, 0.2);
-  --label-color: var(--polar-muted);
-  --label-size: 0.875rem;
-  --label-weight: 500;
-  --form-group-gap: 0.5rem;
-  --form-section-gap: 1.5rem;
-
-  /* Theme-aware overlays and semantics */
-  --hover-overlay: rgba(255, 255, 255, 0.06);
-  --hover-overlay-strong: rgba(255, 255, 255, 0.08);
-  --backdrop-overlay: rgba(0, 0, 0, 0.6);
-  --panel-overlay: rgba(10, 10, 15, 0.6);
-  --panel-overlay-strong: rgba(10, 10, 15, 0.85);
-  --modal-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
-  --error-text: #fca5a5;
-  --success-text: #86efac;
-  --badge-on-accent: #fff;
-  --active-highlight-bg: rgba(236, 72, 153, 0.12);
-  --highlight-subtle: rgba(236, 72, 153, 0.06);
-
-  /* Spacing scale (use for margins, padding, gaps) */
-  --space-2: 0.25rem;
-  --space-3: 0.375rem;
-  --space-4: 0.5rem;
-  --space-6: 0.75rem;
-  --space-8: 1rem;
-  --space-10: 1.25rem;
-  --space-12: 1.5rem;
-  --space-16: 2rem;
-  --space-20: 2.5rem;
-  --space-24: 3rem;
-
-  /* Motion tokens (Constellation v2) */
+:root {
+  /* Motion: the token export has none. */
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.2, 0.8, 0.2, 1.05);
   --dur-instant: 80ms;
   --dur-fast: 160ms;
   --dur-base: 220ms;
   --dur-slow: 420ms;
+  /* Height of the fixed mobile bottom nav; 0 on desktop, set in AppLayout.css. */
+  --mobile-nav-offset: 0px;
 
-  /* Radius scale */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-
-  /* Responsive breakpoints (reference only: custom properties can't be used inside media queries) */
-  --bp-sm: 600px;
-  --bp-md: 768px;
-  --bp-lg: 900px;
-
-  /* Typography */
+  color: var(--pks-text-primary);
+  background-color: var(--pks-bg-app);
+  color-scheme: dark;
   font-family: var(--pks-font-sans);
-  line-height: 1.5;
-  font-weight: 400;
   font-synthesis: none;
+  font-weight: 400;
+  line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  color: var(--polar-white);
-  background-color: var(--space-black);
-  color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --space-black: #f8fafc;
-  --space-black-soft: #f1f5f9;
-  --midnight: #e2e8f0;
-  --midnight-purple: #cbd5e1;
-  --surface: #ffffff;
-  --surface-elevated: #f8fafc;
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --polar-white: #0f172a;
-  --polar-muted: #334155;
-  --polar-dim: #475569;
-  --polar-faint: #5b6b82;
-  --cosmic-pink: #db2777;
-  --cosmic-pink-dim: #be185d;
-  --cosmic-pink-glow: rgba(219, 39, 119, 0.25);
-  --midnight-purple-accent: #4f46e5;
-  --midnight-purple-glow: rgba(79, 70, 229, 0.2);
-  --accent-gradient: linear-gradient(135deg, var(--cosmic-pink) 0%, var(--midnight-purple-accent) 100%);
-  --danger: #dc2626;
-  --danger-bg: rgba(220, 38, 38, 0.1);
-  --success: #15803d;
-  --input-bg: rgba(255, 255, 255, 0.9);
-  --input-border: var(--glass-border);
-  --input-border-hover: rgba(0, 0, 0, 0.15);
-  --input-focus-border: var(--cosmic-pink);
-  --input-focus-ring: 0 0 0 3px var(--cosmic-pink-glow);
-  --input-color: var(--polar-white);
-  --input-placeholder: var(--polar-faint);
-  --input-error-border: rgba(220, 38, 38, 0.5);
-  --input-error-ring: rgba(220, 38, 38, 0.15);
-
-  /* Theme-aware overlays and semantics */
-  --hover-overlay: rgba(0, 0, 0, 0.05);
-  --hover-overlay-strong: rgba(0, 0, 0, 0.08);
-  --backdrop-overlay: rgba(0, 0, 0, 0.4);
-  --panel-overlay: rgba(255, 255, 255, 0.7);
-  --panel-overlay-strong: rgba(255, 255, 255, 0.9);
-  --modal-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
-  --error-text: #dc2626;
-  --success-text: #166534;
-  --badge-on-accent: #fff;
-  --active-highlight-bg: rgba(219, 39, 119, 0.12);
-  --highlight-subtle: rgba(219, 39, 119, 0.06);
-
-  color: var(--polar-white);
-  background-color: var(--space-black);
   color-scheme: light;
 }
 
+html {
+  overflow-x: clip;
+}
+
+body {
+  width: 100%;
+  min-width: 320px;
+  max-width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: clip;
+  background: var(--pks-bg-app);
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
 a {
+  color: var(--pks-accent-link);
   font-weight: 500;
-  color: var(--cosmic-pink);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--dur-fast) ease;
 }
+
 a:hover {
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
 }
 
-a:focus-visible {
-  outline: 2px solid var(--cosmic-pink);
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--pks-focus-ring);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
-/* Skip link: visible on keyboard focus for accessibility */
+h1,
+h2,
+h3 {
+  margin-top: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1 { margin-bottom: var(--pks-space-3); font-size: 1.75rem; line-height: 1.2; }
+h2 { margin-bottom: var(--pks-space-2); font-size: 1.25rem; }
+h3 { margin-bottom: var(--pks-space-2); font-size: 1rem; }
+
+button {
+  padding: 0.6em 1.2em;
+  border: 1px solid transparent;
+  border-radius: var(--pks-radius-md);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Native option lists don't inherit the page's colours. */
+select option {
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+iframe {
+  max-width: 100%;
+}
+
+/* Skip link: visible on keyboard focus. */
 .skip-link {
   position: absolute;
-  left: -9999px;
-  top: 0;
   z-index: 9999;
-  padding: 0.75rem 1.25rem;
-  background: var(--polar-white);
-  color: var(--space-black);
+  top: 0;
+  left: -9999px;
+  padding: var(--pks-space-4) var(--pks-space-6);
+  border-radius: 0 0 var(--pks-radius-md) 0;
+  background: var(--pks-text-primary);
+  color: var(--pks-bg-app);
   font-weight: 600;
-  border-radius: 0 0 8px 0;
-  transition: left 0.15s ease;
 }
 
 .skip-link:focus {
   left: 0;
 }
 
-/* Minimum touch target size (44px) for primary controls on touch devices */
-/* Mobile / touch: minimum 44px tap targets for primary actions (WCAG 2.5.5) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--pks-text-muted);
+}
+
+.breadcrumbs {
+  margin-bottom: var(--pks-space-4);
+}
+
+.breadcrumbs-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pks-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--pks-text-muted);
+  font-size: var(--pks-text-size-sm);
+  list-style: none;
+}
+
+.breadcrumbs-item {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-2);
+}
+
+.breadcrumbs-link,
+.breadcrumbs-sep {
+  color: var(--pks-text-muted);
+}
+
+.breadcrumbs-current {
+  max-width: min(200px, 50vw);
+  overflow: hidden;
+  color: var(--pks-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Touch: 44px targets for the shell's navigation (WCAG 2.5.5). Primitives handle their own. */
 @media (pointer: coarse) {
-  .btn {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0.6rem 1rem;
-  }
   .app-layout-nav-link,
   .app-layout-logout {
-    min-height: 44px;
-  }
-  .object-card {
-    min-height: 44px;
-    box-sizing: border-box;
+    min-height: var(--pks-size-touch-target);
   }
 }
 
-/* Respect user preference for reduced motion */
+/* iOS Safari zooms the page when a focused field's font is under 16px.
+   !important is deliberate: page styles set smaller sizes with class selectors. */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-instant: 0ms;
@@ -226,306 +215,5 @@ a:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-  .btn:hover:not(:disabled) {
-    transform: none;
-  }
-}
-
-/* Prevent horizontal scroll from any overflowing content */
-html {
-  overflow-x: clip;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: clip;
-  background: var(--space-black);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(236, 72, 153, 0.06), transparent);
-}
-
-[data-theme="light"] body {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(236, 72, 153, 0.05), transparent);
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
-  max-width: 100vw;
-  overflow-x: clip;
-}
-
-/* Responsive media: prevent images and embeds from overflowing */
-img,
-video {
-  max-width: 100%;
-  height: auto;
-  vertical-align: middle;
-}
-
-iframe {
-  max-width: 100%;
-}
-
-h1, h2, h3 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-top: 0;
-}
-h1 { font-size: 1.75rem; line-height: 1.2; margin-bottom: var(--space-4, 0.5rem); }
-h2 { font-size: 1.25rem; margin-bottom: var(--space-3, 0.375rem); }
-h3 { font-size: 1rem; margin-bottom: var(--space-2, 0.25rem); }
-
-/* Page section: consistent rhythm for settings, dashboards, etc. */
-.page-section {
-  margin-bottom: var(--space-16, 2rem);
-}
-.page-section-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--polar-white);
-  margin: 0 0 var(--space-4, 0.5rem) 0;
-}
-.page-section-desc {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 var(--space-6, 0.75rem) 0;
-  max-width: 52ch;
-}
-
-button {
-  border-radius: 10px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-button:focus-visible {
-  outline: 2px solid var(--cosmic-pink);
-  outline-offset: 2px;
-}
-
-/* Global utility classes */
-.btn {
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
-}
-.btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
-  color: var(--on-accent);
-  border: none;
-  box-shadow: 0 2px 12px var(--cosmic-pink-glow);
-}
-.btn-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 20px var(--cosmic-pink-glow), 0 0 0 1px rgba(255,255,255,0.1);
-}
-.btn-secondary {
-  background: var(--glass-bg);
-  color: var(--polar-muted);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(10px);
-}
-.btn-secondary:hover:not(:disabled) {
-  background: var(--surface-elevated);
-  color: var(--polar-white);
-  border-color: var(--input-border-hover);
-}
-
-/* Empty state block: centered message + CTA */
-
-/* Form design system: base control styles (use in page-specific forms via same class names or scoping) */
-
-.form input:not([type="checkbox"]):not([type="radio"]),
-.form select,
-.form textarea {
-  font-family: inherit;
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: var(--input-min-height, 48px);
-  padding: var(--input-padding-y, 0.75rem) var(--input-padding-x, 1rem);
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--input-radius);
-  color: var(--input-color);
-  font-size: 1rem;
-  line-height: 1.5;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.form input[type="checkbox"],
-.form input[type="radio"] {
-  width: auto;
-  min-height: 0;
-  padding: 0;
-}
-.form textarea {
-  min-height: 6rem;
-  resize: vertical;
-}
-.form input::placeholder,
-.form textarea::placeholder {
-  color: var(--input-placeholder);
-}
-.form input:hover:not(:focus):not(:disabled),
-.form select:hover:not(:focus):not(:disabled),
-.form textarea:hover:not(:disabled) {
-  border-color: var(--input-border-hover);
-}
-.form input:focus,
-.form select:focus,
-.form textarea:focus {
-  outline: none;
-  border-color: var(--input-focus-border);
-  box-shadow: var(--input-focus-ring);
-}
-.form input[aria-invalid="true"],
-.form select[aria-invalid="true"],
-.form textarea[aria-invalid="true"] {
-  border-color: var(--input-error-border);
-  box-shadow: 0 0 0 2px var(--input-error-ring);
-}
-.form input:focus[aria-invalid="true"],
-.form textarea:focus[aria-invalid="true"] {
-  border-color: var(--input-focus-border);
-  box-shadow: var(--input-focus-ring);
-}
-.form input:disabled,
-.form select:disabled,
-.form textarea:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.form select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--input-padding-x, 1rem) center;
-  padding-right: 2.25rem;
-}
-
-/* Native select options: light text on dark background in dark theme */
-[data-theme="dark"] select option,
-:root select option {
-  background: var(--surface-elevated);
-  color: var(--polar-white);
-}
-
-.form label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--form-group-gap);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  color: var(--label-color);
-  margin-bottom: var(--form-section-gap);
-}
-.form label:last-of-type { margin-bottom: 0; }
-.form label input,
-.form label select,
-.form label textarea {
-  margin-top: 0;
-}
-
-/* Inline field-level error (world-class forms: specific, actionable, below field) */
-
-/* Optional hint below field */
-
-input, select, textarea {
-  font-family: inherit;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Breadcrumbs */
-.breadcrumbs {
-  margin-bottom: 0.75rem;
-}
-
-.breadcrumbs-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--polar-dim);
-  min-width: 0;
-}
-
-.breadcrumbs-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.breadcrumbs-sep {
-  color: var(--polar-faint);
-  margin-right: 0.25rem;
-}
-
-.breadcrumbs-link {
-  color: var(--polar-dim);
-}
-
-.breadcrumbs-link:hover {
-  color: var(--polar-white);
-}
-
-.breadcrumbs-current {
-  color: var(--polar-muted);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .breadcrumbs-current {
-    max-width: min(200px, 50vw);
-  }
-}
-
-/* iOS Safari zooms the page when a focused field's font is under 16px.
-   !important is deliberate: page styles set smaller sizes with class selectors. */
-@media (max-width: 768px) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  select,
-  textarea {
-    font-size: 16px !important;
   }
 }

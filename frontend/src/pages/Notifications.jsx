@@ -13,6 +13,7 @@ import { useNotificationsList, invalidateNotifications } from '../data/notificat
 import './Notifications.css';
 import Button, { ButtonLink } from '../components/ui/Button';
 import Page from '../components/ui/Page';
+import '../components/ui/Input.css';
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -70,7 +71,7 @@ export default function Notifications() {
       <header className="notifications-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Notifications' }]} />
         <div className="notifications-toolbar">
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter notifications">
+          <select className="ui-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter notifications">
             <option value="all">All</option>
             <option value="unread">Unread</option>
           </select>

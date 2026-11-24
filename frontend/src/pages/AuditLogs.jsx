@@ -9,6 +9,8 @@ import LoadMore from '../components/LoadMore';
 import { useAuditLogs } from '../data/auditLogs';
 import './AuditLogs.css';
 import Page from '../components/ui/Page';
+import '../components/ui/Input.css';
+import '../components/ui/Field.css';
 
 export default function AuditLogs() {
   const { user } = useAuth();
@@ -28,22 +30,22 @@ export default function AuditLogs() {
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Audit logs' }]} />
         <p className="audit-logs-desc">History of key actions on your knowledge objects.</p>
         <div className="audit-logs-filters">
-          <label>
+          <label className="ui-field">
             Action
-            <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
+            <select className="ui-select" value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
               <option value="">All</option>
               {AUDIT_ACTION_LIST.map((a) => (
                 <option key={a} value={a}>{formatAction(a)}</option>
               ))}
             </select>
           </label>
-          <label>
+          <label className="ui-field">
             From
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <input className="ui-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </label>
-          <label>
+          <label className="ui-field">
             To
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <input className="ui-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </label>
         </div>
       </header>

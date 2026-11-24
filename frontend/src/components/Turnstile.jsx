@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadTurnstile } from '../lib/turnstile';
+import Button from './ui/Button';
 
 const TURNSTILE_LOAD_ERROR =
   "The security check couldn't load. Check your connection or allow challenges.cloudflare.com, then retry.";
@@ -47,14 +48,13 @@ export default function Turnstile({ siteKey, onToken }) {
       <div ref={ref} className="turnstile-widget" />
       {failed && (
         <div className="turnstile-error" role="alert" style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-          <p style={{ margin: '0 0 0.5rem', color: 'var(--error-text)' }}>{TURNSTILE_LOAD_ERROR}</p>
-          <button
-            type="button"
-            className="btn btn-secondary btn-small"
+          <p style={{ margin: '0 0 0.5rem', color: 'var(--pks-status-danger)' }}>{TURNSTILE_LOAD_ERROR}</p>
+          <Button
+            size="sm"
             onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -154,3 +154,42 @@ describe('page roots (M5)', () => {
     expect(bad).toEqual([])
   })
 })
+
+describe('legacy layer is gone (part 3 exit)', () => {
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)],
+    )
+  const src = path.join(frontendRoot, 'src')
+
+  it('has an empty CSS baseline', () => {
+    const { cssBaseline } = require('../../stylelint.baseline.js') as { cssBaseline: string[] }
+    expect(cssBaseline).toEqual([])
+  })
+
+  it('uses no legacy button or form classes', () => {
+    const legacy = /^(btn|btn-primary|btn-secondary|btn-danger|btn-ghost|btn-small|form|form-control|form-group|form-label|form-error|empty-state)$/
+    const bad: string[] = []
+    for (const f of walk(src).filter((p) => /\.(jsx|tsx)$/.test(p) && !/\.test\./.test(p))) {
+      const code = fs.readFileSync(f, 'utf8')
+      for (const m of code.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        for (const cls of (m[1] ?? m[2]).split(/[\s${}?:'"]+/)) {
+          if (legacy.test(cls)) bad.push(`${path.relative(frontendRoot, f)}: ${cls}`)
+        }
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('defines no legacy variables', () => {
+    const bad: string[] = []
+    for (const f of walk(src).filter((p) => p.endsWith('.css') && !/styles[\\/](tokens|derived)\.css$/.test(p))) {
+      const css = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      for (const m of css.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)) {
+        // Allowed outside the token files: motion, layout state, and variables a library or a component reads.
+        if (!/^--(dur-|ease-|mobile-nav-offset|bn-|type-mark-|pks-)/.test(m[1])) bad.push(`${path.relative(frontendRoot, f)}: ${m[1]}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+})

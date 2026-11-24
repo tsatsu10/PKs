@@ -2,20 +2,6 @@
  * Tokens come from styles/tokens.css (pks-*) so both themes work.
  */
 
-:root {
-  --auth-field-border: rgba(255, 255, 255, 0.1);
-  --auth-chip-bg: rgba(255, 255, 255, 0.06);
-  --auth-brand-fg: #f8fafc;
-  --auth-brand-fg-dim: rgba(226, 232, 240, 0.75);
-}
-
-[data-theme='light'] {
-  --auth-field-border: rgba(15, 23, 42, 0.16);
-  --auth-chip-bg: rgba(255, 255, 255, 0.45);
-  --auth-brand-fg: #0f172a;
-  --auth-brand-fg-dim: rgba(15, 23, 42, 0.65);
-}
-
 .auth-page {
   min-height: 100dvh;
   display: flex;
@@ -34,18 +20,18 @@
   padding: 3rem 3.5rem;
   overflow: hidden;
   position: relative;
-  color: var(--auth-brand-fg);
+  color: var(--pks-text-primary);
   background:
-    radial-gradient(120% 70% at -10% 110%, rgba(236, 72, 153, 0.32), transparent 62%),
-    radial-gradient(110% 70% at 110% -10%, rgba(99, 102, 241, 0.34), transparent 58%),
-    #101019;
+    radial-gradient(120% 70% at -10% 110%, color-mix(in srgb, var(--pks-color-pink-500) 32%, transparent), transparent 62%),
+    radial-gradient(110% 70% at 110% -10%, color-mix(in srgb, var(--pks-color-indigo-500) 34%, transparent), transparent 58%),
+    var(--pks-bg-app);
 }
 
 [data-theme='light'] .auth-brand {
   background:
-    radial-gradient(120% 75% at -10% 110%, rgba(236, 72, 153, 0.28), transparent 62%),
-    radial-gradient(110% 75% at 110% -10%, rgba(99, 102, 241, 0.22), transparent 58%),
-    #f6f3fb;
+    radial-gradient(120% 75% at -10% 110%, color-mix(in srgb, var(--pks-color-pink-500) 28%, transparent), transparent 62%),
+    radial-gradient(110% 75% at 110% -10%, color-mix(in srgb, var(--pks-color-indigo-500) 22%, transparent), transparent 58%),
+    var(--pks-bg-app);
 }
 
 .auth-brand-mark {
@@ -73,7 +59,7 @@
 .auth-brand-copy {
   font-size: 0.9375rem;
   line-height: 1.6;
-  color: var(--auth-brand-fg-dim);
+  color: var(--pks-text-secondary);
   margin: 0 0 2rem;
   max-width: 46ch;
 }
@@ -95,8 +81,8 @@
   min-width: 0;
   padding: 0.8rem 0.9rem;
   border-radius: 12px;
-  background: var(--auth-chip-bg);
-  border: 1px solid var(--auth-field-border);
+  background: var(--pks-surface-raised);
+  border: 1px solid var(--pks-border-subtle);
 }
 
 .auth-brand-chip-title {
@@ -106,12 +92,12 @@
 
 .auth-brand-chip-detail {
   font-size: 0.75rem;
-  color: var(--auth-brand-fg-dim);
+  color: var(--pks-text-secondary);
 }
 
 .auth-brand-footer {
   font-size: 0.75rem;
-  color: var(--auth-brand-fg-dim);
+  color: var(--pks-text-secondary);
   margin: 0;
 }
 
@@ -206,7 +192,7 @@
   font-size: 1rem;
   color: var(--pks-text-primary);
   background: var(--pks-surface-input);
-  border: 1px solid var(--auth-field-border);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: 10px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -291,7 +277,7 @@
 
 .auth-strength[data-level='1'] .auth-strength-segment.is-filled { background: var(--pks-status-danger); }
 .auth-strength[data-level='2'] .auth-strength-segment.is-filled { background: var(--pks-status-warning); }
-.auth-strength[data-level='3'] .auth-strength-segment.is-filled { background: #a3e635; }
+.auth-strength[data-level='3'] .auth-strength-segment.is-filled { background: var(--pks-status-success); }
 .auth-strength[data-level='4'] .auth-strength-segment.is-filled { background: var(--pks-status-success); }
 
 .auth-strength-label {
@@ -302,7 +288,7 @@
 
 .auth-strength[data-level='1'] .auth-strength-label { color: var(--pks-status-danger); }
 .auth-strength[data-level='2'] .auth-strength-label { color: var(--pks-status-warning); }
-.auth-strength[data-level='3'] .auth-strength-label { color: #65a30d; }
+.auth-strength[data-level='3'] .auth-strength-label { color: var(--pks-status-success); }
 
 .auth-strength-hint {
   color: var(--pks-text-muted);
@@ -329,7 +315,7 @@
 
 .auth-button-primary {
   background: linear-gradient(90deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
-  color: #fff;
+  color: var(--pks-text-on-accent);
 }
 
 .auth-button-primary:hover:not(:disabled) {
@@ -338,7 +324,7 @@
 
 .auth-button-secondary {
   background: var(--pks-surface-raised);
-  border-color: var(--auth-field-border);
+  border-color: var(--pks-border-subtle);
   color: var(--pks-text-primary);
 }
 
@@ -409,7 +395,7 @@
   width: 100%;
   max-width: 25rem;
   background: var(--pks-surface-card);
-  border: 1px solid var(--auth-field-border);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: 22px;
   padding: 2.25rem 2rem;
 }
@@ -435,7 +421,7 @@
   width: 4rem;
   height: 4rem;
   border-radius: 999px;
-  color: #fff;
+  color: var(--pks-text-on-accent);
   background: linear-gradient(135deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
   margin-bottom: 1.25rem;
 }
@@ -473,8 +459,8 @@
   .auth-page--split {
     flex-direction: column;
     background:
-      radial-gradient(140% 60% at 120% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
-      radial-gradient(130% 55% at -20% 30%, rgba(236, 72, 153, 0.14), transparent 60%),
+      radial-gradient(140% 60% at 120% -10%, color-mix(in srgb, var(--pks-color-indigo-500) 16%, transparent), transparent 60%),
+      radial-gradient(130% 55% at -20% 30%, color-mix(in srgb, var(--pks-color-pink-500) 14%, transparent), transparent 60%),
       var(--pks-bg-app);
   }
 

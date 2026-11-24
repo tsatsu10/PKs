@@ -20,7 +20,7 @@ The CSS target is the largest piece of work in the phase: about 68 KB more must 
 
 ## Verified status (2026-11-16)
 
-None of the 26 items was fully fixed on 2026-11-16. "Partly" means the item is partly fixed. **Update 2026-11-24 (after part 2, PR #22):** A5, A12 and M9 are fixed; A6 is fixed at Taxonomy and Links (ObjectNew and EntityComboBox remain for part 3). The jsx-a11y baseline has 14 files. CSS is 225,436 bytes before part 3.
+None of the 26 items was fully fixed on 2026-11-16. "Partly" means the item is partly fixed. **Update 2026-11-24 (after part 2, PR #22):** A5, A12 and M9 are fixed; A6 is fixed at Taxonomy and Links (ObjectNew and EntityComboBox remain for part 3). The jsx-a11y baseline has 14 files. CSS is 225,436 bytes before part 3. **Update 2026-11-24 (after part 3, branch `phase-0b-part3-migration`):** A6, A7, A10, A11, A15, M5, M6, M8, M10 and M11 are fixed. CSS is 152,408 bytes, 30.3% below the start of −1A; exit criterion 2 (−35%, ≤ 142,232) is **not met**, by 10,176 bytes. The legacy variable and class layer in `index.css` is gone, every stylesheet passes the token-value stylelint rules with an empty baseline, and CI enforces the byte budget (`css-budget.json`). The jsx-a11y baseline has 5 files left for part 4 (AppLayout, CommandPalette, DashboardCommandPalette, InPlaceFields, ObjectPage).
 
 **Accessibility**
 - A5 **Fixed in part 2.** Was: `features/object/AiPanel.tsx:69-77` has dialog roles but no Escape and no focus trap. A backdrop click or Cancel clears the AI output (`hooks/useRunPrompt.ts:120-123`). The "Template", "Prompt" and "Output" labels are not tied to their controls.

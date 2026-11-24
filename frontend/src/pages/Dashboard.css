@@ -322,20 +322,6 @@
   text-decoration: underline;
 }
 
-.dashboard-suggested-next-btn {
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: var(--pks-accent-primary);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.dashboard-suggested-next-btn:hover {
-  color: var(--pks-text-primary);
-}
-
 /* Command palette */
 .dashboard-command-palette-overlay {
   position: fixed;
@@ -468,28 +454,6 @@
   margin: 0;
   font-weight: 600;
   color: var(--pks-text-primary);
-}
-
-.dashboard-actions .btn {
-  padding: 0.5rem 1.125rem;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  transition: box-shadow 0.2s ease, transform 0.1s ease;
-}
-
-.dashboard-actions .btn-primary {
-  box-shadow: 0 2px 12px var(--pks-focus-ring);
-}
-
-.dashboard-actions .btn-primary:hover {
-  box-shadow: 0 4px 20px var(--pks-focus-ring);
-  transform: translateY(-1px);
 }
 
 .dashboard-actions-right {

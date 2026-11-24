@@ -103,3 +103,19 @@
     min-width: 0;
   }
 }
+
+.page-section {
+  margin-bottom: var(--pks-space-8);
+}
+
+.page-section-title {
+  margin: 0 0 var(--pks-space-3);
+  font-size: var(--pks-text-size-body-lg);
+}
+
+.page-section-desc {
+  max-width: 52ch;
+  margin: 0 0 var(--pks-space-4);
+  color: var(--pks-text-muted);
+  font-size: var(--pks-text-size-sm);
+}
