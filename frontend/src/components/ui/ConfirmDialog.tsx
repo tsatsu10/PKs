@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import Button from './Button';
 import Dialog from './Dialog';
 
@@ -25,12 +25,14 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const messageId = useId();
   return (
     <Dialog
       open={open}
       onClose={onCancel}
       title={title}
       size="sm"
+      describedBy={messageId}
       initialFocusRef={cancelRef}
       footer={
         <>
@@ -39,7 +41,7 @@ export default function ConfirmDialog({
         </>
       }
     >
-      <div>{message}</div>
+      <div id={messageId}>{message}</div>
     </Dialog>
   );
 }

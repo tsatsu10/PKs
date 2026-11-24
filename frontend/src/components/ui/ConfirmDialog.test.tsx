@@ -36,3 +36,10 @@ describe('ConfirmDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('ConfirmDialog description', () => {
+  it('describes the dialog with its message', () => {
+    renderConfirm();
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription("The generated text hasn't been saved.");
+  });
+});

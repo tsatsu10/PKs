@@ -22,7 +22,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading ? true : undefined}
       {...rest}
     >
-      {loading && <Spinner size="sm" />}
+      {loading && <Spinner size="sm" decorative />}
       {children}
     </button>
   );

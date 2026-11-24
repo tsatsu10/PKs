@@ -22,6 +22,8 @@ export interface DialogProps {
   onClose: (reason: DialogCloseReason) => void;
   title: string;
   description?: string;
+  /** Id of an element in the body that describes the dialog, when `description` is not used. */
+  describedBy?: string;
   variant?: 'center' | 'drawer';
   size?: 'sm' | 'md' | 'lg';
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -32,6 +34,12 @@ export interface DialogProps {
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),summary';
+
+/** Focusable elements the user can reach: not inside hidden or inert content (e.g. inactive tab panels). */
+function focusables(scope: HTMLElement | null): HTMLElement[] {
+  if (!scope) return [];
+  return Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.closest('[hidden],[inert]'));
+}
 
 /** Nesting depth, so a dialog opened from inside another ranks above it. */
 const DepthContext = createContext(0);
@@ -47,6 +55,7 @@ export default function Dialog({
   onClose,
   title,
   description,
+  describedBy,
   variant = 'center',
   size = 'md',
   initialFocusRef,
@@ -78,7 +87,7 @@ export default function Dialog({
     pushDialog(id, depth);
     if (isTopDialog(id)) {
       const target =
-        initialFocusRef?.current ?? bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? panelRef.current;
+        initialFocusRef?.current ?? focusables(bodyRef.current)[0] ?? panelRef.current;
       target?.focus();
     }
 
@@ -94,7 +103,7 @@ export default function Dialog({
       if (e.key !== 'Tab') return;
       const panel = panelRef.current;
       if (!panel) return;
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const items = focusables(panel);
       if (items.length === 0) {
         e.preventDefault();
         panel.focus();
@@ -128,7 +137,7 @@ export default function Dialog({
   if (!open) return null;
 
   const titleId = `${id}-title`;
-  const descriptionId = description ? `${id}-description` : undefined;
+  const descriptionId = description ? `${id}-description` : describedBy;
   const panelClass = [
     'ui-dialog-panel',
     `ui-dialog-panel--${variant}`,

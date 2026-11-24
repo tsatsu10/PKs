@@ -51,3 +51,10 @@
   .ui-input,
   .ui-select { transition: none; }
 }
+
+.ui-textarea {
+  display: block;
+  min-height: calc(var(--pks-size-control-height) * 2);
+  line-height: 1.5;
+  resize: vertical;
+}

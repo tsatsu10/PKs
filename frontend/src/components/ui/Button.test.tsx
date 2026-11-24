@@ -14,12 +14,19 @@ describe('Button', () => {
     const btn = screen.getByRole('button', { name: /Save/ });
     expect(btn).toHaveAttribute('aria-busy', 'true');
     expect(btn).toBeDisabled();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(btn.querySelector('.ui-spinner')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('forwards the ref', () => {
     const ref = createRef<HTMLButtonElement>();
     render(<Button ref={ref}>Save</Button>);
     expect(ref.current).toBe(screen.getByRole('button'));
+  });
+});
+
+describe('Button while loading', () => {
+  it('keeps its name while loading', () => {
+    render(<Button loading>Save</Button>);
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 });

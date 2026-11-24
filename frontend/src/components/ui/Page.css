@@ -1,0 +1,40 @@
+.ui-page {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.ui-page--narrow { max-width: 720px; }
+.ui-page--default { max-width: 1080px; }
+.ui-page--wide { max-width: 1440px; }
+
+.ui-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pks-space-4);
+  margin-bottom: var(--pks-space-6);
+}
+
+.ui-page-title {
+  margin: 0;
+  color: var(--pks-text-primary);
+  font-size: var(--pks-text-size-title-lg);
+  font-weight: var(--pks-text-weight-bold);
+  line-height: 1.2;
+}
+
+/* Focused by script on navigation, never by Tab. */
+.ui-page-title:focus { outline: none; }
+
+.ui-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pks-space-3);
+}
+
+@media (min-width: 768px) {
+  .ui-page { padding: var(--pks-space-7); }
+}

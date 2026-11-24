@@ -230,3 +230,24 @@ describe('Dialog', () => {
     expect(root.hasAttribute('inert')).toBe(true);
   });
 });
+
+describe('Dialog with hidden content', () => {
+  it('skips hidden content in the Tab trap', () => {
+    render(
+      <Dialog open onClose={() => {}} title="Tabs">
+        <button type="button">Shown</button>
+        <div hidden><button type="button">Hidden last</button></div>
+      </Dialog>,
+      { container: root },
+    );
+    const close = screen.getByRole('button', { name: 'Close' });
+    const shown = screen.getByRole('button', { name: 'Shown' });
+    const hidden = screen.getByText('Hidden last');
+    shown.focus();
+    fireEvent.keyDown(shown, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(shown);
+    expect(document.activeElement).not.toBe(hidden);
+  });
+});

@@ -191,3 +191,23 @@ describe('Toaster', () => {
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
   });
 });
+
+describe('Toaster duplicates', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('does not restart a paused toast on a duplicate', () => {
+    vi.useFakeTimers();
+    mount();
+    act(() => { api.addToast('success', 'Saved'); });
+    const toast = within(screen.getByRole('status')).getByText('Saved').closest('.ui-toast')!;
+    fireEvent.mouseEnter(toast);
+    act(() => { api.addToast('success', 'Saved'); });
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+    fireEvent.mouseLeave(toast);
+    act(() => { vi.advanceTimersByTime(3999); });
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument();
+  });
+});

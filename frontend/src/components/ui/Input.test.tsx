@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
-import Input from './Input';
+import Input, { Textarea } from './Input';
 import Select from './Select';
 
 describe('Input', () => {
@@ -28,5 +28,17 @@ describe('Select', () => {
     const select = screen.getByRole('combobox', { name: 'Type' });
     expect(select).toHaveAttribute('aria-invalid', 'true');
     expect(ref.current).toBe(select);
+  });
+});
+
+describe('Textarea', () => {
+  it('Textarea marks invalid and forwards its ref', () => {
+    const ref = createRef<HTMLTextAreaElement>();
+    render(<Textarea aria-label="Notes" invalid ref={ref} />);
+    const box = screen.getByRole('textbox', { name: 'Notes' });
+    expect(box.tagName).toBe('TEXTAREA');
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    expect(box).toHaveClass('ui-input');
+    expect(ref.current).toBe(box);
   });
 });
