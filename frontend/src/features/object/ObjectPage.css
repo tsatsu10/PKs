@@ -361,17 +361,6 @@
 
 /* Collapsible detail sections */
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: var(--pks-surface-card);
-  border: 1px solid var(--pks-border-divider);
-  border-radius: 8px;
-  font-size: 0.875rem;
-}
-
 .chips-suggested {
   display: inline-flex;
   flex-wrap: wrap;
@@ -386,16 +375,6 @@
 
 .chip-suggested:hover {
   background: var(--pks-border-divider);
-}
-
-.chip-select {
-  padding: 0.25rem 0.5rem;
-  background: var(--pks-surface-card);
-  border: 1px solid var(--pks-border-divider);
-  border-radius: 8px;
-  color: var(--pks-text-primary);
-  font-size: 0.875rem;
-  cursor: pointer;
 }
 
 .links-list {

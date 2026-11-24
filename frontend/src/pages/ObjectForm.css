@@ -1,11 +1,8 @@
 .object-form-page {
-  min-height: 100vh;
   width: 100%;
-  background: var(--space-black);
-  color: var(--polar-white);
+  background: var(--pks-bg-app);
+  color: var(--pks-text-primary);
   padding: 1.5rem;
-  background-image:
-    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.06), transparent 50%);
 }
 
 .object-form-page > * {
@@ -22,14 +19,12 @@
 .object-form-page.notion-style .object-form {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 3rem);
-  padding-bottom: 4rem;
 }
 
 .notion-form-header {
   margin-bottom: 0;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--pks-border-divider);
   flex-shrink: 0;
 }
 
@@ -43,53 +38,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-
-.notion-form-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.notion-form-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.notion-form-template-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--polar-dim);
-  margin-right: 0.5rem;
-}
-
-.template-select {
-  min-width: 160px;
-  max-width: 280px;
-  padding: 0.5rem 2rem 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--polar-white);
-  background: var(--input-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.6rem center;
-}
-
-.template-select:hover {
-  border-color: var(--input-border-hover);
-}
-
-.template-select:focus {
-  outline: none;
-  border-color: var(--cosmic-pink);
-  box-shadow: 0 0 0 2px var(--cosmic-pink-glow);
 }
 
 .notion-form-body {
@@ -126,10 +74,9 @@
     position: sticky;
     top: 1rem;
     padding: 1rem;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: var(--pks-surface-card);
+    border: 1px solid var(--pks-border-divider);
     border-radius: 12px;
-    backdrop-filter: blur(8px);
   }
 }
 
@@ -140,25 +87,9 @@
   min-height: 0;
 }
 
-.notion-form-sidebar .notion-sidebar-props {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .notion-form-sidebar .notion-prop-chips .form-chips-row {
   flex-direction: column;
   align-items: stretch;
-}
-
-.notion-form-sidebar .notion-prop-chips .chip,
-.notion-form-sidebar .notion-prop-chips .chip-select {
-  width: 100%;
-}
-
-.notion-title-block {
-  margin-bottom: 0.25rem;
-  flex-shrink: 0;
 }
 
 .notion-title-input {
@@ -171,12 +102,12 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   outline: none;
 }
 
 .notion-title-input::placeholder {
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
 }
 
 .notion-title-input:focus {
@@ -202,82 +133,13 @@
 
 .notion-prop-label {
   font-size: 0.75rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.notion-prop-select,
-.notion-prop-input {
-  padding: 0.35rem 0.5rem;
-  font-size: 0.875rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: var(--polar-white);
-  min-width: 120px;
-}
-
-.notion-prop-select:focus,
-.notion-prop-input:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.notion-prop-source {
-  flex: 1;
-  min-width: 160px;
-}
-
-.notion-prop-source .notion-prop-input {
-  min-width: 100%;
 }
 
 .notion-prop-chips .form-chips-row {
   margin-top: 0;
-}
-
-.notion-bookmark-url-block {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--active-highlight-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-}
-
-.notion-bookmark-url-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--cosmic-pink);
-  margin-bottom: 0.35rem;
-}
-
-.notion-bookmark-url-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.9375rem;
-  background: var(--input-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  color: var(--polar-white);
-  outline: none;
-}
-
-.notion-bookmark-url-input:focus {
-  border-color: var(--cosmic-pink);
-}
-
-.notion-prop-bookmark-url .notion-prop-label {
-  color: var(--cosmic-pink);
-  font-weight: 600;
-}
-
-.notion-summary-block {
-  margin-bottom: 0.75rem;
-  flex-shrink: 0;
 }
 
 .notion-summary-input {
@@ -287,59 +149,28 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  color: var(--polar-muted);
+  color: var(--pks-text-secondary);
   outline: none;
 }
 
 .notion-summary-input::placeholder {
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
 }
 
 .notion-summary-input:focus {
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
 }
 
 .notion-content-block {
   margin-top: 0.5rem;
   flex: 1;
-  min-height: 420px;
   display: flex;
   flex-direction: column;
-}
-
-.notion-content-block .blocknote-editor-wrapper {
-  border-radius: 8px;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.notion-content-block .blocknote-editor-wrapper {
-  width: 100%;
 }
 
 .notion-hint {
   margin-top: 1rem;
   font-size: 0.8125rem;
-}
-
-.btn-ghost {
-  background: transparent;
-  border: none;
-  color: var(--polar-muted);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border-radius: 6px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--polar-white);
 }
 
 .notion-field {
@@ -350,68 +181,34 @@
 .notion-field-label {
   display: block;
   font-size: 0.75rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.35rem;
 }
 
 .template-driven-fields .notion-field input,
-.template-driven-fields .notion-field select,
-.template-driven-fields .notion-field textarea {
+.template-driven-fields .notion-field select {
   width: 100%;
   padding: 0.5rem 0.75rem;
   font-size: 1rem;
-  background: var(--surface-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--pks-surface-raised);
+  border: 1px solid var(--pks-border-divider);
   border-radius: 8px;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
 }
 
 /* Dropdown options: light text on dark background so they're visible when open */
 .template-driven-fields .notion-field select option,
 .object-form-page select option {
-  background: var(--surface-elevated);
-  color: var(--polar-white);
-}
-
-.object-form-header {
-  margin-bottom: 1.5rem;
-}
-
-.object-form-header h1 {
-  font-size: 1.5rem;
-  margin: 0;
-  font-weight: 600;
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
 }
 
 .object-form {
   display: flex;
   flex-direction: column;
   gap: 0;
-}
-
-.object-form label .required {
-  color: var(--cosmic-pink);
-}
-
-.object-form-page .form-error {
-  border-radius: var(--input-radius);
-  margin-bottom: 1.25rem;
-}
-
-.object-form-page .form-hint {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0.35rem 0 0 0;
-}
-
-.object-form-page .form-hint a {
-  color: var(--cosmic-pink);
-}
-
-.object-form-page .form-hint a:hover {
-  text-decoration: underline;
 }
 
 .object-form-page .form-chips-row {
@@ -422,56 +219,20 @@
   margin-top: 0.35rem;
 }
 
-.object-form-page .form-chips-row .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  font-size: 0.875rem;
-}
-
-.object-form-page .form-chips-row .chip-remove {
-  background: none;
-  border: none;
-  padding: 0 0.15rem;
-  color: var(--polar-dim);
-  cursor: pointer;
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.object-form-page .form-chips-row .chip-remove:hover {
-  color: var(--cosmic-pink);
-}
-
-.object-form-page .form-chips-row .chip-select {
-  padding: 0.25rem 0.5rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  color: var(--polar-white);
-  font-size: 0.875rem;
-  cursor: pointer;
-  min-width: 140px;
-}
-
 .template-driven-fields {
   margin-bottom: 1.25rem;
 }
 .template-driven-fields label,
 .template-driven-fields .notion-field {
-  margin-bottom: var(--form-section-gap);
+  margin-bottom: var(--pks-space-7);
 }
 
 .checkbox-label {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: var(--label-size);
-  color: var(--label-color);
+  font-size: var(--pks-text-size-sm);
+  color: var(--pks-text-secondary);
   cursor: pointer;
   min-height: 24px;
 }
@@ -480,63 +241,81 @@
   width: 1.125rem;
   height: 1.125rem;
   margin: 0;
-  accent-color: var(--cosmic-pink);
+  accent-color: var(--pks-accent-primary);
 }
-
-.object-form-page .btn-primary {
-  box-shadow: 0 2px 12px var(--cosmic-pink-glow);
-}
-
-.object-form-page .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 20px var(--cosmic-pink-glow);
-}
-
-.object-form-page .btn-secondary {
-  background: var(--glass-bg);
-  color: var(--polar-muted);
-  border: 1px solid var(--glass-border);
-}
-
-.object-form-page .btn-secondary:hover {
-  background: var(--surface-elevated);
-  color: var(--polar-white);
-}
-
-.object-form-page .btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.quick-capture-page .object-form-header h1 { margin-bottom: 0.25rem; }
 .quick-capture-desc {
   font-size: 0.875rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   margin: 0 0 1rem 0;
 }
 .object-form-quick .object-form-field { display: block; margin-bottom: 1rem; }
-.object-form-quick .object-form-label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: var(--polar-dim); }
+.object-form-quick .object-form-label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: var(--pks-text-muted); }
 .object-form-quick .object-form-field .blocknote-editor-wrapper { margin-top: 0.25rem; min-height: 180px; }
 .object-form-quick .blocknote-editor-wrapper { margin-top: 0.25rem; min-height: 180px; }
 
 /* Mobile: template dropdown and actions full width, safe-area for sticky bar */
 @media (max-width: 768px) {
   .object-form-page {
-    padding: 1rem;
+    padding: 0;
   }
   .notion-form-toolbar {
     gap: 0.75rem;
   }
-  .notion-form-toolbar-left,
-  .notion-form-toolbar-right {
-    width: 100%;
-    min-width: 0;
-  }
-  .template-select {
-    max-width: 100%;
-    width: 100%;
-    min-width: 0;
-  }
-  .object-form-page .form-chips-row .chip-select {
-    min-width: 0;
-  }
+}
+
+.notion-content-block .blocknote-editor-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--pks-radius-md);
+}
+
+@media (min-width: 768px) {
+  .notion-content-block { min-height: 420px; }
+}
+
+.notion-form-toolbar-right,
+.object-form-actions,
+.object-form-submit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--pks-space-3);
+}
+
+/* Below 768px the only submit button: after the properties, always in reach (M10). */
+.object-form-submit-bar {
+  position: sticky;
+  bottom: var(--mobile-nav-offset);
+  margin-top: var(--pks-space-5);
+  padding: var(--pks-space-3) 0;
+  background: var(--pks-bg-app);
+}
+
+.object-form-error {
+  margin-bottom: var(--pks-space-5);
+  padding: var(--pks-space-3) var(--pks-space-4);
+  border-radius: var(--pks-radius-md);
+  background: var(--pks-status-danger-surface);
+  color: var(--pks-status-danger);
+}
+
+.notion-form-sidebar,
+.notion-properties-row {
+  display: grid;
+  align-content: start;
+  gap: var(--pks-space-4);
+}
+
+.notion-properties-row {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.entity-combobox-create {
+  display: flex;
+  align-items: center;
+  gap: var(--pks-space-3);
 }

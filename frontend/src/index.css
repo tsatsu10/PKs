@@ -401,12 +401,6 @@ button:focus-visible {
 
 /* Form design system: base control styles (use in page-specific forms via same class names or scoping) */
 
-.form-hint {
-  font-size: 0.8125rem;
-  color: var(--polar-faint);
-  margin-top: 0.25rem;
-}
-
 .form input:not([type="checkbox"]):not([type="radio"]),
 .form select,
 .form textarea {
