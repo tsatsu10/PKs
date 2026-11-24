@@ -26,7 +26,7 @@
 .object-card-accent {
   height: 3px;
   flex-shrink: 0;
-  background: linear-gradient(90deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
+  background: linear-gradient(90deg, var(--pks-color-pink-500), var(--pks-color-indigo-500));
 }
 
 .object-card-cover-wrap {

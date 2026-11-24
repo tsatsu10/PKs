@@ -260,3 +260,12 @@
   border-radius: var(--pks-radius-lg);
   background: var(--pks-surface-card);
 }
+
+.templates-fields-columns {
+  color: var(--pks-text-muted);
+  font-size: var(--pks-text-size-sm);
+}
+
+@media (max-width: 800px) {
+  .templates-fields-columns { display: none; }
+}

@@ -263,7 +263,7 @@ export default function PromptBank() {
               icon={MessageSquare}
               title="No prompts yet"
               description="Save prompts you collect so you can copy them anytime or run them on a knowledge object."
-              action={<Button variant="primary" onClick={openNew}>Save your first prompt</Button>}
+              action={<Button variant="primary" onClick={() => guard(openNew)}>Save your first prompt</Button>}
             />
           ) : (
             <ul className="prompt-bank-list">

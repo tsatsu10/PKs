@@ -60,7 +60,7 @@
   font-weight: 800;
   font-size: 1.35rem;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
+  background: linear-gradient(135deg, var(--pks-color-pink-500), var(--pks-color-indigo-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

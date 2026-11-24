@@ -38,6 +38,7 @@
   color: var(--pks-text-on-accent);
 }
 .ui-button--primary:hover:not(:disabled) {
+  color: var(--pks-text-on-accent);
   background: color-mix(in srgb, var(--pks-accent-primary-strong) 85%, var(--pks-color-black));
 }
 
@@ -64,6 +65,7 @@
   color: var(--pks-text-on-accent);
 }
 .ui-button--danger:hover:not(:disabled) {
+  color: var(--pks-text-on-accent);
   background: color-mix(in srgb, var(--pks-status-danger-fill) 85%, var(--pks-color-black));
 }
 

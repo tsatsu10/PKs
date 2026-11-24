@@ -343,6 +343,11 @@ export default function ObjectNew() {
                   required
                   aria-label="Title"
                 />
+                {isBookmark && (
+                  <Field label="Bookmark URL">
+                    {(f) => <Input id={f.id} type="url" value={form.source} onChange={set('source')} placeholder="https://…" />}
+                  </Field>
+                )}
                 <input
                   type="text"
                   className="notion-summary-input"

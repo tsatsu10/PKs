@@ -21,6 +21,7 @@ import Page from '../../../components/ui/Page';
 import Button from '../../../components/ui/Button';
 import Kbd from '../../../components/ui/Kbd';
 import { Plus, X } from 'lucide-react';
+import Input from '../../../components/ui/Input';
 
 export default function DashboardView(props) {
   const {
@@ -102,9 +103,7 @@ export default function DashboardView(props) {
         {/* Suggested next step when few objects and no domains */}
         {heroStats && (heroStats.total ?? 0) <= 5 && domains.length === 0 && (heroStats.total ?? 0) > 0 && (
           <p className="dashboard-suggested-next">
-            <button type="button" className="dashboard-suggested-next-btn" onClick={() => setShowFilters(true)}>
-              Add a domain in filters
-            </button>
+            <Button variant="ghost" size="sm" onClick={() => setShowFilters(true)}>Add a domain in filters</Button>
             {' '}to organize by topic.
           </p>
         )}
@@ -266,9 +265,8 @@ export default function DashboardView(props) {
 
           {showSaveFilterModal && (
             <div className="dashboard-save-filter-inline">
-              <input
+              <Input
                 type="text"
-                className="dashboard-save-filter-input"
                 value={saveFilterName}
                 onChange={(e) => setSaveFilterName(e.target.value)}
                 placeholder="Name this view"

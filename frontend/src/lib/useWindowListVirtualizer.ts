@@ -14,12 +14,18 @@ interface Options {
  */
 export function useWindowListVirtualizer({ listRef, count, estimateSize, overscan = 5 }: Options) {
   const [scrollMargin, setScrollMargin] = useState(0);
-  const empty = count === 0;
+  // The list element mounts late (after loading) and is replaced when the list re-mounts, so the
+  // measuring effect follows the element itself, not the row count.
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  // Runs after every render on purpose: a ref's current value changes without notifying anyone.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (listRef.current !== element) setElement(listRef.current);
+  });
 
   useLayoutEffect(() => {
-    const el = listRef.current;
-    if (!el) return undefined;
-    const measure = () => setScrollMargin(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    if (!element) return undefined;
+    const measure = () => setScrollMargin(Math.round(element.getBoundingClientRect().top + window.scrollY));
     measure();
     window.addEventListener('resize', measure);
     // Content above the list (filters, banners) changes height without a window resize.
@@ -29,7 +35,7 @@ export function useWindowListVirtualizer({ listRef, count, estimateSize, oversca
       window.removeEventListener('resize', measure);
       observer?.disconnect();
     };
-  }, [listRef, empty]);
+  }, [element]);
 
   const virtualizer = useWindowVirtualizer({ count, estimateSize, overscan, scrollMargin });
   return { virtualizer, scrollMargin };

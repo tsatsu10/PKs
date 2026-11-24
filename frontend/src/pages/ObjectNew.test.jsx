@@ -152,4 +152,19 @@ describe('ObjectNew form (A6, M10, A11)', () => {
     const title = screen.getByRole('textbox', { name: 'Title' });
     expect(submit.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it("asks for a bookmark URL right under the title", () => {
+    stubMatchMedia(() => false);
+    renderNew();
+    expect(screen.queryByLabelText('Bookmark URL')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'bookmark' } });
+    const url = screen.getByLabelText('Bookmark URL');
+    expect(url).toHaveAttribute('type', 'url');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const body = screen.getByLabelText('Body');
+    expect(title.compareDocumentPosition(url) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(url.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.change(url, { target: { value: 'https://example.com' } });
+    expect(screen.getByLabelText('URL')).toHaveValue('https://example.com');
+  });
 });

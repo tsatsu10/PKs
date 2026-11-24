@@ -111,4 +111,24 @@ describe('Templates', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Meeting note' }));
     expect(screen.getByRole('dialog', { name: 'Delete this template?' })).toBeInTheDocument();
   });
+
+  it('asks before Duplicate replaces unsaved edits', () => {
+    renderPage();
+    openFirst();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Standup note' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate Report' }));
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('Standup note');
+  });
+
+  it('shows what each field column is', () => {
+    renderPage();
+    openFirst();
+    const head = screen.getByTestId('templates-fields-columns');
+    expect(head).toHaveAttribute('aria-hidden', 'true');
+    expect(head).toHaveTextContent('Key');
+    expect(head).toHaveTextContent('Label');
+    expect(head).toHaveTextContent('Type');
+  });
 });

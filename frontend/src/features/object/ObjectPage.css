@@ -765,7 +765,6 @@
     padding: 0;
   }
   .object-detail-header {
-    flex-wrap: nowrap;
     margin-right: 0;
     margin-left: 0;
     padding: 0.5rem 0;
@@ -774,8 +773,9 @@
     min-width: 0;
   }
   .detail-header-link-search {
+    order: 3;
     min-width: 0;
-    flex: 1 1 8rem;
+    flex: 1 1 100%;
   }
   .detail-meta-inline {
     gap: 0.5rem;

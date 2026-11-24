@@ -398,9 +398,9 @@ export default function Settings() {
         <p className="settings-desc page-section-desc">Your display name and timezone. Used across the app for dates and identification.</p>
         {profileError && <div className="ui-page-error" role="alert">{profileError}</div>}
         <form onSubmit={saveProfile} className="settings-form">
-          <label>
+          <label className="ui-field">
             Email
-            <input type="text" value={user?.email ?? ''} readOnly disabled className="settings-input-readonly" aria-describedby="account-email-hint" />
+            <input type="text" value={user?.email ?? ''} readOnly disabled className="ui-input settings-input-readonly" aria-describedby="account-email-hint" />
             <span id="account-email-hint" className="settings-desc">Email cannot be changed here. Use your auth provider or contact support.</span>
           </label>
           <label className="ui-field">

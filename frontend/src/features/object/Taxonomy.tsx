@@ -5,6 +5,7 @@ import Combobox from '../../components/ui/Combobox';
 import type { useTaxonomyActions } from './hooks/useTaxonomyActions';
 import type { PanelName } from './useObjectPage';
 import type { Named, SuggestedTag } from './types';
+import Button from '../../components/ui/Button';
 
 type Props = {
   isOwner: boolean;
@@ -68,9 +69,9 @@ export default function Taxonomy({ isOwner, objectDomains, objectTags, available
               <div className="chips chips-suggested">
                 <span className="muted">Suggested: </span>
                 {suggestions.map((s) => (
-                  <button key={s.tag_id} type="button" className="chip-suggested" onClick={() => addTag(s.tag_id)} title={`Add ${s.tag_name} (used ${s.usage_count}x in related objects)`}>
+                  <Button key={s.tag_id} size="sm" className="chip-suggested" onClick={() => addTag(s.tag_id)} title={`Add ${s.tag_name} (used ${s.usage_count}x in related objects)`}>
                     +{s.tag_name}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}

@@ -65,7 +65,15 @@
   border-bottom: none;
 }
 
-.notification-list li.unread .notification-item {
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pks-space-3);
+  padding: var(--pks-space-4) 0;
+}
+
+.notification-item.unread {
   background: var(--pks-accent-selected-surface);
 }
 

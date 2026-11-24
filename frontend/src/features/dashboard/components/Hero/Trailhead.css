@@ -49,7 +49,7 @@
 }
 
 .trailhead--resume .trailhead-accent {
-  background: linear-gradient(135deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
+  background: linear-gradient(135deg, var(--pks-color-pink-500), var(--pks-color-indigo-500));
 }
 
 .trailhead--pending .trailhead-accent {

@@ -58,7 +58,7 @@
 }
 .dashboard-scroll-progress-bar {
   height: 100%;
-  background: linear-gradient(135deg, var(--pks-accent-gradient-start), var(--pks-accent-gradient-end));
+  background: linear-gradient(135deg, var(--pks-color-pink-500), var(--pks-color-indigo-500));
   border-radius: 0 2px 2px 0;
   transition: width 0.1s ease-out;
 }

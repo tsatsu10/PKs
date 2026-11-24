@@ -36,6 +36,7 @@ import History from './History';
 import SharePanel from './SharePanel';
 import ExportPanel from './ExportPanel';
 import './ObjectPage.css';
+import '../../components/ui/Page.css';
 
 /** The object page (`/objects/:id`). The route remounts it per id, so no state carries over. */
 export default function ObjectPage() {
@@ -152,7 +153,7 @@ export default function ObjectPage() {
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
         inert={creating}
       />
-      {error && <div className="detail-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
       {create.status === 'failed' && (
         // The editor stays usable: its edits wait in the save queue until the object exists.
         <div className="conflict-bar" role="alert">

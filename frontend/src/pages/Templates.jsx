@@ -322,7 +322,7 @@ export default function Templates() {
               icon={LayoutTemplate}
               title="No templates yet"
               description="Create a template to get a guided form when adding new objects—e.g. meeting notes, reports, or SOPs."
-              action={<Button variant="primary" onClick={openNew}>Create your first template</Button>}
+              action={<Button variant="primary" onClick={() => guard(openNew)}>Create your first template</Button>}
             />
           ) : (
             <ul className="templates-list">
@@ -336,7 +336,7 @@ export default function Templates() {
                   </button>
                   <div className="templates-card-actions">
                     <ButtonLink to={`/objects/new?template=${t.id}`} size="sm" variant="ghost">Use template</ButtonLink>
-                    <IconButton label={`Duplicate ${t.name}`} icon={Copy} iconSize={16} onClick={() => handleDuplicate(t)} />
+                    <IconButton label={`Duplicate ${t.name}`} icon={Copy} iconSize={16} onClick={() => guard(() => handleDuplicate(t))} />
                     <IconButton label={`Delete ${t.name}`} icon={Trash2} iconSize={16} onClick={() => setDeleteConfirmId(t.id)} />
                   </div>
                 </li>
@@ -404,6 +404,12 @@ export default function Templates() {
                 {fields.length === 0 ? (
                   <p className="templates-fields-empty">No fields. Add one to define the form.</p>
                 ) : (
+                  <>
+                  <div className="templates-field-row templates-fields-columns" aria-hidden="true" data-testid="templates-fields-columns">
+                    <span>Key</span>
+                    <span>Label</span>
+                    <span>Type</span>
+                  </div>
                   <ul className="templates-fields-list" aria-labelledby="templates-fields-title">
                     {fields.map((fld, i) => {
                       const n = i + 1;
@@ -433,6 +439,7 @@ export default function Templates() {
                       );
                     })}
                   </ul>
+                  </>
                 )}
               </div>
             </Card>
