@@ -162,8 +162,7 @@
   color: var(--polar-white);
 }
 
-.notification-loading,
-.notification-empty {
+.notification-loading {
   padding: 1.5rem 1rem;
   margin: 0;
   font-size: 0.875rem;

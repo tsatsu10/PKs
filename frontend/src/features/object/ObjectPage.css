@@ -142,15 +142,6 @@
   gap: 0.75rem;
 }
 
-.object-detail-header .back-link {
-  color: var(--polar-dim);
-  font-size: 0.875rem;
-}
-
-.object-detail-header .back-link:hover {
-  color: var(--polar-white);
-}
-
 .detail-actions {
   display: flex;
   gap: 0.5rem;
@@ -297,11 +288,6 @@
   font-weight: 500;
 }
 
-.detail-type-icon {
-  font-size: 1rem;
-  line-height: 1;
-}
-
 .detail-title {
   font-size: 1.5rem;
   margin: 0 0 0.5rem 0;
@@ -366,12 +352,6 @@
   color: var(--polar-muted);
 }
 
-.detail-source {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 0.5rem 0;
-}
-
 .detail-summary {
   color: var(--polar-muted);
   margin: 0 0 1rem 0;
@@ -418,90 +398,7 @@
   margin-bottom: 2rem;
 }
 
-.detail-edit label,
-.detail-edit .detail-edit-field {
-  display: block;
-  margin-bottom: 1rem;
-}
-.detail-edit .detail-edit-label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--polar-muted);
-}
-
-.detail-edit input,
-.detail-edit textarea {
-  display: block;
-  width: 100%;
-  margin-top: 0.25rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  color: var(--polar-white);
-  font-size: 1rem;
-  font-family: inherit;
-}
-
-.detail-edit textarea {
-  resize: vertical;
-  min-height: 6rem;
-}
-
-.detail-edit .markdown-editor-wrapper,
-.detail-edit .blocknote-editor-wrapper {
-  margin-top: 0.25rem;
-  display: block;
-}
-
-
 /* Collapsible detail sections */
-.detail-section {
-  margin-top: 1rem;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 0.75rem;
-}
-
-.detail-section-summary {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--polar-muted);
-  cursor: pointer;
-  list-style: none;
-  padding: 0.25rem 0;
-  user-select: none;
-}
-
-.detail-section-summary::-webkit-details-marker {
-  display: none;
-}
-
-.detail-section-summary::before {
-  content: '▸ ';
-  display: inline-block;
-  transition: transform 0.2s ease;
-  margin-right: 0.25rem;
-}
-
-.detail-section[open] .detail-section-summary::before {
-  transform: rotate(90deg);
-}
-
-.detail-subhead {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--polar-dim);
-  margin: 0.75rem 0 0.25rem 0;
-}
-
-.detail-classification .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-}
 
 .chip {
   display: inline-flex;
@@ -554,24 +451,6 @@
   cursor: pointer;
 }
 
-.detail-links {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--glass-border);
-}
-
-.detail-links h2 {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 0.25rem 0;
-}
-
-.links-desc {
-  font-size: 0.8125rem;
-  color: var(--polar-faint);
-  margin: 0 0 0.5rem 0;
-}
-
 .links-list {
   list-style: none;
   padding: 0;
@@ -599,50 +478,11 @@
   color: var(--polar-faint);
 }
 
-.links-add {
-  margin-bottom: 1.25rem;
-}
-
-.links-suggested-label {
-  display: block;
-  font-size: 0.75rem;
-  margin-bottom: 0.35rem;
-}
-
-.links-suggested-btn {
-  margin-right: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.links-add select {
-  padding: 0.35rem 0.5rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  color: var(--polar-white);
-  font-size: 0.875rem;
-  cursor: pointer;
-  min-width: 200px;
-}
-
 /* Related you might link – one-tap graph building */
 .detail-related {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--glass-border);
-}
-
-.detail-related-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--polar-muted);
-  margin: 0 0 0.25rem 0;
-}
-
-.detail-related-desc {
-  font-size: 0.8125rem;
-  color: var(--polar-faint);
-  margin: 0 0 0.75rem 0;
 }
 
 .detail-related-grid {
@@ -683,18 +523,6 @@
   align-self: flex-start;
   padding: 0.25rem 0.5rem !important;
   font-size: 0.8125rem !important;
-}
-
-.detail-attachments {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--glass-border);
-}
-
-.detail-attachments h2 {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 0.25rem 0;
 }
 
 .attachments-list {
@@ -749,76 +577,6 @@
   pointer-events: none;
 }
 
-.detail-prompts {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--glass-border);
-}
-
-.detail-prompts h2 {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 0.25rem 0;
-}
-
-.run-prompt-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.prompt-select {
-  flex: 1;
-  max-width: 280px;
-  padding: 0.5rem 0.75rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  color: var(--polar-white);
-  font-size: 0.875rem;
-}
-
-.run-output-panel {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  padding: 1.25rem;
-  border-radius: 16px;
-  margin-bottom: 1rem;
-  backdrop-filter: blur(8px);
-}
-
-.run-output-panel label {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--polar-dim);
-  margin-bottom: 0.35rem;
-}
-
-.run-output-panel textarea {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: var(--panel-overlay);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  color: var(--polar-white);
-  font-size: 0.875rem;
-  font-family: inherit;
-  resize: vertical;
-  margin-bottom: 0.75rem;
-}
-
-.run-output-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.prompt-history-title {
-  font-size: 0.8125rem;
-  color: var(--polar-faint);
-  margin: 0.5rem 0 0.35rem 0;
-}
-
 .prompt-runs-list {
   list-style: none;
   padding: 0;
@@ -840,11 +598,6 @@
   color: var(--polar-faint);
   font-size: 0.8125rem;
   margin-right: 0.5rem;
-}
-
-.run-snippet {
-  color: var(--polar-dim);
-  font-size: 0.8125rem;
 }
 
 /* —— Run prompt dialog body (the Dialog primitive owns the chrome) —— */
@@ -943,12 +696,6 @@
   gap: 0.75rem;
 }
 
-.run-prompt-select-label {
-  font-size: 0.8125rem;
-  color: var(--polar-dim);
-  margin: 0;
-}
-
 .run-prompt-template-select {
   flex: 1;
   min-width: 160px;
@@ -979,12 +726,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-}
-
-.run-prompt-prompt-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--polar-dim);
 }
 
 .run-prompt-prompt-input {
@@ -1065,10 +806,6 @@
   margin-bottom: 0.5rem;
 }
 
-.run-prompt-model-row .run-prompt-select-label {
-  margin-bottom: 0;
-}
-
 .run-prompt-model-row .run-prompt-template-select {
   min-width: 200px;
 }
@@ -1086,12 +823,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-}
-
-.run-prompt-output-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--polar-dim);
 }
 
 .run-prompt-output-input {
@@ -1468,12 +1199,6 @@
 .detail-property input,
 .detail-property select {
   width: 100%;
-}
-
-.detail-editor-area {
-  /* Room below the last block to click into it. */
-  padding-bottom: 4rem;
-  cursor: text;
 }
 
 .conflict-bar {

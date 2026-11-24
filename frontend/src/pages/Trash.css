@@ -50,11 +50,6 @@
   flex-wrap: wrap;
 }
 
-.trash-item-type {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
 .trash-item-title {
   flex: 1;
   min-width: 0;

@@ -263,9 +263,4 @@
     width: 100%;
     max-width: 100%;
   }
-  .journal-entry-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
 }

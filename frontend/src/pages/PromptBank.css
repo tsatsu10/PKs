@@ -199,20 +199,6 @@
   opacity: 0.8;
 }
 
-.prompt-bank-empty-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 0.35rem;
-  color: var(--polar-white);
-}
-
-.prompt-bank-empty-desc {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 1.25rem;
-  line-height: 1.45;
-}
-
 .prompt-bank-empty .btn {
   padding: 0.5rem 1rem;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ESLint } from 'eslint'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
@@ -88,4 +89,33 @@ describe('eslint guardrails', { timeout: 30_000 }, () => {
       ).toBe(true)
     }
   }, 60_000)
+})
+
+describe('css guardrails', { timeout: 60_000 }, () => {
+  const runCheckCss = (...args: string[]) =>
+    execFileSync('node', ['scripts/check-css.mjs', ...args], { cwd: frontendRoot, encoding: 'utf8' })
+
+  it('keeps the CSS total within budget', () => {
+    expect(() => runCheckCss()).not.toThrow()
+  })
+
+  it('lists only CSS files that still break the token rules', async () => {
+    const { cssBaseline } = require('../../stylelint.baseline.js') as { cssBaseline: string[] }
+    const { tokenRules } = require('../../stylelint.config.js') as { tokenRules: Record<string, unknown> }
+    const stylelint = (await import('stylelint')).default
+    for (const rel of cssBaseline) {
+      const { results } = await stylelint.lint({
+        files: [path.join(frontendRoot, rel).split(path.sep).join('/')],
+        config: { rules: tokenRules },
+      })
+      expect(
+        results[0].warnings.length > 0,
+        `${rel} is clean now: remove it from stylelint.baseline.js`,
+      ).toBe(true)
+    }
+  })
+
+  it('has no unreferenced classes outside the allowlist', () => {
+    expect(JSON.parse(runCheckCss('--unused', '--json'))).toEqual([])
+  })
 })

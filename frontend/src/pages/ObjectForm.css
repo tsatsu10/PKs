@@ -307,7 +307,6 @@
   flex-direction: column;
 }
 
-.notion-content-block .markdown-editor-wrapper,
 .notion-content-block .blocknote-editor-wrapper {
   border-radius: 8px;
   overflow: hidden;
@@ -378,18 +377,6 @@
 
 .object-form-header {
   margin-bottom: 1.5rem;
-}
-
-.object-form-header .back-link {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  color: var(--polar-dim);
-  font-size: 0.875rem;
-  transition: color 0.2s ease;
-}
-
-.object-form-header .back-link:hover {
-  color: var(--polar-white);
 }
 
 .object-form-header h1 {
@@ -479,13 +466,6 @@
   margin-bottom: var(--form-section-gap);
 }
 
-.checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin-top: 0.35rem;
-}
-
 .checkbox-label {
   display: inline-flex;
   align-items: center;
@@ -501,15 +481,6 @@
   height: 1.125rem;
   margin: 0;
   accent-color: var(--cosmic-pink);
-}
-
-.form-actions,
-.object-form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  padding-top: 0.25rem;
 }
 
 .object-form-page .btn-primary {
@@ -536,33 +507,12 @@
   cursor: not-allowed;
 }
 
-.object-form-templates-first {
-  margin-bottom: 1.5rem;
-  padding: 1.25rem 1.5rem;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-}
-
-.object-form-section-heading {
-  font-size: 1rem;
-  margin: 0 0 0.25rem 0;
-  color: var(--polar-muted);
-}
-
-.object-form-section-desc {
-  font-size: 0.875rem;
-  color: var(--polar-dim);
-  margin: 0 0 1rem 0;
-}
-
 .quick-capture-page .object-form-header h1 { margin-bottom: 0.25rem; }
 .quick-capture-desc {
   font-size: 0.875rem;
   color: var(--polar-dim);
   margin: 0 0 1rem 0;
 }
-.object-form-quick .object-form-actions { margin-top: 1rem; }
 .object-form-quick .object-form-field { display: block; margin-bottom: 1rem; }
 .object-form-quick .object-form-label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: var(--polar-dim); }
 .object-form-quick .object-form-field .blocknote-editor-wrapper { margin-top: 0.25rem; min-height: 180px; }
@@ -585,11 +535,6 @@
     max-width: 100%;
     width: 100%;
     min-width: 0;
-  }
-  .form-actions,
-  .object-form-actions {
-    width: 100%;
-    padding-bottom: env(safe-area-inset-bottom, 0);
   }
   .object-form-page .form-chips-row .chip-select {
     min-width: 0;
