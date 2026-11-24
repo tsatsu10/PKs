@@ -55,7 +55,7 @@
 .linked-bar-chip--more {
   cursor: pointer;
   font-weight: 600;
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }
 
 .linked-bar-overflow-wrap {
@@ -98,5 +98,5 @@
 }
 
 .linked-bar-popover-link:hover {
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }

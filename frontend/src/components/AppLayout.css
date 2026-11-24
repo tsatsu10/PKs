@@ -192,7 +192,7 @@
 
 .app-layout-nav-link.active {
   background: var(--pks-accent-selected-surface);
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }
 
 .app-layout-nav-icon {
@@ -550,7 +550,7 @@
     background: var(--pks-surface-raised);
   }
   .app-layout-bottom-link.active {
-    color: var(--pks-accent-primary);
+    color: var(--pks-accent-link);
   }
   .app-layout-bottom-link:focus-visible {
     outline: 2px solid var(--pks-accent-primary);

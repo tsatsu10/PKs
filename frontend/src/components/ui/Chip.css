@@ -14,7 +14,7 @@
 
 .ui-chip--accent {
   background: var(--pks-accent-selected-surface);
-  color: var(--pks-accent-primary-strong);
+  color: var(--pks-accent-link);
 }
 
 .ui-chip-label {

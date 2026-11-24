@@ -157,7 +157,7 @@
 .object-card-pin {
   flex-shrink: 0;
   margin-top: var(--pks-space-1);
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }
 
 .object-card-link {

@@ -84,7 +84,7 @@
 }
 
 .audit-logs-link {
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   text-decoration: none;
   font-size: 0.8125rem;
 }

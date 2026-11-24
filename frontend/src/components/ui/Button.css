@@ -34,11 +34,11 @@
 }
 
 .ui-button--primary {
-  background: var(--pks-accent-primary);
+  background: var(--pks-accent-primary-strong);
   color: var(--pks-text-on-accent);
 }
 .ui-button--primary:hover:not(:disabled) {
-  background: var(--pks-accent-primary-strong);
+  background: color-mix(in srgb, var(--pks-accent-primary-strong) 85%, var(--pks-color-black));
 }
 
 .ui-button--secondary {

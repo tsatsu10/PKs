@@ -29,7 +29,7 @@
   font-weight: 600;
   line-height: 18px;
   text-align: center;
-  background: var(--pks-accent-primary);
+  background: var(--pks-accent-primary-strong);
   color: var(--pks-text-on-accent);
   border-radius: 9px;
   box-shadow: 0 0 12px var(--pks-focus-ring);

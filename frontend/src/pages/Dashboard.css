@@ -130,13 +130,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   display: block;
   margin-bottom: 0.35rem;
 }
 .dashboard-mobile-quick-links-link {
   font-size: 0.875rem;
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -252,7 +252,7 @@
   min-width: 0;
 }
 .dashboard-banner-steps a {
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   text-decoration: none;
 }
 .dashboard-banner-steps a:hover {
@@ -315,7 +315,7 @@
   margin: 0 0 1rem 0;
 }
 .dashboard-suggested-next a {
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   text-decoration: none;
 }
 .dashboard-suggested-next a:hover {
@@ -541,7 +541,7 @@
 .quick-filter-pill.active {
   background: var(--pks-accent-selected-surface);
   border-color: var(--pks-accent-primary);
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }
 
 .dashboard-quick-add-trigger {
@@ -569,7 +569,7 @@
 .dashboard-quick-add-icon {
   font-size: 1.25rem;
   font-weight: 300;
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
 }
 
 .dashboard-quick-add-label {

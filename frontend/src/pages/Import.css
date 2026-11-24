@@ -40,7 +40,7 @@
 .import-result { font-size: 0.9375rem; color: var(--pks-text-secondary); margin: 0 0 0.75rem 0; }
 .import-footer { margin-top: 1rem; }
 .import-back { color: var(--pks-text-muted); text-decoration: none; font-size: 0.9375rem; }
-.import-back:hover { color: var(--pks-accent-primary); }
+.import-back:hover { color: var(--pks-accent-link); }
 
 @media (max-width: 768px) {
   .import-section {

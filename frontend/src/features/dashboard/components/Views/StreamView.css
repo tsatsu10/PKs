@@ -123,6 +123,6 @@
 }
 
 .title-cluster-pin {
-  color: var(--pks-accent-primary);
+  color: var(--pks-accent-link);
   margin-right: 0.2rem;
 }
