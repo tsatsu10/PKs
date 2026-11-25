@@ -12,14 +12,14 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   white-space: nowrap;
 }
 
 .stream-bucket-header-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, var(--glass-border), transparent);
+  background: linear-gradient(90deg, var(--pks-border-divider), transparent);
 }
 
 .timeline-row-wrap {
@@ -42,22 +42,29 @@
 }
 
 .timeline-row-wrap--selected {
-  border-color: rgba(236, 72, 153, 0.45);
-  background: rgba(236, 72, 153, 0.06);
+  border-color: var(--pks-accent-primary);
+  background: var(--pks-accent-selected-surface);
 }
 
 .timeline-row-checkbox {
   display: flex;
   align-items: center;
   padding-left: 0.25rem;
-  opacity: 0;
-  transition: opacity 0.16s ease;
 }
 
-.timeline-row-checkbox.is-visible,
-.timeline-row-wrap:hover .timeline-row-checkbox,
-.timeline-row-wrap:focus-within .timeline-row-checkbox {
-  opacity: 1;
+/* Hidden until hover only where hover exists; always shown on touch (M8). */
+@media (hover: hover) {
+  .timeline-row-checkbox {
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+
+  .timeline-row-checkbox.is-visible,
+  .timeline-row-wrap--selected .timeline-row-checkbox,
+  .timeline-row-wrap:hover .timeline-row-checkbox,
+  .timeline-row-wrap:focus-within .timeline-row-checkbox {
+    opacity: 1;
+  }
 }
 
 .timeline-row {
@@ -74,7 +81,7 @@
 }
 
 .timeline-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--pks-surface-raised);
 }
 
 .timeline-row-main {
@@ -87,7 +94,7 @@
 .timeline-row-title .title-cluster-text {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--polar-white);
+  color: var(--pks-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -95,7 +102,7 @@
 
 .timeline-row-snippet {
   font-size: 0.75rem;
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -107,7 +114,7 @@
   flex-wrap: nowrap;
   gap: 0.2rem;
   font-size: 0.6875rem;
-  color: var(--polar-faint);
+  color: var(--pks-text-muted);
   white-space: nowrap;
 }
 
@@ -116,6 +123,6 @@
 }
 
 .title-cluster-pin {
-  color: var(--cosmic-pink);
+  color: var(--pks-accent-link);
   margin-right: 0.2rem;
 }

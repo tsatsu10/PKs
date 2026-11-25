@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,9 @@ import { formatObjectTypeLabel } from '../constants';
 import { useNotifyError } from '../lib/useNotifyError';
 import { useNotificationsList, invalidateNotifications } from '../data/notifications';
 import './Notifications.css';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import '../components/ui/Input.css';
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -64,17 +67,16 @@ export default function Notifications() {
   }
 
   return (
-    <div className="notifications-page" >
+    <Page title="Notifications" width="narrow" className="notifications-page">
       <header className="notifications-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Notifications' }]} />
-        <h1>Notifications</h1>
         <div className="notifications-toolbar">
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter notifications">
+          <select className="ui-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter notifications">
             <option value="all">All</option>
             <option value="unread">Unread</option>
           </select>
           {filter === 'all' && list.some((n) => !n.read_at) && (
-            <button type="button" className="btn btn-secondary" onClick={markAllRead}>Mark all read</button>
+            <Button onClick={markAllRead}>Mark all read</Button>
           )}
         </div>
       </header>
@@ -101,12 +103,12 @@ export default function Notifications() {
                 </div>
                 <div className="notifications-item-actions">
                   {n.related_type === 'knowledge_object' && n.related_id && (
-                    <Link to={`/objects/${n.related_id}`} className="btn btn-secondary btn-small">View object</Link>
+                    <ButtonLink to={`/objects/${n.related_id}`} size="sm">View object</ButtonLink>
                   )}
                   {n.read_at ? (
-                    <button type="button" className="btn btn-secondary btn-small" onClick={() => markUnread(n.id)}>Mark unread</button>
+                    <Button size="sm" onClick={() => markUnread(n.id)}>Mark unread</Button>
                   ) : (
-                    <button type="button" className="btn btn-secondary btn-small" onClick={() => markRead(n.id)}>Mark read</button>
+                    <Button size="sm" onClick={() => markRead(n.id)}>Mark read</Button>
                   )}
                 </div>
               </div>
@@ -116,6 +118,6 @@ export default function Notifications() {
         <LoadMore query={query} />
         </>
       )}
-    </div>
+    </Page>
   );
 }

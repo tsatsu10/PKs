@@ -34,3 +34,15 @@ describe('components/ui CSS', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('Chip remove target (A11)', () => {
+  it('gives chip remove a 24px minimum box', () => {
+    const css = read('Chip.css');
+    const rule = css.match(/\.ui-chip-remove\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rule).toContain('min-width: var(--pks-size-min-target)');
+    expect(rule).toContain('min-height: var(--pks-size-min-target)');
+    const coarse = css.match(/@media \(pointer: coarse\)\s*\{[\s\S]*?\}\s*\}/)?.[0] ?? '';
+    expect(coarse).toContain('.ui-chip-remove');
+    expect(coarse).toContain('var(--pks-size-touch-target)');
+  });
+});

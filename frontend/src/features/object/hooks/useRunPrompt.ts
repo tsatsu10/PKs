@@ -127,7 +127,8 @@ export function useRunPrompt({ object, userId, promptTemplates, setPromptRuns, s
 
   /** Escape, the backdrop, Close and Cancel: close at once, or ask first when there is output to lose. */
   function requestCloseRunPanel() {
-    if (runOutput.trim() === '') closeRunPanel();
+    // Mid-generation there is no output yet, but closing would still throw the response away.
+    if (runOutput.trim() === '' && !generatingAI) closeRunPanel();
     else setConfirmDiscard(true);
   }
 

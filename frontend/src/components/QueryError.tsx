@@ -1,5 +1,6 @@
 import { getErrorMessage } from '../lib/errors';
 import './QueryError.css';
+import Button from './ui/Button';
 
 type Props = { error: unknown; onRetry?: () => void; what?: string };
 
@@ -11,7 +12,7 @@ export default function QueryError({ error, onRetry, what }: Props) {
         {what ? `Couldn't load ${what}. ` : ''}{getErrorMessage(error)}
       </p>
       {onRetry && (
-        <button type="button" className="btn btn-secondary btn-small" onClick={onRetry}>Retry</button>
+        <Button size="sm" onClick={onRetry}>Retry</Button>
       )}
     </div>
   );

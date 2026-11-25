@@ -1,6 +1,6 @@
 .ui-card {
   padding: var(--pks-space-5);
-  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+  border: 1px solid var(--pks-border-divider);
   border-radius: var(--pks-radius-lg);
   background: var(--pks-surface-card);
   color: var(--pks-text-primary);

@@ -5,7 +5,6 @@ import Turnstile from '../components/Turnstile';
 import { useAuth } from '../context/AuthContext';
 import { AI_PROVIDERS, DEFAULT_AI_PROVIDER, aiProviderLabel } from '../constants';
 import { validateApiKeyForProvider } from '../lib/aiProviders';
-import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/ui/Toaster';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
@@ -21,10 +20,14 @@ import { useTaxonomy, upsertTaxonomyEntity, removeTaxonomyEntity, invalidateTaxo
 import { useAiProviders, invalidateAiProviders } from '../data/settings';
 import { fetchOwnObjectsForExport, fetchAccountExtras } from '../data/exports';
 import './Settings.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import ThemePicker from '../components/ThemePicker';
+import '../components/ui/Input.css';
+import '../components/ui/Field.css';
 
 export default function Settings() {
   const { user, refreshUser, profileLoaded } = useAuth();
-  const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
   const notifyError = useNotifyError();
@@ -381,29 +384,28 @@ export default function Settings() {
     }
   }
 
-  if (loading) return <div className="settings-page"><p role="status" aria-live="polite">Loading…</p></div>;
+  if (loading) return <Page title="Settings" width="narrow" className="settings-page"><p role="status" aria-live="polite">Loading…</p></Page>;
 
   return (
-    <div className="settings-page">
+    <Page title="Settings" width="narrow" className="settings-page">
       <header className="settings-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Settings' }]} />
-        <h1>Settings</h1>
       </header>
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
 
       <section className="settings-section page-section" aria-labelledby="account-heading">
         <h2 id="account-heading" className="page-section-title">Account</h2>
         <p className="settings-desc page-section-desc">Your display name and timezone. Used across the app for dates and identification.</p>
-        {profileError && <div className="form-error" role="alert">{profileError}</div>}
-        <form onSubmit={saveProfile} className="settings-form form">
-          <label>
+        {profileError && <div className="ui-page-error" role="alert">{profileError}</div>}
+        <form onSubmit={saveProfile} className="settings-form">
+          <label className="ui-field">
             Email
-            <input type="text" value={user?.email ?? ''} readOnly disabled className="settings-input-readonly" aria-describedby="account-email-hint" />
+            <input type="text" value={user?.email ?? ''} readOnly disabled className="ui-input settings-input-readonly" aria-describedby="account-email-hint" />
             <span id="account-email-hint" className="settings-desc">Email cannot be changed here. Use your auth provider or contact support.</span>
           </label>
-          <label>
+          <label className="ui-field">
             Display name
-            <input
+            <input className="ui-input"
               type="text"
               value={profileDisplayName}
               onChange={(e) => setProfileDisplayName(e.target.value)}
@@ -412,9 +414,9 @@ export default function Settings() {
               aria-label="Display name"
             />
           </label>
-          <label>
+          <label className="ui-field">
             Timezone
-            <input
+            <input className="ui-input"
               type="text"
               value={profileTimezone}
               onChange={(e) => setProfileTimezone(e.target.value)}
@@ -439,26 +441,26 @@ export default function Settings() {
               Loading your saved profile… You can save once it has loaded.
             </p>
           )}
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
+            variant="primary"
             disabled={profileSaving || !profileLoaded}
             aria-describedby={profileLoaded ? undefined : 'profile-loading-hint'}
           >
             {profileSaving ? 'Saving…' : 'Save profile'}
-          </button>
+          </Button>
         </form>
       </section>
 
       <section className="settings-section page-section" aria-labelledby="password-heading">
         <h2 id="password-heading" className="page-section-title">Change password</h2>
         <p className="settings-desc page-section-desc">Enter your current password, then choose a new one (min 8 characters).</p>
-        {passwordError && <div className="form-error" role="alert">{passwordError}</div>}
+        {passwordError && <div className="ui-page-error" role="alert">{passwordError}</div>}
         {passwordSuccess && <p className="settings-muted" role="status">Password updated. You can sign in with the new password next time.</p>}
-        <form onSubmit={changePassword} className="settings-form form">
-          <label>
+        <form onSubmit={changePassword} className="settings-form">
+          <label className="ui-field">
             Current password
-            <input
+            <input className="ui-input"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -468,9 +470,9 @@ export default function Settings() {
               aria-label="Current password"
             />
           </label>
-          <label>
+          <label className="ui-field">
             New password
-            <input
+            <input className="ui-input"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -481,9 +483,9 @@ export default function Settings() {
               aria-label="New password"
             />
           </label>
-          <label>
+          <label className="ui-field">
             Confirm new password
-            <input
+            <input className="ui-input"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -495,27 +497,23 @@ export default function Settings() {
             />
           </label>
           <Turnstile key={captchaKey} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
-          <button type="submit" className="btn btn-primary" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword || (captchaSiteKey && !captchaToken)}>
+          <Button type="submit" variant="primary" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword || (captchaSiteKey && !captchaToken)}>
             {passwordSaving ? 'Updating…' : 'Update password'}
-          </button>
+          </Button>
         </form>
       </section>
 
       <section className="settings-section page-section">
         <h2 className="page-section-title">Appearance</h2>
         <p className="settings-desc page-section-desc">Choose light, dark, or system theme.</p>
-        <div className="settings-theme-toggle" role="group" aria-label="Theme">
-          <button type="button" className={`btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTheme('dark')}>Dark</button>
-          <button type="button" className={`btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTheme('light')}>Light</button>
-          <button type="button" className={`btn ${theme === 'system' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTheme('system')}>System</button>
-        </div>
+        <ThemePicker />
       </section>
 
       <section className="settings-section page-section">
         <h2 className="page-section-title">AI API keys</h2>
         <p className="settings-desc page-section-desc">Add your own DeepSeek or Claude API key and give it a name. You can then choose it in the Run prompt dropdown instead of the server default. Keys are write-only: they can't be read back, only removed.</p>
-        <form onSubmit={addAiProvider} className="settings-form form">
-          <select
+        <form onSubmit={addAiProvider} className="settings-form">
+          <select className="ui-select"
             value={aiProviderType}
             onChange={(e) => setAiProviderType(e.target.value)}
             disabled={addingAiProvider}
@@ -525,7 +523,7 @@ export default function Settings() {
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
           </select>
-          <input
+          <input className="ui-input"
             type="text"
             value={aiProviderName}
             onChange={(e) => setAiProviderName(e.target.value)}
@@ -533,7 +531,7 @@ export default function Settings() {
             disabled={addingAiProvider}
             aria-label="Provider name"
           />
-          <input
+          <input className="ui-input"
             type="password"
             value={aiProviderKey}
             onChange={(e) => setAiProviderKey(e.target.value)}
@@ -542,22 +540,21 @@ export default function Settings() {
             autoComplete="off"
             aria-label="API key"
           />
-          <button type="submit" className="btn btn-primary" disabled={addingAiProvider || !aiProviderName.trim() || !aiProviderKey.trim()}>
+          <Button type="submit" variant="primary" disabled={addingAiProvider || !aiProviderName.trim() || !aiProviderKey.trim()}>
             {addingAiProvider ? 'Adding…' : 'Add'}
-          </button>
+          </Button>
         </form>
         <ul className="settings-list">
           {aiProviders.map((p) => (
             <li key={p.id}>
               <span><strong>{p.name}</strong> ({aiProviderLabel(p.provider_type)})</span>
-              <button
-                type="button"
-                className="btn btn-small btn-danger"
+              <Button
+                variant="danger" size="sm"
                 onClick={() => deleteAiProvider(p.id)}
                 disabled={deletingId === p.id}
               >
                 {deletingId === p.id ? '…' : 'Remove'}
-              </button>
+              </Button>
             </li>
           ))}
           {aiProviders.length === 0 && <li className="muted">No custom AI providers yet.</li>}
@@ -568,30 +565,29 @@ export default function Settings() {
         <h2 className="page-section-title">Domains</h2>
         <p className="settings-desc page-section-desc">Domains group your knowledge by area (e.g. Health, Tech, Projects).</p>
         {taxonomy.error && <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />}
-        <form onSubmit={addDomain} className="settings-form form">
-          <input
+        <form onSubmit={addDomain} className="settings-form">
+          <input className="ui-input"
             type="text"
             value={newDomain}
             onChange={(e) => setNewDomain(e.target.value)}
             placeholder="New domain name"
             disabled={addingDomain}
           />
-          <button type="submit" className="btn btn-primary" disabled={addingDomain || !newDomain.trim()}>
+          <Button type="submit" variant="primary" disabled={addingDomain || !newDomain.trim()}>
             {addingDomain ? 'Adding…' : 'Add'}
-          </button>
+          </Button>
         </form>
         <ul className="settings-list">
           {domains.map((d) => (
             <li key={d.id}>
               <span>{d.name}</span>
-              <button
-                type="button"
-                className="btn btn-small btn-danger"
+              <Button
+                variant="danger" size="sm"
                 onClick={() => deleteDomain(d.id)}
                 disabled={deletingId === d.id}
               >
                 {deletingId === d.id ? '…' : 'Remove'}
-              </button>
+              </Button>
             </li>
           ))}
           {domains.length === 0 && <li className="muted">No domains yet.</li>}
@@ -602,9 +598,9 @@ export default function Settings() {
         <h2 className="page-section-title">Install app</h2>
         <p className="settings-desc page-section-desc">Install PKS on your device for quick access. The app caches assets for faster loads and basic offline support when installed.</p>
         {installPrompt && !installed && (
-          <button type="button" className="btn btn-primary" onClick={handleInstallClick}>
+          <Button variant="primary" onClick={handleInstallClick}>
             Install PKS app
-          </button>
+          </Button>
         )}
         {installed && <p className="settings-muted">PKS is installed.</p>}
         {!installPrompt && !installed && <p className="settings-muted">Install prompt not available (e.g. already installed or not supported).</p>}
@@ -613,52 +609,51 @@ export default function Settings() {
       <section className="settings-section page-section">
         <h2 className="page-section-title">Export &amp; backup</h2>
         <p className="settings-desc page-section-desc">Download your data as a portable backup. &quot;Download my data&quot; includes knowledge objects, journal entries, paste bin, domains, and tags in one JSON file.</p>
-        {backupError && <div className="form-error" role="alert">{backupError}</div>}
+        {backupError && <div className="ui-page-error" role="alert">{backupError}</div>}
         <div className="settings-form settings-form-actions">
-          <button type="button" className="btn btn-primary" onClick={downloadFullAccountData} disabled={backupLoading}>
+          <Button variant="primary" onClick={downloadFullAccountData} disabled={backupLoading}>
             {backupLoading ? 'Preparing…' : 'Download my data (full JSON)'}
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={downloadBackupJson} disabled={backupLoading}>
+          </Button>
+          <Button onClick={downloadBackupJson} disabled={backupLoading}>
             {backupLoading ? 'Preparing…' : 'Objects only (JSON)'}
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={downloadBackupMarkdownZip} disabled={backupLoading}>
+          </Button>
+          <Button onClick={downloadBackupMarkdownZip} disabled={backupLoading}>
             {backupLoading ? 'Preparing…' : 'Objects as Markdown (ZIP)'}
-          </button>
+          </Button>
         </div>
       </section>
 
       <section className="settings-section page-section">
         <h2 className="page-section-title">Tags</h2>
         <p className="settings-desc page-section-desc">Tags are labels you can attach to any object (e.g. urgent, draft).</p>
-        <form onSubmit={addTag} className="settings-form form">
-          <input
+        <form onSubmit={addTag} className="settings-form">
+          <input className="ui-input"
             type="text"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}
             placeholder="New tag name"
             disabled={addingTag}
           />
-          <button type="submit" className="btn btn-primary" disabled={addingTag || !newTag.trim()}>
+          <Button type="submit" variant="primary" disabled={addingTag || !newTag.trim()}>
             {addingTag ? 'Adding…' : 'Add'}
-          </button>
+          </Button>
         </form>
         <ul className="settings-list">
           {tags.map((t) => (
             <li key={t.id}>
               <span>{t.name}</span>
-              <button
-                type="button"
-                className="btn btn-small btn-danger"
+              <Button
+                variant="danger" size="sm"
                 onClick={() => deleteTag(t.id)}
                 disabled={deletingId === t.id}
               >
                 {deletingId === t.id ? '…' : 'Remove'}
-              </button>
+              </Button>
             </li>
           ))}
           {tags.length === 0 && <li className="muted">No tags yet.</li>}
         </ul>
       </section>
-    </div>
+    </Page>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useWindowListVirtualizer } from '../../../lib/useWindowListVirtualizer';
 import { useAuth } from '../../../context/AuthContext';
 import { logAudit } from '../../../lib/audit';
 import { deliverWebhookEvent } from '../../../lib/webhooks';
@@ -119,9 +119,9 @@ export function useDashboardPage() {
     : viewMode === 'stream'
       ? streamItems.length
       : objects.length;
-  const listVirtualizer = useVirtualizer({
+  const { virtualizer: listVirtualizer, scrollMargin: listScrollMargin } = useWindowListVirtualizer({
+    listRef: listScrollRef,
     count: virtualizerCount,
-    getScrollElement: () => listScrollRef.current,
     estimateSize: (index) => {
       if (viewMode === 'card') return cardRowHeight;
       if (viewMode === 'stream') return streamItems[index]?.size ?? 48;
@@ -201,7 +201,7 @@ export function useDashboardPage() {
   const handlePageChange = useCallback((nextPage) => {
     goToPage(nextPage);
     clearBulkSelection();
-    listScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    listScrollRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
   }, [goToPage, clearBulkSelection]);
 
   const keyboard = useDashboardKeyboard({
@@ -540,6 +540,7 @@ export function useDashboardPage() {
     runPromptSuffix,
     streamItems,
     listVirtualizer,
+    listScrollMargin,
     filterChips,
     handlePageChange,
     dismissRunPromptBanner,

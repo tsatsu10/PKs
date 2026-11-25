@@ -35,10 +35,10 @@ export default function DashboardHero({
       <div className="dashboard-hero-v2-top">
         <div className="dashboard-hero-v2-copy">
           <p className="dashboard-hero-v2-date">{formatDateLine()}</p>
-          <h1 className="dashboard-hero-v2-greeting">
+          <p className="dashboard-hero-v2-greeting">
             {getGreeting()}
             {displayName ? `, ${displayName}` : ''}
-          </h1>
+          </p>
           {isFirstRun && (
             <p className="dashboard-hero-v2-hint">Create your first object to get started.</p>
           )}

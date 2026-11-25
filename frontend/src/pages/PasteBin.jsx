@@ -9,6 +9,10 @@ import QueryError from '../components/QueryError';
 import LoadMore from '../components/LoadMore';
 import { usePasteList, usePasteItem, invalidatePasteBin } from '../data/pasteBin';
 import './PasteBin.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import { ClipboardList } from 'lucide-react';
+import EmptyState from '../components/ui/EmptyState';
 
 export default function PasteBin() {
   const { user } = useAuth();
@@ -116,16 +120,16 @@ export default function PasteBin() {
   if (!user) return null;
 
   return (
-    <div className="paste-bin-page" >
+    <Page title="Paste bin" width="wide" className="paste-bin-page">
       <header className="paste-bin-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Paste bin' }]} />
         <div className="paste-bin-actions">
-          <button type="button" className="btn btn-primary" onClick={handleNew}>
+          <Button variant="primary" onClick={handleNew}>
             New paste
-          </button>
+          </Button>
         </div>
       </header>
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
 
       <div className="paste-bin-layout">
         <aside className="paste-bin-list">
@@ -135,21 +139,21 @@ export default function PasteBin() {
           ) : query.error ? (
             <QueryError what="pastes" error={query.error} onRetry={() => query.refetch()} />
           ) : pastes.length === 0 ? (
-            <div className="paste-bin-empty empty-state">
-              <p className="empty-state-title">No pastes yet</p>
-              <p className="empty-state-desc">Store snippets, code, or text you want to reuse.</p>
-              <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-                Create your first paste
-              </button>
-            </div>
+            <EmptyState
+              icon={ClipboardList}
+              title="No pastes yet"
+              description="Store snippets, code, or text you want to reuse."
+              action={<Button variant="primary" onClick={() => setCreating(true)}>Create your first paste</Button>}
+            />
           ) : (
             <>
-            <ul className="paste-bin-list-ul" role="list">
+            <ul className="paste-bin-list-ul">
               {pastes.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     className={`paste-bin-list-item ${selectedId === p.id ? 'active' : ''}`}
+                    aria-current={selectedId === p.id ? 'true' : undefined}
                     onClick={() => selectPaste(p)}
                   >
                     <span className="paste-bin-list-label">
@@ -177,17 +181,17 @@ export default function PasteBin() {
                 aria-label="Paste title"
               />
               <div className="paste-bin-editor-actions">
-                <button type="button" className="btn btn-secondary" onClick={handleCopy} disabled={!content.trim()}>
+                <Button onClick={handleCopy} disabled={!content.trim()}>
                   Copy
-                </button>
+                </Button>
                 {selectedId && (
-                  <button type="button" className="btn btn-danger" onClick={handleDelete}>
+                  <Button variant="danger" onClick={handleDelete}>
                     Delete
-                  </button>
+                  </Button>
                 )}
-                <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                <Button variant="primary" onClick={handleSave} disabled={saving}>
                   {saving ? 'Saving…' : selectedId ? 'Update' : 'Save'}
-                </button>
+                </Button>
               </div>
             </div>
             <textarea
@@ -202,6 +206,6 @@ export default function PasteBin() {
           </div>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

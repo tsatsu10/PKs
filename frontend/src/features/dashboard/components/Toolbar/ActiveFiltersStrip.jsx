@@ -1,5 +1,6 @@
 import FilterChip from './FilterChip';
 import './ActiveFiltersStrip.css';
+import Button from '../../../../components/ui/Button';
 
 /**
  * Active filter pills with clear-all.
@@ -17,13 +18,13 @@ export default function ActiveFiltersStrip({
         <FilterChip key={chip.id} label={chip.label} onRemove={chip.onRemove} />
       ))}
       {onAddFilter && (
-        <button type="button" className="btn btn-ghost btn-small active-filters-add" onClick={onAddFilter}>
+        <Button variant="ghost" size="sm" className="active-filters-add" onClick={onAddFilter}>
           + Filter
-        </button>
+        </Button>
       )}
-      <button type="button" className="btn btn-ghost btn-small active-filters-clear" onClick={onClearAll}>
+      <Button variant="ghost" size="sm" className="active-filters-clear" onClick={onClearAll}>
         Clear all
-      </button>
+      </Button>
     </div>
   );
 }

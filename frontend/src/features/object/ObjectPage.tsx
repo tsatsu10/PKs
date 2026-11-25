@@ -1,3 +1,4 @@
+import Button from '../../components/ui/Button';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +36,10 @@ import History from './History';
 import SharePanel from './SharePanel';
 import ExportPanel from './ExportPanel';
 import './ObjectPage.css';
+import '../../components/ui/Page.css';
+
+/** Empty space around the content: the hero, the editor area and the editor's own frame below its last block. */
+const EMPTY_AREA = '.detail-hero, .detail-editor-area, .blocknote-editor-wrapper, .bn-container';
 
 /** The object page (`/objects/:id`). The route remounts it per id, so no state carries over. */
 export default function ObjectPage() {
@@ -91,9 +96,7 @@ export default function ObjectPage() {
   const editorRef = useRef<EditorHandle>(null);
   const onMainClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    if (target === e.currentTarget || target.classList.contains('detail-hero') || target.classList.contains('detail-editor-area')) {
-      editorRef.current?.focusEnd();
-    }
+    if (target === e.currentTarget || target.matches(EMPTY_AREA)) editorRef.current?.focusEnd();
   };
 
   const actions = useObjectActions({ object, userId, objectDomains, objectTags, queue, setError });
@@ -151,13 +154,13 @@ export default function ObjectPage() {
         onToggleShare={() => { setShowSharePanel((v) => !v); if (!showSharePanel) shares.load(); }}
         inert={creating}
       />
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
       {create.status === 'failed' && (
         // The editor stays usable: its edits wait in the save queue until the object exists.
         <div className="conflict-bar" role="alert">
           <p className="conflict-bar-text">Couldn&apos;t create this object: {getErrorMessage(create.error)}</p>
           <div className="conflict-bar-actions">
-            <button type="button" className="btn btn-primary btn-small" onClick={create.retry}>Retry</button>
+            <Button variant="primary" size="sm" onClick={create.retry}>Retry</Button>
           </div>
         </div>
       )}

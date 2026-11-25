@@ -5,7 +5,7 @@
   width: 100%;
   min-height: var(--pks-size-control-height);
   padding: var(--pks-space-3) var(--pks-space-4);
-  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: var(--pks-radius-md);
   background: var(--pks-surface-input);
   color: var(--pks-text-primary);
@@ -50,4 +50,11 @@
 @media (prefers-reduced-motion: reduce) {
   .ui-input,
   .ui-select { transition: none; }
+}
+
+.ui-textarea {
+  display: block;
+  min-height: calc(var(--pks-size-control-height) * 2);
+  line-height: 1.5;
+  resize: vertical;
 }

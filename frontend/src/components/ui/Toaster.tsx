@@ -80,8 +80,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       ? undefined
       : list.current.find((t) => !t.action && t.type === type && t.message === message);
     if (existing) {
-      clearTimer(existing.id);
-      if (existing.ttlMs !== null) start(existing.id, existing.ttlMs);
+      const running = timers.current.get(existing.id);
+      if (running && running.timer === null) {
+        // Paused under the pointer or focus: stay paused, with a full lifetime once released.
+        running.remaining = existing.ttlMs ?? running.remaining;
+      } else {
+        clearTimer(existing.id);
+        if (existing.ttlMs !== null) start(existing.id, existing.ttlMs);
+      }
       return existing.id;
     }
 

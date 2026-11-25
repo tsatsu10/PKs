@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../lib/errors';
@@ -12,6 +12,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../constants';
 import { useToast } from '../components/ui/Toaster';
 import BlockNoteEditor from '../components/BlockNoteEditor';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Field from '../components/ui/Field';
+import Input from '../components/ui/Input';
+import Page from '../components/ui/Page';
 import './ObjectForm.css';
 
 export default function QuickCapture() {
@@ -76,27 +80,19 @@ export default function QuickCapture() {
   }
 
   return (
-    <div className="object-form-page quick-capture-page" >
-      <header className="object-form-header">
-        <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Quick capture' }]} />
-        <h1>Quick capture</h1>
-        <p className="quick-capture-desc">Minimal capture: title + content. You can add details later.</p>
-      </header>
-      <form onSubmit={handleSubmit} className="object-form object-form-quick form">
-        {error && <div className="form-error" role="alert">{error}</div>}
-        <label>
-          Title <span className="required">*</span>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Short title"
-            required
-            autoFocus
-          />
-        </label>
+    <Page title="Quick capture" width="narrow">
+      <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Quick capture' }]} />
+      <p className="quick-capture-desc">Minimal capture: title + content. You can add details later.</p>
+      <form onSubmit={handleSubmit} className="object-form object-form-quick">
+        {error && <div className="object-form-error" role="alert">{error}</div>}
+        <Field label="Title (required)">
+          {(f) => (
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- the page exists to type into this field
+            <Input id={f.id} type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short title" required autoFocus />
+          )}
+        </Field>
         <div className="object-form-field">
-          <span className="object-form-label">Content <span className="required">*</span></span>
+          <span className="object-form-label">Content (required)</span>
           <BlockNoteEditor
             value={content}
             onChange={(val) => setContent(val)}
@@ -106,12 +102,10 @@ export default function QuickCapture() {
           />
         </div>
         <div className="object-form-actions">
-          <Link to="/" className="btn btn-secondary">Cancel</Link>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Capturing…' : 'Capture'}
-          </button>
+          <ButtonLink to="/">Cancel</ButtonLink>
+          <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Capturing…' : 'Capture'}</Button>
         </div>
       </form>
-    </div>
+    </Page>
   );
 }

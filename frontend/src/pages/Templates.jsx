@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +8,17 @@ import { useToast } from '../components/ui/Toaster';
 import QueryError from '../components/QueryError';
 import OptionsInput from '../components/OptionsInput';
 import { useTemplatesList, invalidateTemplates } from '../data/templates';
+import { Copy, LayoutTemplate, Plus, Trash2, X } from 'lucide-react';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import EmptyState from '../components/ui/EmptyState';
+import Field from '../components/ui/Field';
+import IconButton from '../components/ui/IconButton';
+import Input from '../components/ui/Input';
+import Page from '../components/ui/Page';
+import Select from '../components/ui/Select';
+import Spinner from '../components/ui/Spinner';
 import './Templates.css';
 
 const FIELD_TYPES = [
@@ -46,6 +56,10 @@ export default function Templates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [saving, setSaving] = useState(false);
+  /** The form as it was when the editor opened, to tell whether anything changed. */
+  const [baseline, setBaseline] = useState('');
+  /** What to do once the user agrees to drop unsaved edits. */
+  const [pendingAction, setPendingAction] = useState(null);
 
   const filteredList = useMemo(() => {
     if (!searchQuery.trim()) return list;
@@ -57,14 +71,18 @@ export default function Templates() {
     );
   }, [list, searchQuery]);
 
+  function startEditing(id, next) {
+    setEditingId(id);
+    setForm(next);
+    setBaseline(JSON.stringify(next));
+  }
+
   function openNew() {
-    setEditingId('new');
-    setForm({ name: '', description: '', schema: JSON.parse(JSON.stringify(defaultSchema)) });
+    startEditing('new', { name: '', description: '', schema: JSON.parse(JSON.stringify(defaultSchema)) });
     setError('');
   }
 
   function openEdit(t) {
-    setEditingId(t.id);
     let schemaVal = defaultSchema;
     if (t.schema && typeof t.schema === 'object') {
       schemaVal = t.schema;
@@ -75,11 +93,7 @@ export default function Templates() {
         schemaVal = defaultSchema;
       }
     }
-    setForm({
-      name: t.name,
-      description: t.description || '',
-      schema: schemaVal,
-    });
+    startEditing(t.id, { name: t.name, description: t.description || '', schema: schemaVal });
     setError('');
   }
 
@@ -269,373 +283,194 @@ export default function Templates() {
 
   if (loading) {
     return (
-      <div className="templates-page" >
-        <div className="templates-loading">
-          <div className="templates-loading-spinner" aria-hidden="true" />
-          <p role="status" aria-live="polite">
-            Loading templates…
-          </p>
-        </div>
-      </div>
+      <Page title="Templates">
+        <Spinner label="Loading templates" />
+      </Page>
     );
   }
 
-  return (
-    <div className="templates-page" >
-      <header className="templates-hero">
-        <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Templates' }]} />
-        <h1 className="templates-hero-title">Templates</h1>
-        <p className="templates-hero-desc">
-          Guided forms for creating knowledge objects. Pick a template when creating a new object to
-          get a structured form.
-        </p>
-      </header>
+  const editing = editingId !== undefined;
+  const dirty = editing && JSON.stringify(form) !== baseline;
+  /** Run `action` now, or after the user agrees to drop unsaved edits. */
+  const guard = (action) => {
+    if (dirty) setPendingAction(() => action);
+    else action();
+  };
 
-      {error && (
-        <div className="templates-error" role="alert">
-          {error}
-        </div>
-      )}
+  return (
+    <Page title="Templates" actions={<Button variant="primary" onClick={() => guard(openNew)}><Plus size={16} aria-hidden="true" />New template</Button>}>
+      <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Templates' }]} />
+      <p className="templates-hero-desc">
+        Guided forms for creating knowledge objects. Pick a template when creating a new object to
+        get a structured form.
+      </p>
+
+      {error && <div className="templates-error" role="alert">{error}</div>}
 
       <div className="templates-layout">
         <aside className="templates-sidebar">
-          <div className="templates-sidebar-actions">
-            <button type="button" className="btn btn-primary templates-new-btn" onClick={openNew}>
-              <span className="templates-new-icon" aria-hidden="true">+</span>
-              New template
-            </button>
-            {list.length > 0 && (
-              <div className="templates-search-wrap">
-                <input
-                  type="search"
-                  className="templates-search"
-                  placeholder="Search templates…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Search templates"
-                />
-              </div>
-            )}
-          </div>
+          {list.length > 0 && (
+            <Field label="Search templates" labelHidden>
+              {(f) => <Input id={f.id} type="search" placeholder="Search templates…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />}
+            </Field>
+          )}
 
           {listQ.error ? (
             <QueryError what="templates" error={listQ.error} onRetry={() => listQ.refetch()} />
           ) : list.length === 0 ? (
-            <section className="templates-empty-state empty-state" aria-label="No templates">
-              <div className="templates-empty-icon" aria-hidden="true">
-                📋
-              </div>
-              <p className="empty-state-title">No templates yet</p>
-              <p className="empty-state-desc">
-                Create a template to get a guided form when adding new objects—e.g. meeting notes,
-                reports, or SOPs.
-              </p>
-              <button type="button" className="btn btn-primary" onClick={openNew}>
-                Create your first template
-              </button>
-            </section>
+            <EmptyState
+              icon={LayoutTemplate}
+              title="No templates yet"
+              description="Create a template to get a guided form when adding new objects—e.g. meeting notes, reports, or SOPs."
+              action={<Button variant="primary" onClick={() => guard(openNew)}>Create your first template</Button>}
+            />
           ) : (
-            <ul className="templates-list" role="list">
-              {filteredList.map((t) => {
-                const fieldCount = getFieldCount(t);
-                const isActive = editingId === t.id;
-                return (
-                  <li key={t.id} className="templates-list-item">
-                    <div
-                      className={`templates-card ${isActive ? 'templates-card-active' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openEdit(t)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          openEdit(t);
-                        }
-                      }}
-                      aria-pressed={isActive}
-                    >
-                      <div className="templates-card-head">
-                        <span className="templates-card-name">{t.name}</span>
-                        <span className="templates-card-badge">{fieldCount} fields</span>
-                      </div>
-                      {t.description && (
-                        <p className="templates-card-desc">{t.description}</p>
-                      )}
-                      <div className="templates-card-actions">
-                        <Link
-                          to={`/objects/new?template=${t.id}`}
-                          className="templates-card-use"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          Use template
-                        </Link>
-                        <button
-                          type="button"
-                          className="templates-card-action-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDuplicate(t);
-                          }}
-                          title="Duplicate"
-                          aria-label="Duplicate template"
-                        >
-                          Copy
-                        </button>
-                        <button
-                          type="button"
-                          className="templates-card-action-btn templates-card-action-danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmId(t.id);
-                          }}
-                          title="Delete"
-                          aria-label="Delete template"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-              {filteredList.length === 0 && searchQuery.trim() && (
-                <li className="templates-list-empty">
-                  <p>No templates match “{searchQuery}”.</p>
+            <ul className="templates-list">
+              {filteredList.map((t) => (
+                <li key={t.id} className={`templates-card${editingId === t.id ? ' templates-card-active' : ''}`}>
+                  {/* The row's main button selects it; its actions are siblings, never nested (A7). */}
+                  <button type="button" className="templates-card-main" aria-current={editingId === t.id ? 'true' : undefined} onClick={() => guard(() => openEdit(t))}>
+                    <span className="templates-card-name">{t.name}</span>
+                    <span className="templates-card-badge">{getFieldCount(t)} fields</span>
+                    {t.description && <span className="templates-card-desc">{t.description}</span>}
+                  </button>
+                  <div className="templates-card-actions">
+                    <ButtonLink to={`/objects/new?template=${t.id}`} size="sm" variant="ghost">Use template</ButtonLink>
+                    <IconButton label={`Duplicate ${t.name}`} icon={Copy} iconSize={16} onClick={() => guard(() => handleDuplicate(t))} />
+                    <IconButton label={`Delete ${t.name}`} icon={Trash2} iconSize={16} onClick={() => setDeleteConfirmId(t.id)} />
+                  </div>
                 </li>
+              ))}
+              {filteredList.length === 0 && searchQuery.trim() && (
+                <li className="templates-list-empty">No templates match “{searchQuery}”.</li>
               )}
             </ul>
           )}
         </aside>
 
-        <div className="templates-main" aria-label="Templates list">
-          {editingId === 'new' || editingId ? (
-            <div className="templates-editor">
-              <div className="templates-editor-header">
-                <h2>{editingId === 'new' ? 'New template' : 'Edit template'}</h2>
-                <div className="templates-editor-header-actions">
-                  <button type="button" className="btn btn-ghost" onClick={closeEditor} disabled={saving}>
-                    Cancel
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
-
+        <div className="templates-main">
+          {editing ? (
+            <Card
+              as="section"
+              titleLevel={2}
+              title={editingId === 'new' ? 'New template' : 'Edit template'}
+              actions={
+                <>
+                  <Button variant="ghost" onClick={() => guard(closeEditor)} disabled={saving}>Cancel</Button>
+                  <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                </>
+              }
+            >
               <div className="templates-editor-sections">
-                <section className="templates-section">
-                  <h3 className="templates-section-title">Basics</h3>
-                  <div className="templates-section-fields">
-                    <label className="templates-field">
-                      <span className="templates-field-label">Name</span>
-                      <input
-                        type="text"
-                        value={form.name}
-                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="e.g. Meeting note"
-                        required
-                      />
-                    </label>
-                    <label className="templates-field">
-                      <span className="templates-field-label">Description (optional)</span>
-                      <input
-                        type="text"
-                        value={form.description}
-                        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                        placeholder="Short description of when to use this template"
-                      />
-                    </label>
-                  </div>
-                </section>
+                <Field label="Name">
+                  {(f) => <Input id={f.id} type="text" value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="e.g. Meeting note" required />}
+                </Field>
+                <Field label="Description (optional)">
+                  {(f) => <Input id={f.id} type="text" value={form.description} onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))} placeholder="Short description of when to use this template" />}
+                </Field>
 
-                <section className="templates-section">
-                  <h3 className="templates-section-title">Form design</h3>
-                  <p className="templates-section-hint">
-                    Choose which field becomes the object title and define the form fields.
-                  </p>
-                  <details className="templates-example">
-                    <summary>Example: what each property does</summary>
-                    <div className="templates-example-content">
-                      <table className="templates-example-table">
-                        <thead>
-                          <tr>
-                            <th>Property</th>
-                            <th>Meaning</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr><td><strong>Key</strong></td><td>Internal name (e.g. <code>title</code>, <code>content</code>). Use <code>content</code> or <code>body</code> for the main text area. Lowercase, no spaces.</td></tr>
-                          <tr><td><strong>Label</strong></td><td>Text shown on the form (e.g. &quot;Meeting title&quot;, &quot;Notes&quot;).</td></tr>
-                          <tr><td><strong>Type</strong></td><td><strong>Text</strong> = single line. <strong>Long text</strong> = paragraph. <strong>Dropdown</strong> = select one option.</td></tr>
-                          <tr><td><strong>Required</strong></td><td>If checked, the form won’t submit until this field has a value.</td></tr>
-                          <tr><td><strong>Options</strong></td><td>Only for Dropdown: comma-separated choices (e.g. Draft, In review, Done).</td></tr>
-                        </tbody>
-                      </table>
-                      <p className="templates-example-note">The <strong>Title field</strong> dropdown above picks which field becomes the knowledge object’s title when you create an object from this template.</p>
-                    </div>
-                  </details>
-                  <label className="templates-field">
-                    <span className="templates-field-label">Title field</span>
-                    <select
-                      value={schema.titleField}
-                      onChange={(e) =>
-                        setSchemaField((s) => ({ ...s, titleField: e.target.value }))
-                      }
-                    >
-                      {fields.map((f) => (
-                        <option key={f.key} value={f.key}>
-                          {f.label || f.key}
-                        </option>
-                      ))}
+                <h3 className="templates-section-title">Form design</h3>
+                <p className="templates-section-hint">Choose which field becomes the object title and define the form fields.</p>
+                <details className="templates-example">
+                  <summary>Example: what each property does</summary>
+                  <dl className="templates-example-list">
+                    <dt>Key</dt>
+                    <dd>Internal name (e.g. <code>title</code>, <code>content</code>). Use <code>content</code> or <code>body</code> for the main text area. Lowercase, no spaces.</dd>
+                    <dt>Label</dt>
+                    <dd>Text shown on the form (e.g. &quot;Meeting title&quot;, &quot;Notes&quot;).</dd>
+                    <dt>Type</dt>
+                    <dd><strong>Text</strong> = single line. <strong>Long text</strong> = paragraph. <strong>Dropdown</strong> = select one option.</dd>
+                    <dt>Required</dt>
+                    <dd>If checked, the form won’t submit until this field has a value.</dd>
+                    <dt>Options</dt>
+                    <dd>Only for Dropdown: comma-separated choices (e.g. Draft, In review, Done).</dd>
+                    <dt>Title field</dt>
+                    <dd>Which field becomes the knowledge object’s title when you create an object from this template.</dd>
+                  </dl>
+                </details>
+                <Field label="Title field">
+                  {(f) => (
+                    <Select id={f.id} value={schema.titleField} onChange={(e) => setSchemaField((s) => ({ ...s, titleField: e.target.value }))}>
+                      {fields.map((fld) => <option key={fld.key} value={fld.key}>{fld.label || fld.key}</option>)}
                       {fields.length === 0 && <option value="title">title</option>}
-                    </select>
-                  </label>
+                    </Select>
+                  )}
+                </Field>
 
-                  <div className="templates-fields-block">
-                    <div className="templates-fields-head">
-                      <span className="templates-field-label">Fields</span>
-                      <button type="button" className="btn btn-secondary btn-small" onClick={addField}>
-                        + Add field
-                      </button>
-                    </div>
-                    <p className="templates-fields-legend">
-                      Each field becomes a form input when creating an object. <strong>Key</strong> is the internal name; <strong>Label</strong> is what users see. Use <strong>key</strong> <code>content</code> or <code>body</code> for the main text area.
-                    </p>
-                    {fields.length === 0 ? (
-                      <p className="templates-fields-empty">No fields. Add one to define the form.</p>
-                    ) : (
-                      <>
-                        <div className="templates-fields-header-row" aria-hidden="true">
-                          <span className="templates-fields-th templates-fields-th-key">Key</span>
-                          <span className="templates-fields-th templates-fields-th-label">Label</span>
-                          <span className="templates-fields-th templates-fields-th-type">Type</span>
-                          <span className="templates-fields-th templates-fields-th-required">Required</span>
-                          <span className="templates-fields-th templates-fields-th-action" />
-                        </div>
-                        <ul className="templates-fields-list">
-                          {fields.map((f, i) => (
-                            <li key={i} className="templates-field-row">
-                              <div className="templates-field-row-inputs">
-                                <input
-                                  placeholder="e.g. title"
-                                  value={f.key}
-                                  onChange={(e) => updateField(i, { key: e.target.value })}
-                                  className="templates-field-key"
-                                  title="Internal name (lowercase, no spaces)"
-                                  aria-label="Field key"
-                                />
-                                <input
-                                  placeholder="e.g. Title"
-                                  value={f.label}
-                                  onChange={(e) => updateField(i, { label: e.target.value })}
-                                  className="templates-field-label-input"
-                                  title="Shown to users on the form"
-                                  aria-label="Field label"
-                                />
-                                <select
-                                  value={f.type}
-                                  onChange={(e) => updateField(i, { type: e.target.value })}
-                                  className="templates-field-type"
-                                  aria-label="Field type"
-                                  title="Text = one line, Long text = paragraph, Dropdown = select one"
-                                >
-                                  {FIELD_TYPES.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                  </option>
-                                  ))}
-                                </select>
-                                <label className="templates-checkbox" title="Form won't submit until filled">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!f.required}
-                                    onChange={(e) => updateField(i, { required: e.target.checked })}
-                                    aria-label="Required"
-                                  />
-                                  <span>Required</span>
-                                </label>
-                                <button
-                                  type="button"
-                                  className="templates-field-remove"
-                                  onClick={() => removeField(i)}
-                                  aria-label="Remove field"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                              {f.type === 'select' && (
-                                <div className="templates-field-options-wrap">
-                                  <span className="templates-field-options-label">Options (comma-separated)</span>
-                                  <OptionsInput
-                                    key={`${editingId}:${i}:${f.key}`}
-                                    options={f.options}
-                                    onCommit={(opts) => updateField(i, { options: opts })}
-                                    className="templates-field-options"
-                                    placeholder="e.g. Draft, In review, Done"
-                                    ariaLabel="Dropdown options"
-                                  />
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
+                <div className="templates-fields-head">
+                  <h3 className="templates-section-title" id="templates-fields-title">Fields</h3>
+                  <Button size="sm" onClick={addField}><Plus size={16} aria-hidden="true" />Add field</Button>
+                </div>
+                {fields.length === 0 ? (
+                  <p className="templates-fields-empty">No fields. Add one to define the form.</p>
+                ) : (
+                  <>
+                  <div className="templates-field-row templates-fields-columns" aria-hidden="true" data-testid="templates-fields-columns">
+                    <span>Key</span>
+                    <span>Label</span>
+                    <span>Type</span>
                   </div>
-                </section>
+                  <ul className="templates-fields-list" aria-labelledby="templates-fields-title">
+                    {fields.map((fld, i) => {
+                      const n = i + 1;
+                      return (
+                        <li key={i} className="templates-field-row">
+                          <Input placeholder="Key, e.g. title" value={fld.key} onChange={(e) => updateField(i, { key: e.target.value })} aria-label={`Key for field ${n}`} />
+                          <Input placeholder="Label, e.g. Title" value={fld.label} onChange={(e) => updateField(i, { label: e.target.value })} aria-label={`Label for field ${n}`} />
+                          <Select value={fld.type} onChange={(e) => updateField(i, { type: e.target.value })} aria-label={`Type for field ${n}`}>
+                            {FIELD_TYPES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                          </Select>
+                          <label className="templates-checkbox">
+                            <input type="checkbox" checked={!!fld.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
+                            <span>Required</span>
+                          </label>
+                          <IconButton label={`Remove field ${n}`} icon={X} iconSize={16} onClick={() => removeField(i)} />
+                          {fld.type === 'select' && (
+                            <OptionsInput
+                              key={`${editingId}:${i}:${fld.key}`}
+                              options={fld.options}
+                              onCommit={(opts) => updateField(i, { options: opts })}
+                              className="ui-input templates-field-options"
+                              placeholder="Options, e.g. Draft, In review, Done"
+                              ariaLabel={`Options for field ${n}`}
+                            />
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  </>
+                )}
               </div>
-            </div>
+            </Card>
           ) : (
-            <div className="templates-welcome">
-              <div className="templates-welcome-icon" aria-hidden="true">
-                ✨
-              </div>
-              <p className="templates-welcome-text">
-                {list.length === 0
-                  ? 'Create a template to get started.'
-                  : 'Select a template to edit, or create a new one.'}
-              </p>
-              {list.length > 0 && (
-                <button type="button" className="btn btn-secondary" onClick={openNew}>
-                  New template
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={LayoutTemplate}
+              title={list.length === 0 ? 'Create a template to get started.' : 'Select a template to edit, or create a new one.'}
+            />
           )}
         </div>
       </div>
 
-      {deleteConfirmId && (
-        <div
-          className="templates-modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="templates-delete-title"
-        >
-          <div className="templates-modal">
-            <h2 id="templates-delete-title">Delete this template?</h2>
-            <p className="templates-modal-desc">
-              This cannot be undone. Objects created with this template will not be affected.
-            </p>
-            <div className="templates-modal-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setDeleteConfirmId(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => handleDelete(deleteConfirmId)}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <ConfirmDialog
+        open={pendingAction !== null}
+        danger
+        title="Discard your changes?"
+        message="Your edits haven't been saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={() => { const action = pendingAction; setPendingAction(null); action?.(); }}
+        onCancel={() => setPendingAction(null)}
+      />
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        danger
+        title="Delete this template?"
+        message="This cannot be undone. Objects created with this template will not be affected."
+        confirmLabel="Delete"
+        onConfirm={() => handleDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
+    </Page>
   );
 }

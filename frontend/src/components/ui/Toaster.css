@@ -21,12 +21,12 @@
   align-items: center;
   gap: var(--pks-space-3);
   padding: var(--pks-space-3) var(--pks-space-3) var(--pks-space-3) var(--pks-space-5);
-  border: 1px solid color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border: 1px solid var(--pks-border-subtle);
   border-radius: var(--pks-radius-lg);
   background: var(--pks-surface-sheet);
   color: var(--pks-text-primary);
   font-size: var(--pks-text-size-body);
-  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+  box-shadow: 0 var(--pks-space-3) var(--pks-space-7) var(--pks-scrim);
   pointer-events: auto;
   animation: ui-toast-in 0.2s ease-out;
 }

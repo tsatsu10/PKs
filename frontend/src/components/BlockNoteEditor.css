@@ -1,20 +1,20 @@
 /* BlockNote editor — dark theme to match PKS */
 .blocknote-editor-wrapper {
-  --bn-colors-editor-text: var(--polar-white);
+  --bn-colors-editor-text: var(--pks-text-primary);
   --bn-colors-editor-background: transparent;
-  --bn-colors-menu-text: var(--polar-white);
-  --bn-colors-menu-background: var(--surface-elevated);
-  --bn-colors-tooltip-text: var(--polar-white);
-  --bn-colors-tooltip-background: var(--surface-elevated);
-  --bn-colors-hovered-text: var(--polar-white);
-  --bn-colors-hovered-background: var(--glass-border);
-  --bn-colors-selected-text: var(--polar-white);
-  --bn-colors-selected-background: var(--active-highlight-bg);
-  --bn-colors-disabled-text: var(--polar-faint);
-  --bn-colors-disabled-background: var(--surface);
-  --bn-colors-shadow: rgba(0, 0, 0, 0.4);
-  --bn-colors-border: var(--glass-border);
-  --bn-colors-side-menu: var(--polar-dim);
+  --bn-colors-menu-text: var(--pks-text-primary);
+  --bn-colors-menu-background: var(--pks-surface-raised);
+  --bn-colors-tooltip-text: var(--pks-text-primary);
+  --bn-colors-tooltip-background: var(--pks-surface-raised);
+  --bn-colors-hovered-text: var(--pks-text-primary);
+  --bn-colors-hovered-background: var(--pks-border-divider);
+  --bn-colors-selected-text: var(--pks-text-primary);
+  --bn-colors-selected-background: var(--pks-accent-selected-surface);
+  --bn-colors-disabled-text: var(--pks-text-muted);
+  --bn-colors-disabled-background: var(--pks-surface-card);
+  --bn-colors-shadow: var(--pks-scrim);
+  --bn-colors-border: var(--pks-border-divider);
+  --bn-colors-side-menu: var(--pks-text-muted);
   --bn-border-radius: 8px;
   --bn-font-family: inherit;
 }

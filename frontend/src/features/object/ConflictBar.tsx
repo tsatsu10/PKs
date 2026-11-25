@@ -1,3 +1,4 @@
+import Button from '../../components/ui/Button';
 import { useState } from 'react';
 import { useToast } from '../../components/ui/Toaster';
 import { useNotifyError } from '../../lib/useNotifyError';
@@ -30,17 +31,14 @@ export default function ConflictBar({ queue, onLoaded }: { queue: SaveQueue; onL
     <div className="conflict-bar" role="alert">
       <p className="conflict-bar-text">This changed elsewhere.</p>
       <div className="conflict-bar-actions">
-        <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => run(() => queue.keepMine())}>
-          Keep mine
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-small"
+        <Button variant="primary" size="sm" disabled={busy} onClick={() => run(() => queue.keepMine())}>Keep mine</Button>
+        <Button
+          size="sm"
           disabled={busy}
           onClick={() => run(() => queue.loadTheirs(), () => { addToast('success', 'Your version was saved to history'); onLoaded?.(); })}
         >
           Load theirs
-        </button>
+        </Button>
         <a
           href={`#${HISTORY_ANCHOR}`}
           className="conflict-bar-link"

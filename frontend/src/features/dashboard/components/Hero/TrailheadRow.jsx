@@ -8,9 +8,9 @@ export default function TrailheadRow({ resumeObject, pendingObject, sparkObject,
   const to = (id) => `/objects/${id}${runPromptSuffix}`;
 
   const cards = [
-    resumeObject ? { kind: 'resume', object: resumeObject, shortcutKey: '⌥1' } : null,
-    pendingObject ? { kind: 'pending', object: pendingObject, shortcutKey: '⌥2' } : null,
-    sparkObject ? { kind: 'spark', object: sparkObject, shortcutKey: '⌥3' } : null,
+    resumeObject ? { kind: 'resume', object: resumeObject, shortcutDigit: '1' } : null,
+    pendingObject ? { kind: 'pending', object: pendingObject, shortcutDigit: '2' } : null,
+    sparkObject ? { kind: 'spark', object: sparkObject, shortcutDigit: '3' } : null,
   ].filter(Boolean);
 
   if (cards.length === 0) return null;
@@ -22,7 +22,7 @@ export default function TrailheadRow({ resumeObject, pendingObject, sparkObject,
           key={card.kind}
           kind={card.kind}
           object={card.object}
-          shortcutKey={card.shortcutKey}
+          shortcutDigit={card.shortcutDigit}
           to={to(card.object.id)}
         />
       ))}

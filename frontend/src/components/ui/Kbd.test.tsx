@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { modKey } from '../../lib/keyboardMap';
+import { altKey, modKey } from '../../lib/keyboardMap';
 import { stubMatchMedia } from '../../test/matchMedia';
 import Kbd from './Kbd';
 
@@ -18,5 +18,15 @@ describe('Kbd', () => {
     stubMatchMedia((q) => q.includes('pointer: coarse'));
     const { container } = render(<Kbd keys={['mod', 'K']} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Kbd alt', () => {
+  it('maps alt per platform', () => {
+    stubMatchMedia(() => false);
+    render(<Kbd keys={['alt', '1']} />);
+    expect(screen.getByText(altKey)).toBeInTheDocument();
+    expect(['⌥', 'Alt']).toContain(altKey);
+    expect(screen.queryByText('alt')).not.toBeInTheDocument();
   });
 });

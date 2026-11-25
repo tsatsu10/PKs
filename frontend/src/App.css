@@ -15,10 +15,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1.25rem;
-  background: var(--space-black);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent);
-  color: var(--polar-dim);
+  background: var(--pks-bg-app);
+  color: var(--pks-text-muted);
   font-family: var(--pks-font-sans);
 }
 
@@ -60,8 +58,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: var(--space-black);
-  color: var(--polar-white);
+  background: var(--pks-bg-app);
+  color: var(--pks-text-primary);
   text-align: center;
 }
 
@@ -70,14 +68,14 @@ body {
 }
 
 .error-boundary-fallback p {
-  color: var(--polar-dim);
+  color: var(--pks-text-muted);
   margin: 0 0 1.5rem 0;
 }
 
 .error-boundary-fallback button {
   padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, var(--accent-strong-start) 0%, var(--accent-strong-end) 100%);
-  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--pks-accent-gradient-start) 0%, var(--pks-accent-gradient-end) 100%);
+  color: var(--pks-text-on-accent);
   border: none;
   border-radius: 10px;
   cursor: pointer;
@@ -86,7 +84,7 @@ body {
 
 /* Skeleton loaders */
 .skeleton {
-  background: var(--surface-elevated);
+  background: var(--pks-surface-raised);
   border-radius: 8px;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
@@ -107,7 +105,7 @@ body {
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--pks-border-divider);
 }
 
 .skeleton-detail {
@@ -123,13 +121,12 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--pks-space-4);
   width: max-content;
   max-width: calc(100vw - 32px);
-  padding: var(--space-6) var(--space-8);
-  background: var(--surface-elevated);
-  color: var(--polar-white);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--modal-shadow);
+  padding: var(--pks-space-4) var(--pks-space-5);
+  background: var(--pks-surface-raised);
+  color: var(--pks-text-primary);
+  border: 1px solid var(--pks-border-divider);
+  border-radius: var(--pks-radius-lg);
 }

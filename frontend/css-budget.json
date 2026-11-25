@@ -1,0 +1,9 @@
+{
+  "maxBytes": 152731,
+  "allow": [
+    "bn-container",
+    "bn-editor",
+    "bn-block-content"
+  ],
+  "allowReason": "bn-*: BlockNote library classes, styled from BlockNoteEditor.css"
+}

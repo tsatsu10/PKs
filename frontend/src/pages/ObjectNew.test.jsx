@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubMatchMedia } from '../test/matchMedia';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -94,5 +95,76 @@ describe('ObjectNew', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(side.logAudit).toHaveBeenCalled());
     expect(getDraft(DRAFT_KEYS.new)).toBeFalsy();
+  });
+});
+
+describe('ObjectNew form (A6, M10, A11)', () => {
+  const withTaxonomy = () => {
+    sb.current.respond = (call) => {
+      if (call.table === 'domains') return { data: [{ id: 'd1', name: 'Work' }, { id: 'd2', name: 'Home' }], error: null };
+      if (call.table === 'tags') return { data: [{ id: 't1', name: 'urgent' }], error: null };
+      return OK;
+    };
+  };
+  const narrow = () => stubMatchMedia((q) => q.includes('max-width: 768px'));
+
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('adds a domain only on Enter', async () => {
+    withTaxonomy();
+    renderNew();
+    const input = await screen.findByRole('combobox', { name: 'Add domain' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(screen.queryByRole('button', { name: /^Remove domain/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('button', { name: 'Remove domain Work' })).toBeInTheDocument();
+  });
+
+  it('names chip removes and removes the chip', async () => {
+    withTaxonomy();
+    renderNew();
+    const input = await screen.findByRole('combobox', { name: 'Add tag' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag urgent' }));
+    expect(screen.queryByRole('button', { name: 'Remove tag urgent' })).not.toBeInTheDocument();
+  });
+
+  it.each([['wide', () => stubMatchMedia(() => false)], ['narrow', narrow]])('has exactly one submit button on %s screens', (_name, stub) => {
+    stub();
+    renderNew();
+    expect(screen.getAllByRole('button', { name: 'Create' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Cancel' })).toHaveLength(1);
+  });
+
+  it('puts the submit bar after the properties on narrow screens', () => {
+    narrow();
+    renderNew();
+    const submit = screen.getByRole('button', { name: 'Create' });
+    const lastProperty = screen.getByLabelText('Source');
+    expect(lastProperty.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps submit in the header on wide screens', () => {
+    stubMatchMedia(() => false);
+    renderNew();
+    const submit = screen.getByRole('button', { name: 'Create' });
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    expect(submit.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks for a bookmark URL right under the title", () => {
+    stubMatchMedia(() => false);
+    renderNew();
+    expect(screen.queryByLabelText('Bookmark URL')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'bookmark' } });
+    const url = screen.getByLabelText('Bookmark URL');
+    expect(url).toHaveAttribute('type', 'url');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const body = screen.getByLabelText('Body');
+    expect(title.compareDocumentPosition(url) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(url.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.change(url, { target: { value: 'https://example.com' } });
+    expect(screen.getByLabelText('URL')).toHaveValue('https://example.com');
   });
 });

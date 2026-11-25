@@ -21,7 +21,7 @@
 
 .ui-icon-button--secondary {
   background: var(--pks-surface-raised);
-  border-color: color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  border-color: var(--pks-border-subtle);
 }
 
 .ui-icon-button:focus-visible {

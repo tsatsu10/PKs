@@ -9,6 +9,10 @@ import QueryError from '../components/QueryError';
 import { SkeletonList } from '../components/Skeleton';
 import { useIntegrationsList, invalidateIntegrations } from '../data/integrations';
 import './Integrations.css';
+import Button from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import '../components/ui/Input.css';
+import '../components/ui/Field.css';
 
 export default function Integrations() {
   const { user } = useAuth();
@@ -133,45 +137,43 @@ export default function Integrations() {
 
   if (loading) {
     return (
-      <div className="integrations-page" >
+      <Page title="Integrations" width="narrow" className="integrations-page">
         <header className="integrations-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
-          <h1>Integrations</h1>
         </header>
         <div role="status" aria-live="polite">
           <SkeletonList lines={5} />
         </div>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="integrations-page" >
+    <Page title="Integrations" width="narrow" className="integrations-page">
       <header className="integrations-header">
         <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'Integrations' }]} />
-        <h1>Integrations</h1>
         <p className="integrations-desc">Send webhooks to your own services when you create an object, finish a prompt run or export an object. Enable or disable each one.</p>
       </header>
-      {error && <div className="form-error" role="alert">{error}</div>}
+      {error && <div className="ui-page-error" role="alert">{error}</div>}
 
       <section className="integrations-add">
         <h2>Add integration</h2>
-        <form onSubmit={handleAdd} className="integrations-form form">
-          <label>
+        <form onSubmit={handleAdd} className="integrations-form">
+          <label className="ui-field">
             Name
-            <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Notion import" required />
+            <input className="ui-input" type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Notion import" required />
           </label>
-          <label>
+          <label className="ui-field">
             Type
-            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+            <select className="ui-select" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
               {INTEGRATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </label>
           {form.type === 'webhook' && (
             <div className="webhook-config">
-              <label>
+              <label className="ui-field">
                 Webhook URL
-                <input type="url" value={form.webhookUrl} onChange={(e) => setForm((f) => ({ ...f, webhookUrl: e.target.value }))} placeholder="https://..." required />
+                <input className="ui-input" type="url" value={form.webhookUrl} onChange={(e) => setForm((f) => ({ ...f, webhookUrl: e.target.value }))} placeholder="https://..." required />
               </label>
               <div className="webhook-events">
                 <span>Events</span>
@@ -182,16 +184,16 @@ export default function Integrations() {
                   </label>
                 ))}
               </div>
-              <label>
+              <label className="ui-field">
                 Secret (optional, for HMAC signing)
-                <input type="password" value={form.webhookSecret} onChange={(e) => setForm((f) => ({ ...f, webhookSecret: e.target.value }))} placeholder="Leave blank to skip signing" autoComplete="off" />
+                <input className="ui-input" type="password" value={form.webhookSecret} onChange={(e) => setForm((f) => ({ ...f, webhookSecret: e.target.value }))} placeholder="Leave blank to skip signing" autoComplete="off" />
               </label>
             </div>
           )}
           {form.type === 'webhook' && (
             <p className="settings-desc">Each request is signed: verify <code>X-PKS-Signature-256: v1=&lt;hex&gt;</code> as HMAC-SHA256 of <code>&lt;X-PKS-Timestamp&gt;.&lt;body&gt;</code> with your secret, and reject timestamps older than 5 minutes.</p>
           )}
-          <button type="submit" className="btn btn-primary" disabled={adding}>{adding ? 'Adding…' : 'Add'}</button>
+          <Button type="submit" variant="primary" disabled={adding}>{adding ? 'Adding…' : 'Add'}</Button>
         </form>
       </section>
 
@@ -210,17 +212,17 @@ export default function Integrations() {
                   <span className="integration-type">{i.type}</span>
                   {i.type === 'webhook' && i.config?.url && <span className="integration-webhook-url" title={i.config.url}>{i.config.url.slice(0, 40)}{i.config.url.length > 40 ? '…' : ''}</span>}
                 </div>
-                {i.type === 'webhook' && <button type="button" className="btn btn-small" onClick={() => openEditConfig(i)}>Configure</button>}
+                {i.type === 'webhook' && <Button size="sm" onClick={() => openEditConfig(i)}>Configure</Button>}
                 <label className="toggle-label">
                   <input type="checkbox" checked={i.enabled} onChange={(e) => toggleEnabled(i.id, e.target.checked)} />
                   {i.enabled ? 'On' : 'Off'}
                 </label>
-                <button type="button" className="btn btn-danger btn-small" onClick={() => handleDelete(i.id)}>Remove</button>
+                <Button variant="danger" size="sm" onClick={() => handleDelete(i.id)}>Remove</Button>
                 {editingConfigId === i.id && (
                   <div className="webhook-edit-overlay">
-                    <div className="webhook-edit-box form">
+                    <div className="webhook-edit-box">
                       <h3>Webhook config</h3>
-                      <label>URL <input type="url" value={editConfig.url} onChange={(e) => setEditConfig((c) => ({ ...c, url: e.target.value }))} placeholder="https://..." /></label>
+                      <label className="ui-field">URL <input className="ui-input" type="url" value={editConfig.url} onChange={(e) => setEditConfig((c) => ({ ...c, url: e.target.value }))} placeholder="https://..." /></label>
                       <div className="webhook-events">
                         <span>Events</span>
                         {WEBHOOK_EVENTS.map((ev) => (
@@ -230,10 +232,10 @@ export default function Integrations() {
                           </label>
                         ))}
                       </div>
-                      <label>Secret (optional) <input type="password" value={editConfig.secret} onChange={(e) => setEditConfig((c) => ({ ...c, secret: e.target.value }))} placeholder="Leave blank or ******** to keep" autoComplete="off" /></label>
+                      <label className="ui-field">Secret (optional) <input className="ui-input" type="password" value={editConfig.secret} onChange={(e) => setEditConfig((c) => ({ ...c, secret: e.target.value }))} placeholder="Leave blank or ******** to keep" autoComplete="off" /></label>
                       <div className="webhook-edit-actions">
-                        <button type="button" className="btn btn-primary" onClick={saveEditConfig}>Save</button>
-                        <button type="button" className="btn" onClick={() => { setEditingConfigId(null); setEditConfig({ url: '', events: [], secret: '' }); }}>Cancel</button>
+                        <Button variant="primary" onClick={saveEditConfig}>Save</Button>
+                        <Button onClick={() => { setEditingConfigId(null); setEditConfig({ url: '', events: [], secret: '' }); }}>Cancel</Button>
                       </div>
                     </div>
                   </div>
@@ -253,6 +255,6 @@ export default function Integrations() {
           <li><strong>Export:</strong> Build TXT/MD in the app or replicate the export logic client-side.</li>
         </ul>
       </section>
-    </div>
+    </Page>
   );
 }

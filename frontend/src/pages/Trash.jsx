@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FILES_BUCKET, getStoragePath } from '../lib/storage';
@@ -16,6 +16,10 @@ import { optimistic } from '../data/optimistic';
 import { qk } from '../data/keys';
 import { invalidateObjectLists } from '../data/objects';
 import './Trash.css';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Page from '../components/ui/Page';
+import { Trash2 } from 'lucide-react';
+import EmptyState from '../components/ui/EmptyState';
 
 export default function Trash() {
   const { user } = useAuth();
@@ -69,10 +73,9 @@ export default function Trash() {
   }
 
   return (
-    <div className="trash-page">
+    <Page title="Trash" width="narrow" className="trash-page">
       <header className="trash-header">
         <Breadcrumbs items={[{ label: 'Trash', to: '/trash' }]} />
-        <h1 className="trash-title">Trash</h1>
         <p className="trash-desc">Soft-deleted objects. Restore or permanently delete.</p>
       </header>
 
@@ -83,11 +86,12 @@ export default function Trash() {
       ) : query.error ? (
         <QueryError what="trash" error={query.error} onRetry={() => query.refetch()} />
       ) : objects.length === 0 ? (
-        <section className="trash-empty empty-state" aria-label="Trash empty">
-          <p className="empty-state-title">Nothing in trash</p>
-          <p className="empty-state-desc">Deleted objects will appear here. You can restore or permanently delete them.</p>
-          <Link to="/" className="btn btn-primary">Back to Dashboard</Link>
-        </section>
+        <EmptyState
+          icon={Trash2}
+          title="Nothing in trash"
+          description="Deleted objects will appear here. You can restore or permanently delete them."
+          action={<ButtonLink to="/" variant="primary">Back to Dashboard</ButtonLink>}
+        />
       ) : (
         <>
         <ul className="trash-list" aria-label="Deleted objects">
@@ -97,22 +101,20 @@ export default function Trash() {
               <span className="trash-item-title">{o.title || 'Untitled'}</span>
               <span className="trash-item-meta">{new Date(o.updated_at).toLocaleDateString()}</span>
               <div className="trash-item-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-small"
+                <Button
+                  variant="primary" size="sm"
                   onClick={() => handleRestore(o.id)}
                   disabled={restoringId === o.id || deletingId === o.id}
                 >
                   {restoringId === o.id ? 'Restoring…' : 'Restore'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger btn-small"
+                </Button>
+                <Button
+                  variant="danger" size="sm"
                   onClick={() => handlePermanentDelete(o.id)}
                   disabled={restoringId === o.id || deletingId === o.id}
                 >
                   {deletingId === o.id ? 'Deleting…' : 'Delete permanently'}
-                </button>
+                </Button>
               </div>
             </li>
           ))}
@@ -120,6 +122,6 @@ export default function Trash() {
         <LoadMore query={query} />
         </>
       )}
-    </div>
+    </Page>
   );
 }

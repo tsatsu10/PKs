@@ -1,3 +1,4 @@
+import '../../components/ui/Button.css';
 import { useState, type ReactNode } from 'react';
 import ContentView from './ContentView';
 import type { ObjectRow } from './types';
@@ -37,7 +38,7 @@ export default function ReadOnlyBody({ object, synthesize }: { object: ObjectRow
               <>
                 <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="detail-reference-link">{object.source}</a>
                 {isBookmark && (
-                  <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-small detail-open-link">Open link</a>
+                  <a href={object.source.trim()} target="_blank" rel="noopener noreferrer" className="ui-button ui-button--secondary ui-button--sm">Open link</a>
                 )}
               </>
             ) : (

@@ -20,17 +20,17 @@ The CSS target is the largest piece of work in the phase: about 68 KB more must 
 
 ## Verified status (2026-11-16)
 
-None of the 26 items is fully fixed. "Partly" means the item is partly fixed.
+None of the 26 items was fully fixed on 2026-11-16. "Partly" means the item is partly fixed. **Update 2026-11-24 (after part 2, PR #22):** A5, A12 and M9 are fixed; A6 is fixed at Taxonomy and Links (ObjectNew and EntityComboBox remain for part 3). The jsx-a11y baseline has 14 files. CSS is 225,436 bytes before part 3. **Update 2026-11-24 (after part 3, branch `phase-0b-part3-migration`):** A6, A7, A10, A11, A15, M5, M6, M8, M10 and M11 are fixed. CSS is 152,731 bytes, 30.2% below the start of −1A; exit criterion 2 (−35%, ≤ 142,232) is **not met**, by 10,499 bytes. The legacy variable and class layer in `index.css` is gone, every stylesheet passes the token-value stylelint rules with an empty baseline, and CI enforces the byte budget (`css-budget.json`). The jsx-a11y baseline has 5 files left for part 4 (AppLayout, CommandPalette, DashboardCommandPalette, InPlaceFields, ObjectPage).
 
 **Accessibility**
-- A5 Open: `features/object/AiPanel.tsx:69-77` has dialog roles but no Escape and no focus trap. A backdrop click or Cancel clears the AI output (`hooks/useRunPrompt.ts:120-123`). The "Template", "Prompt" and "Output" labels are not tied to their controls.
-- A6 Open: the add-domain, add-tag and add-link selects commit on change (`Taxonomy.tsx:40,79`, `Links.tsx:24`, `pages/ObjectNew.jsx:505,527`). `components/EntityComboBox.jsx:30-40` also commits on change.
+- A5 **Fixed in part 2.** Was: `features/object/AiPanel.tsx:69-77` has dialog roles but no Escape and no focus trap. A backdrop click or Cancel clears the AI output (`hooks/useRunPrompt.ts:120-123`). The "Template", "Prompt" and "Output" labels are not tied to their controls.
+- A6 **Partly (Taxonomy and Links fixed in part 2).** Was: the add-domain, add-tag and add-link selects commit on change (`Taxonomy.tsx:40,79`, `Links.tsx:24`, `pages/ObjectNew.jsx:505,527`). `components/EntityComboBox.jsx:30-40` also commits on change.
 - A7 Open: the card body is a `<Link>` containing a checkbox and LinkedBar's links/button (`components/DashboardObjectCard.jsx:68-146`). PromptBank has a `div role=button` around three buttons (`pages/PromptBank.jsx:284-342`).
 - A8 Open: no `document.title` is set anywhere, focus doesn't move on route change, and ObjectNew, Journal, PasteBin and the auth pages have no h1. The object page has an h1 only in read mode.
 - A9 Partly: CommandPalette options are fixed. Still open: the CommandBar radiogroup with `aria-pressed` (`CommandBar.jsx:65,72`), no `aria-activedescendant` in either palette, and the Journal grid with no rows (`Journal.jsx:197-216`).
 - A10 Open: no `aria-setsize`/`aria-posinset` (`DashboardView.jsx:401-498`, `Search.jsx:159-172`).
 - A11 Open: `.chip-remove` is about 15×18 px (`ObjectPage.css:514`, `ObjectForm.css:449`, `.prompt-bank-editor-tag-remove`).
-- A12 Partly: toasts pause on hover/focus (PR #15), but error toasts still expire after 4 s. Every toast is both `role=alert` and `aria-live=polite` (`context/ToastContext.jsx:84-85`).
+- A12 **Fixed in part 2.** Was: toasts pause on hover/focus (PR #15), but error toasts still expire after 4 s. Every toast is both `role=alert` and `aria-live=polite` (`context/ToastContext.jsx:84-85`).
 - A13 Open: Remove/Restore labels are unscoped (`Links.tsx:77,92`, `Attachments.tsx:33`, `Trash.jsx:106`, `History.tsx:42`, `Integrations.jsx:219`). ⌘K is hard-coded (`CommandBar.jsx:60`, `AppLayout.jsx:159,203`) while `keyboardMap.js:2 modKey` sits unused. The card's aria-label omits status, due date and summary.
 - A14 Open: Settings domain/tag inputs are placeholder-only (`Settings.jsx:573,635`). Import radios and webhook checkboxes have no fieldset. The integration toggle's label is "On"/"Off".
 - A15 Open: overdue vs soon is shown by colour only (`Dashboard.css:1139`). The theme picker has no `aria-pressed` (`Settings.jsx:508`). The selected paste has no `aria-current` (`PasteBin.jsx:150`).
@@ -39,7 +39,7 @@ None of the 26 items is fully fixed. "Partly" means the item is partly fixed.
 - M5 Open: padding is doubled (`AppLayout.css:533` + page roots), `min-height:100vh` on page roots, nested scroll boxes `calc(100vh-280px)` (`DashboardView.jsx:401`) and `calc(100vh-260px)` (`Search.jsx:159`).
 - M6 Open: the sticky object header (`ObjectPage.css:120-128`) wraps to about 200 px on mobile.
 - M8 Open: selection checkboxes have `opacity:0` until hover (`TableView.css:17`, `StreamView.css:53`, `Dashboard.css:1023`).
-- M9 Open: the activity drawer is a plain `<aside>` (`DashboardView.jsx:520-527`).
+- M9 **Fixed in part 2.** Was: the activity drawer is a plain `<aside>` (`DashboardView.jsx:520-527`).
 - M10 Open: ObjectNew's editor min-height is 520 px or more with properties after it, and submit is only in the header.
 - M11 Open: "press /", ⌥1–3 `HotkeyHint` and ⌘K show on touch. `.hotkey-hint` has no CSS.
 

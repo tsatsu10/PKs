@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom';
+import { Command, LayoutGrid, List, Plus, Rows3, Search } from 'lucide-react';
+import Button from '../../../../components/ui/Button';
+import Kbd from '../../../../components/ui/Kbd';
+import { modKey } from '../../../../lib/keyboardMap';
 import './CommandBar.css';
 
 const VIEW_OPTIONS = [
-  { id: 'stream', label: 'Stream', short: '≡' },
-  { id: 'card', label: 'Cards', short: '▦' },
-  { id: 'table', label: 'Table', short: '☷' },
+  { id: 'stream', label: 'Stream', icon: List },
+  { id: 'card', label: 'Cards', icon: LayoutGrid },
+  { id: 'table', label: 'Table', icon: Rows3 },
 ];
 
 /**
@@ -25,7 +29,7 @@ export default function CommandBar({
   return (
     <div className="command-bar" role="search">
       <form className="command-bar-form" onSubmit={onSearchSubmit}>
-        <span className="command-bar-search-icon" aria-hidden="true">⌕</span>
+        <Search size={16} aria-hidden="true" className="command-bar-search-icon" />
         <input
           ref={searchInputRef}
           type="search"
@@ -40,25 +44,18 @@ export default function CommandBar({
           placeholder="Search or type / for commands…"
           aria-label="Search knowledge objects"
         />
-        <button type="submit" className="btn btn-primary btn-small command-bar-search-btn">
-          Search
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-small"
-          onClick={onOpenFilters}
-          aria-expanded={showFilters}
-        >
-          Filters
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost btn-small command-bar-kbd"
+        <Button type="submit" variant="primary" size="sm">Search</Button>
+        <Button size="sm" onClick={onOpenFilters} aria-expanded={showFilters}>Filters</Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onOpenCommandPalette}
-          title="Command palette (Ctrl+K)"
+          aria-label="Command palette"
+          title={`Command palette (${modKey}+K)`}
         >
-          ⌘K
-        </button>
+          <Command size={16} aria-hidden="true" />
+          <Kbd keys={['mod', 'K']} />
+        </Button>
       </form>
 
       <div className="command-bar-actions">
@@ -72,19 +69,18 @@ export default function CommandBar({
               aria-pressed={viewMode === opt.id}
               title={opt.label}
             >
-              <span className="command-bar-view-icon" aria-hidden="true">{opt.short}</span>
+              <opt.icon size={16} aria-hidden="true" />
               <span className="command-bar-view-label">{opt.label}</span>
             </button>
           ))}
         </div>
 
         <div className="command-bar-cta">
-          <button type="button" className="btn btn-secondary btn-small" onClick={onToggleQuickAdd}>
-            + Quick add
-          </button>
-          <Link to="/objects/new" className="btn btn-primary btn-small">
-            New object
-          </Link>
+          <Button size="sm" onClick={onToggleQuickAdd}>
+            <Plus size={16} aria-hidden="true" />
+            Quick add
+          </Button>
+          <Link to="/objects/new" className="ui-button ui-button--primary ui-button--sm">New object</Link>
         </div>
       </div>
     </div>

@@ -87,4 +87,20 @@ describe('useRunPrompt', () => {
     expect(result.current.showRunPanel).toBe(false);
     expect(result.current.confirmDiscard).toBe(false);
   });
+
+  it('asks before closing mid-generation', async () => {
+    let finish: (v: unknown) => void = () => {};
+    const invoke = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    (sb.current!.client as unknown as { functions: unknown }).functions = { invoke };
+    const { result } = setup();
+    act(() => result.current.openRunPanel());
+    act(() => result.current.setRunPromptText('Summarise'));
+    let pending: Promise<unknown> = Promise.resolve();
+    act(() => { pending = result.current.onGenerateWithAI(); });
+    expect(result.current.generatingAI).toBe(true);
+    act(() => result.current.requestCloseRunPanel());
+    expect(result.current.showRunPanel).toBe(true);
+    expect(result.current.confirmDiscard).toBe(true);
+    await act(async () => { finish({ data: { output: 'answer', run: { id: 'r1', created_at: '2026-11-17T00:00:00Z' } }, error: null }); await pending; });
+  });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ConfirmDialog from './ConfirmDialog';
 
-function renderConfirm() {
+function renderConfirm({ busy = false } = {}) {
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
   render(
@@ -13,6 +13,7 @@ function renderConfirm() {
       confirmLabel="Discard"
       cancelLabel="Keep editing"
       danger
+      busy={busy}
       onConfirm={onConfirm}
       onCancel={onCancel}
     />,
@@ -34,5 +35,23 @@ describe('ConfirmDialog', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onCancel).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('ConfirmDialog description', () => {
+  it('describes the dialog with its message', () => {
+    renderConfirm();
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription("The generated text hasn't been saved.");
+  });
+});
+
+describe('ConfirmDialog busy', () => {
+  it('ignores repeat clicks on Confirm while busy', () => {
+    const { onConfirm } = renderConfirm({ busy: true });
+    const confirm = screen.getByRole('button', { name: 'Discard' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
   });
 });

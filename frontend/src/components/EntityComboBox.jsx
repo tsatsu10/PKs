@@ -1,8 +1,14 @@
-import { useState, useId, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus } from 'lucide-react';
+import Button from './ui/Button';
+import Field from './ui/Field';
+import Input from './ui/Input';
+import Select from './ui/Select';
 import './EntityComboBox.css';
 
 /**
- * Filter-friendly entity picker with inline create (domain or tag).
+ * Entity picker (domain or tag) with inline create. Creating starts from its own button,
+ * so choosing in the select never changes what is on screen (A6).
  */
 export default function EntityComboBox({
   label,
@@ -14,7 +20,6 @@ export default function EntityComboBox({
   createLabel = 'Create',
   disabled = false,
 }) {
-  const inputId = useId();
   const createInputRef = useRef(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -22,22 +27,8 @@ export default function EntityComboBox({
   const [localError, setLocalError] = useState('');
 
   useEffect(() => {
-    if (creating && createInputRef.current) {
-      createInputRef.current.focus();
-    }
+    if (creating) createInputRef.current?.focus();
   }, [creating]);
-
-  const handleSelectChange = (e) => {
-    const next = e.target.value;
-    if (next === '__create__') {
-      setCreating(true);
-      setNewName('');
-      setLocalError('');
-      return;
-    }
-    setCreating(false);
-    onChange(next);
-  };
 
   const cancelCreate = () => {
     setCreating(false);
@@ -62,66 +53,56 @@ export default function EntityComboBox({
     }
   };
 
+  const nameLabel = `New ${label.toLowerCase()} name`;
   return (
     <div className="entity-combobox">
-      <label htmlFor={inputId} className="entity-combobox-label">
-        {label}
-      </label>
-      <div className="entity-combobox-row">
-        <select
-          id={inputId}
-          className="entity-combobox-select"
-          value={creating ? '__create__' : (value || '')}
-          onChange={handleSelectChange}
-          disabled={disabled || busy}
-          aria-describedby={localError ? `${inputId}-error` : undefined}
-        >
-          <option value="">{placeholder}</option>
-          {options.map((opt) => (
-            <option key={opt.id} value={opt.id}>{opt.name}</option>
-          ))}
-          {onCreate && <option value="__create__">+ {createLabel}…</option>}
-        </select>
-      </div>
-      {creating && onCreate && (
-        <div className="entity-combobox-create" role="group" aria-label={`${createLabel} ${label}`}>
-          <input
-            ref={createInputRef}
-            type="text"
-            className="entity-combobox-create-input"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder={`New ${label.toLowerCase()} name`}
-            disabled={busy}
-            maxLength={120}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                submitCreate();
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                cancelCreate();
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-small"
-            onClick={submitCreate}
-            disabled={busy || !newName.trim()}
-          >
-            {busy ? '…' : 'Add'}
-          </button>
-          <button type="button" className="btn btn-ghost btn-small" onClick={cancelCreate} disabled={busy}>
-            Cancel
-          </button>
-        </div>
+      <Field label={label}>
+        {(f) => (
+          <Select id={f.id} value={value || ''} onChange={(e) => onChange(e.target.value)} disabled={disabled || busy}>
+            <option value="">{placeholder}</option>
+            {options.map((opt) => (
+              <option key={opt.id} value={opt.id}>{opt.name}</option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      {onCreate && !creating && (
+        <Button variant="ghost" size="sm" onClick={() => setCreating(true)} disabled={disabled}>
+          <Plus size={16} aria-hidden="true" />
+          {createLabel}
+        </Button>
       )}
-      {localError && (
-        <p id={`${inputId}-error`} className="entity-combobox-error" role="alert">
-          {localError}
-        </p>
+      {creating && onCreate && (
+        <Field label={nameLabel} labelHidden error={localError || undefined}>
+          {(f) => (
+            <div className="entity-combobox-create">
+              <Input
+                id={f.id}
+                ref={createInputRef}
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder={nameLabel}
+                disabled={busy}
+                maxLength={120}
+                invalid={f.invalid}
+                aria-describedby={f.describedBy}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitCreate();
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelCreate();
+                  }
+                }}
+              />
+              <Button variant="primary" size="sm" onClick={submitCreate} disabled={busy || !newName.trim()}>{busy ? '…' : 'Add'}</Button>
+              <Button variant="ghost" size="sm" onClick={cancelCreate} disabled={busy}>Cancel</Button>
+            </div>
+          )}
+        </Field>
       )}
     </div>
   );

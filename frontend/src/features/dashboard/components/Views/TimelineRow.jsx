@@ -35,7 +35,6 @@ function TimelineRow({
       ref={rowRef}
       className={`timeline-row-wrap${selected ? ' timeline-row-wrap--selected' : ''}`}
       data-object-index={navIndex ?? objectIndex}
-      role="listitem"
     >
       <label className={`timeline-row-checkbox${selectionMode ? ' is-visible' : ''}`}>
         <input

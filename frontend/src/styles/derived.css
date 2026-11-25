@@ -1,0 +1,12 @@
+/*
+ * Hand-written tokens derived from the generated ones in tokens.css, for recipes that would
+ * otherwise be repeated in every stylesheet. They follow the theme because their inputs do.
+ */
+:root {
+  /* Hairlines between sections and around cards. */
+  --pks-border-divider: color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-divider) * 100%), transparent);
+  /* Outlines of controls (inputs, secondary buttons). */
+  --pks-border-subtle: color-mix(in srgb, var(--pks-border-default) calc(var(--pks-opacity-border-subtle) * 100%), transparent);
+  /* Backdrop behind modal layers. */
+  --pks-scrim: color-mix(in srgb, var(--pks-color-black) calc(var(--pks-opacity-scrim) * 100%), transparent);
+}

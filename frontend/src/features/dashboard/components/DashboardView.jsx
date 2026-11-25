@@ -9,17 +9,19 @@ import DashboardHero from './Hero/DashboardHero';
 import CommandBar from './Toolbar/CommandBar';
 import ActiveFiltersStrip from './Toolbar/ActiveFiltersStrip';
 import BulkActionRibbon from './Selection/BulkActionRibbon';
-import TimelineRow from './Views/TimelineRow';
-import StreamBucketHeader from './Views/StreamBucketHeader';
-import TableViewRow from './Views/TableView';
 import { LinkedObjectsProvider } from '../context/LinkedObjectsContext';
 import ActivityPulse from './Sidebar/ActivityPulse';
 import ActivityDrawer from './ActivityDrawer';
 import { DashboardEmptyFirstRun, DashboardEmptyNoResults } from './Empty/DashboardEmptyStates';
-import DashboardObjectCard from './DashboardObjectCard';
+import DashboardObjectList from './DashboardObjectList';
 import DashboardPagination from '../../../components/DashboardPagination';
 import DashboardCommandPalette from './DashboardCommandPalette';
 import DashboardModals from './DashboardModals';
+import Page from '../../../components/ui/Page';
+import Button from '../../../components/ui/Button';
+import Kbd from '../../../components/ui/Kbd';
+import { Plus, X } from 'lucide-react';
+import Input from '../../../components/ui/Input';
 
 export default function DashboardView(props) {
   const {
@@ -42,7 +44,7 @@ export default function DashboardView(props) {
     searchInputRef, quickAddInputRef, listScrollRef, cardColumns, runPromptTemplate,
     heroStats, showActivityPanel, setShowActivityPanel, pendingObject, sparkObject,
     resumeObject,
-    selectionMode, runPromptSuffix, streamItems, listVirtualizer, filterChips, handlePageChange,
+    selectionMode, runPromptSuffix, streamItems, listVirtualizer, listScrollMargin, filterChips, handlePageChange,
     dismissRunPromptBanner, closeQuickAdd, handleTagFilterFromActivity, handleSearchSubmit,
     toggleSelect, selectAllOnPage, clearSelection, handleQuickAddCreate, handleExportSelected,
     bulkAddDomain, bulkAddTag, bulkRemoveDomain, bulkRemoveTag, bulkDelete, bulkChangeType,
@@ -53,16 +55,16 @@ export default function DashboardView(props) {
 
   return (
 
-    <div className="dashboard">
+    <Page title="Dashboard" titleHidden width="wide" className="dashboard">
       <div className="dashboard-main" aria-busy={loading} aria-label="Dashboard">
-        <div className="dashboard-sr-only" aria-live="polite" aria-atomic="true">
+        <div className="ui-visually-hidden" aria-live="polite" aria-atomic="true">
           {selectedIds.size > 0 ? `${selectedIds.size} object${selectedIds.size !== 1 ? 's' : ''} selected` : ''}
         </div>
         <a href="#dashboard-object-list" className="dashboard-skip-link">Skip to object list</a>
         <div className="dashboard-scroll-progress" role="presentation" aria-hidden="true">
           <div className="dashboard-scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
         </div>
-        <LinkedObjectsProvider userId={user?.id ?? null} scrollRootRef={listScrollRef}>
+        <LinkedObjectsProvider userId={user?.id ?? null}>
         <div className="dashboard-layout">
           <div className="dashboard-main-col">
         <DashboardHero
@@ -82,7 +84,7 @@ export default function DashboardView(props) {
                 <span className="dashboard-banner-text">
                   Run prompt: <strong>{runPromptTemplate.name}</strong>. Open an object to run this prompt.
                 </span>
-                <button type="button" className="btn btn-ghost btn-small" onClick={dismissRunPromptBanner} aria-label="Dismiss">Dismiss</button>
+                <Button variant="ghost" size="sm" onClick={dismissRunPromptBanner}>Dismiss</Button>
               </>
             ) : (
               <>
@@ -92,7 +94,7 @@ export default function DashboardView(props) {
                   <li>Use <strong>More filters</strong> to add a domain or tag without leaving the dashboard.</li>
                   <li><Link to="/quick">Try Quick capture</Link> to capture a thought in seconds.</li>
                 </ol>
-                <button type="button" className="btn btn-secondary btn-small" onClick={dismissOnboarding}>Got it</button>
+                <Button size="sm" onClick={dismissOnboarding}>Got it</Button>
               </>
             )}
           </div>
@@ -101,9 +103,7 @@ export default function DashboardView(props) {
         {/* Suggested next step when few objects and no domains */}
         {heroStats && (heroStats.total ?? 0) <= 5 && domains.length === 0 && (heroStats.total ?? 0) > 0 && (
           <p className="dashboard-suggested-next">
-            <button type="button" className="dashboard-suggested-next-btn" onClick={() => setShowFilters(true)}>
-              Add a domain in filters
-            </button>
+            <Button variant="ghost" size="sm" onClick={() => setShowFilters(true)}>Add a domain in filters</Button>
             {' '}to organize by topic.
           </p>
         )}
@@ -145,13 +145,13 @@ export default function DashboardView(props) {
           <div className="dashboard-actions-right">
             {viewMode === 'table' && (
               <div className="density-toggle" role="group" aria-label="Table density">
-                <button type="button" className={`btn btn-secondary btn-small ${listDensity === 'compact' ? 'active' : ''}`} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'}>Compact</button>
-                <button type="button" className={`btn btn-secondary btn-small ${listDensity === 'comfortable' ? 'active' : ''}`} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'}>Comfy</button>
+                <Button size="sm" variant={listDensity === 'compact' ? 'primary' : 'secondary'} onClick={() => setListDensity('compact')} aria-pressed={listDensity === 'compact'}>Compact</Button>
+                <Button size="sm" variant={listDensity === 'comfortable' ? 'primary' : 'secondary'} onClick={() => setListDensity('comfortable')} aria-pressed={listDensity === 'comfortable'}>Comfy</Button>
               </div>
             )}
-            <button type="button" className="btn btn-secondary btn-small" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
+            <Button size="sm" onClick={() => { setShowExportModal(true); setExportScope(selectedIds.size > 0 ? 'selected' : 'filtered'); }}>
               Export
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -251,7 +251,7 @@ export default function DashboardView(props) {
                         <button type="button" className="dashboard-saved-filters-apply" role="menuitem" onClick={() => applySavedFilter(s)}>
                           {s.name}
                         </button>
-                        <button type="button" className="dashboard-saved-filters-delete" aria-label={`Delete ${s.name}`} onClick={() => deleteSavedFilter(s.id)}>×</button>
+                        <button type="button" className="dashboard-saved-filters-delete" aria-label={`Delete ${s.name}`} onClick={() => deleteSavedFilter(s.id)}><X size={16} aria-hidden="true" /></button>
                       </div>
                     ))}
                   </div>
@@ -265,17 +265,16 @@ export default function DashboardView(props) {
 
           {showSaveFilterModal && (
             <div className="dashboard-save-filter-inline">
-              <input
+              <Input
                 type="text"
-                className="dashboard-save-filter-input"
                 value={saveFilterName}
                 onChange={(e) => setSaveFilterName(e.target.value)}
                 placeholder="Name this view"
                 aria-label="Name for saved filters"
                 onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentFilters(); if (e.key === 'Escape') setShowSaveFilterModal(false); }}
               />
-              <button type="button" className="btn btn-primary btn-small" onClick={saveCurrentFilters}>Save</button>
-              <button type="button" className="btn btn-ghost btn-small" onClick={() => { setShowSaveFilterModal(false); setSaveFilterName(''); }}>Cancel</button>
+              <Button variant="primary" size="sm" onClick={saveCurrentFilters}>Save</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setShowSaveFilterModal(false); setSaveFilterName(''); }}>Cancel</Button>
             </div>
           )}
 
@@ -344,11 +343,11 @@ export default function DashboardView(props) {
             type="button"
             className="dashboard-quick-add-trigger"
             onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
-            aria-label="Add new object (or press /)"
+            aria-keyshortcuts="/"
           >
-            <span className="dashboard-quick-add-icon">+</span>
+            <Plus size={20} aria-hidden="true" className="dashboard-quick-add-icon" />
             <span className="dashboard-quick-add-label">Add new object</span>
-            <span className="dashboard-quick-add-hint">or press /</span>
+            <Kbd keys={['/']} />
           </button>
         ) : (
           <DashboardQuickAddForm
@@ -371,7 +370,7 @@ export default function DashboardView(props) {
             onClick={() => { setShowQuickAdd(true); setTimeout(() => quickAddInputRef.current?.focus(), 0); }}
             aria-label="Add new object"
           >
-            +
+            <Plus size={24} aria-hidden="true" />
           </button>
         )}
 
@@ -403,111 +402,22 @@ export default function DashboardView(props) {
                 onPageChange={handlePageChange}
               />
             )}
-            <div id="dashboard-object-list" ref={listScrollRef} className={`dashboard-object-list-scroll dashboard-density-${listDensity}${viewMode === 'card' ? ' dashboard-object-list-scroll--card' : ''}${viewMode === 'stream' ? ' dashboard-object-list-scroll--stream' : ''}`} style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }} role="list" aria-label="Knowledge objects" tabIndex={-1}>
-              <div style={{ height: `${listVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-                {listVirtualizer.getVirtualItems().map((virtualRow) => {
-                  if (viewMode === 'card') {
-                    const rowIndex = virtualRow.index;
-                    const startIdx = rowIndex * cardColumns;
-                    const rowObjects = objects.slice(startIdx, startIdx + cardColumns);
-                    return (
-                      <div
-                        key={`card-row-${rowIndex}`}
-                        className="object-card-grid-row-wrap"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <div
-                          className="object-card-grid-row"
-                          style={{ gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))` }}
-                        >
-                          {rowObjects.map((rowObj, colIdx) => (
-                            <DashboardObjectCard
-                              key={rowObj.id}
-                              obj={rowObj}
-                              to={`/objects/${rowObj.id}${runPromptSuffix}`}
-                              selected={selectedIds.has(rowObj.id)}
-                              onToggleSelect={toggleSelect}
-                              animationDelay={Math.min(startIdx + colIdx, 12) * 25}
-                              compact={listDensity === 'compact'}
-                              objectIndex={startIdx + colIdx}
-                              runPromptSuffix={runPromptSuffix}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (viewMode === 'stream') {
-                    const item = streamItems[virtualRow.index];
-                    if (!item) return null;
-                    return (
-                      <div
-                        key={item.id}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        {item.kind === 'header' ? (
-                          <StreamBucketHeader label={item.label} />
-                        ) : (
-                          <TimelineRow
-                            obj={item.obj}
-                            to={`/objects/${item.obj.id}${runPromptSuffix}`}
-                            selected={selectedIds.has(item.obj.id)}
-                            onToggleSelect={toggleSelect}
-                            selectionMode={selectionMode}
-                            objectIndex={virtualRow.index}
-                            navIndex={item.navIndex}
-                            snippet={item.obj.snippet || item.obj.summary}
-                            runPromptSuffix={runPromptSuffix}
-                            listDensity={listDensity}
-                          />
-                        )}
-                      </div>
-                    );
-                  }
-
-                  const obj = objects[virtualRow.index];
-                  return (
-                    <div
-                      key={obj.id}
-                      data-object-index={virtualRow.index}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <TableViewRow
-                        obj={obj}
-                        to={`/objects/${obj.id}${runPromptSuffix}`}
-                        selected={selectedIds.has(obj.id)}
-                        onToggleSelect={toggleSelect}
-                        selectionMode={selectionMode}
-                        objectIndex={virtualRow.index}
-                        compact={listDensity === 'compact'}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <DashboardObjectList
+              listScrollRef={listScrollRef}
+              listVirtualizer={listVirtualizer}
+              scrollMargin={listScrollMargin}
+              objects={objects}
+              viewMode={viewMode}
+              listDensity={listDensity}
+              cardColumns={cardColumns}
+              streamItems={streamItems}
+              selectedIds={selectedIds}
+              toggleSelect={toggleSelect}
+              selectionMode={selectionMode}
+              runPromptSuffix={runPromptSuffix}
+              totalCount={totalCount}
+              positionOffset={(page - 1) * pageSize}
+            />
             {objects.length > 0 && (
               <DashboardPagination
                 page={page}
@@ -597,7 +507,6 @@ export default function DashboardView(props) {
           onDelete={() => setBulkModal('delete')}
         />
       </div>
-    </div>
-  
+    </Page>
   );
 }

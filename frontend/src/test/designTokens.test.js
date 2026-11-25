@@ -3,10 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rgb, ratio, blend } from './contrast.js';
+import { rgb, ratio } from './contrast.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
-const indexCss = readFileSync(join(SRC, 'index.css'), 'utf8');
 
 function cssFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -17,33 +16,84 @@ function cssFiles(dir) {
 }
 const allCss = cssFiles(SRC).map((file) => ({ file, text: readFileSync(file, 'utf8') }));
 
+const tokensCss = readFileSync(join(SRC, 'styles', 'tokens.css'), 'utf8');
+
 function tokenBlock(re) {
-  const m = indexCss.match(re);
+  const m = tokensCss.match(re);
   if (!m) throw new Error(`token block not found: ${re}`);
   return Object.fromEntries([...m[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, k, v]) => [k, v.trim()]));
 }
-const dark = tokenBlock(/:root,\s*\[data-theme="dark"\]\s*\{([^}]*)\}/);
+// tokens.css: core palette, then the dark theme's semantic tokens, then the light theme's.
+const core = tokenBlock(/^:root\s*\{([^}]*)\}/m);
+const dark = { ...core, ...tokenBlock(/:root,\s*\[data-theme="dark"\]\s*\{([^}]*)\}/) };
 const light = { ...dark, ...tokenBlock(/\[data-theme="light"\]\s*\{([^}]*)\}/) };
 
-const t = (theme, name) => rgb(theme[name]);
+/** A token's colour in a theme, following var() references down to the palette. */
+function t(theme, name) {
+  let value = theme[name];
+  for (let i = 0; i < 5 && value && value.startsWith('var('); i++) value = theme[value.slice(4, -1).trim()];
+  if (!value || !value.startsWith('#')) throw new Error(`${name} does not resolve to a colour`);
+  return rgb(value);
+}
+
+// Part 3 moved every page from hand-tuned legacy variables onto these pairs; each must hold in both themes.
+const THEMES = [['dark', dark], ['light', light]];
+const TEXT_ON_SURFACE = [
+  ['--pks-text-primary', '--pks-bg-app'],
+  ['--pks-text-primary', '--pks-surface-card'],
+  ['--pks-text-primary', '--pks-surface-raised'],
+  ['--pks-text-secondary', '--pks-bg-app'],
+  ['--pks-text-secondary', '--pks-surface-card'],
+  ['--pks-text-secondary', '--pks-surface-raised'],
+  ['--pks-text-muted', '--pks-bg-app'],
+  ['--pks-text-muted', '--pks-surface-card'],
+  ['--pks-text-muted', '--pks-surface-raised'],
+  ['--pks-text-primary', '--pks-surface-input'],
+  ['--pks-accent-link', '--pks-bg-app'],
+  ['--pks-accent-link', '--pks-surface-card'],
+  ['--pks-text-on-accent', '--pks-accent-primary-strong'],
+  ['--pks-text-on-accent', '--pks-status-danger-fill'],
+  ['--pks-status-danger', '--pks-status-danger-surface'],
+  ['--pks-status-success', '--pks-status-success-surface'],
+  ['--pks-status-warning', '--pks-status-warning-surface'],
+  ['--pks-accent-ai-text', '--pks-accent-ai-surface'],
+  ['--pks-accent-link', '--pks-accent-selected-surface'],
+  ['--pks-status-danger', '--pks-bg-app'],
+  ['--pks-status-danger', '--pks-surface-card'],
+  ['--pks-status-success', '--pks-surface-card'],
+  ['--pks-status-warning', '--pks-surface-card'],
+];
 
 describe('text contrast meets WCAG AA (4.5:1)', () => {
-  it('faint text on dark surfaces', () => {
-    expect(ratio(t(dark, '--polar-faint'), t(dark, '--surface'))).toBeGreaterThanOrEqual(4.5);
-    expect(ratio(t(dark, '--polar-faint'), t(dark, '--surface-elevated'))).toBeGreaterThanOrEqual(4.5);
+  describe.each(THEMES)('%s theme', (_name, theme) => {
+    it.each(TEXT_ON_SURFACE)('%s on %s', (fg, bg) => {
+      expect(ratio(t(theme, fg), t(theme, bg))).toBeGreaterThanOrEqual(4.5);
+    });
   });
-  it('faint text on the light background', () => {
-    expect(ratio(t(light, '--polar-faint'), t(light, '--space-black'))).toBeGreaterThanOrEqual(4.5);
+});
+
+describe('rules that set both a text colour and a background token', () => {
+  // The list above covers the pairs the system intends; this covers the pairs rules actually use.
+  const pairs = allCss.flatMap(({ file, text }) =>
+    [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap((m) => {
+      const fg = m[2].match(/(?:^|[\s;])color:\s*var\((--pks-[\w-]+)\)\s*;/)?.[1];
+      const bg = m[2].match(/background(?:-color)?:\s*var\((--pks-[\w-]+)\)\s*;/)?.[1];
+      return fg && bg ? [{ where: `${file.slice(SRC.length + 1)}: ${m[1].trim().split(/\n/).pop()}`, fg, bg }] : [];
+    }));
+
+  it('finds the pairs', () => {
+    expect(pairs.length).toBeGreaterThan(20);
   });
-  it('primary button text on both gradient stops, in both themes', () => {
-    for (const theme of [dark, light]) {
-      expect(ratio(t(theme, '--on-accent'), t(theme, '--accent-strong-start'))).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(t(theme, '--on-accent'), t(theme, '--accent-strong-end'))).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-  it('success toast text in light theme', () => {
-    const toastBg = blend([34, 197, 94], 0.2, t(light, '--space-black'));
-    expect(ratio(t(light, '--success-text'), toastBg)).toBeGreaterThanOrEqual(4.5);
+
+  it.each(THEMES)('meet 4.5:1 in the %s theme', (_name, theme) => {
+    // Translucent tokens (rgba) depend on what is under them; only solid pairs are measured.
+    const solid = (name) => { try { return t(theme, name); } catch { return null; } };
+    const bad = pairs
+      .filter((p) => solid(p.fg) && solid(p.bg))
+      .map((p) => ({ ...p, r: ratio(t(theme, p.fg), t(theme, p.bg)) }))
+      .filter((p) => p.r < 4.5)
+      .map((p) => `${p.where} (${p.fg} on ${p.bg}: ${p.r.toFixed(2)})`);
+    expect(bad).toEqual([]);
   });
 });
 
@@ -57,6 +107,21 @@ describe('stylesheet hygiene', () => {
         .map((name) => `${name} in ${file.slice(SRC.length + 1)}`));
     expect(missing).toEqual([]);
   });
+  it('--pks-accent-primary is never text or the fill under on-accent text', () => {
+    // White on pink-500 is 3.5:1 in the dark theme and pink-600 on the light page is under 4.5:1.
+    // Text uses --pks-accent-link; fills under --pks-text-on-accent use --pks-accent-primary-strong.
+    const bad = [];
+    for (const { file, text } of allCss) {
+      const css = text.replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const body = m[2];
+        const asText = /(^|[\s;])color:\s*var\(--pks-accent-primary\)/.test(body);
+        const underText = /background(-color)?:\s*var\(--pks-accent-primary\)/.test(body) && /(^|[\s;])color:\s*var\(--pks-text-on-accent\)/.test(body);
+        if (asText || underText) bad.push(`${file.slice(SRC.length + 1)}: ${m[1].trim().split('\n').pop()}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
   it('no :focus-visible rule removes the outline', () => {
     const offenders = allCss.flatMap(({ file, text }) =>
       [...text.matchAll(/([^{}]*:focus-visible[^{}]*)\{([^}]*)\}/g)]
@@ -64,22 +129,8 @@ describe('stylesheet hygiene', () => {
         .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
     expect(offenders).toEqual([]);
   });
-  it('no .btn-primary rule re-applies the low-contrast accent gradient', () => {
-    const offenders = allCss.flatMap(({ file, text }) =>
-      [...text.matchAll(/([^{}]*\.btn-primary[^{}]*)\{([^}]*)\}/g)]
-        .filter((m) => /--accent-gradient|color:\s*var\(--polar-white\)/.test(m[2]))
-        .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
-    expect(offenders).toEqual([]);
-  });
   it('no media query uses var(), which browsers ignore', () => {
     const offenders = allCss.filter(({ text }) => /@media[^{]*var\(/.test(text)).map(({ file }) => file.slice(SRC.length + 1));
-    expect(offenders).toEqual([]);
-  });
-  it('no rule pairs the low-contrast accent gradient with a text color', () => {
-    const offenders = allCss.flatMap(({ file, text }) =>
-      [...text.matchAll(/([^{}]*)\{([^}]*)\}/g)]
-        .filter((m) => /var\(--accent-gradient\)/.test(m[2]) && /(?:^|[^-])color:/.test(m[2]))
-        .map((m) => `${m[1].trim()} in ${file.slice(SRC.length + 1)}`));
     expect(offenders).toEqual([]);
   });
 });

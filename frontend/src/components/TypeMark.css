@@ -1,3 +1,8 @@
+/*
+ * TypeMark derives its colours from one hue per object type (--type-mark-hue), which the
+ * token set cannot express; the design spec keeps it as is.
+ */
+/* stylelint-disable function-disallowed-list, declaration-property-value-disallowed-list */
 .type-mark {
   --type-mark-hue: 215;
   display: inline-flex;
@@ -8,7 +13,7 @@
   background: hsl(var(--type-mark-hue) 42% 22%);
   color: hsl(var(--type-mark-hue) 75% 88%);
   box-shadow: inset 0 0 0 1px hsl(var(--type-mark-hue) 50% 38% / 0.45);
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--pks-font-mono);
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;

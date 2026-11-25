@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import Button from './Button';
 import Dialog from './Dialog';
 
@@ -9,6 +9,8 @@ export interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
+  /** While the confirmed action runs: Confirm ignores clicks (it stays focusable, so focus isn't lost). */
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,25 +23,35 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Cancel',
   danger = false,
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const messageId = useId();
   return (
     <Dialog
       open={open}
       onClose={onCancel}
       title={title}
       size="sm"
+      describedBy={messageId}
       initialFocusRef={cancelRef}
       footer={
         <>
           <Button ref={cancelRef} onClick={onCancel}>{cancelLabel}</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+            onClick={busy ? undefined : onConfirm}
+          >
+            {confirmLabel}
+          </Button>
         </>
       }
     >
-      <div>{message}</div>
+      <div id={messageId}>{message}</div>
     </Dialog>
   );
 }

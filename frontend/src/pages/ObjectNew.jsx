@@ -17,6 +17,14 @@ import { createObject } from '../data/createObject';
 import { useQueryClient } from '@tanstack/react-query';
 import QueryError from '../components/QueryError';
 import BlockNoteEditor from '../components/BlockNoteEditor';
+import { useMediaQuery } from '@mantine/hooks';
+import { MOBILE_QUERY } from '../breakpoints';
+import Button, { ButtonLink } from '../components/ui/Button';
+import Chip from '../components/ui/Chip';
+import Combobox from '../components/ui/Combobox';
+import Field from '../components/ui/Field';
+import Input, { Textarea } from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import './ObjectForm.css';
 
 export default function ObjectNew() {
@@ -205,137 +213,150 @@ export default function ObjectNew() {
   const availableDomains = domains.filter((d) => !form.domainIds.includes(d.id));
   const availableTags = tags.filter((t) => !form.tagIds.includes(t.id));
 
+  const narrow = useMediaQuery(MOBILE_QUERY, false, { getInitialValueInEffect: false });
   const [editorHeight, setEditorHeight] = useState(560);
   useEffect(() => {
-    const updateHeight = () => setEditorHeight(Math.max(520, (typeof window !== 'undefined' ? window.innerHeight : 800) - 340));
+    // On a phone the properties and the submit bar follow the editor, so it starts short (M10).
+    const updateHeight = () => setEditorHeight(narrow ? 192 : Math.max(520, (typeof window !== 'undefined' ? window.innerHeight : 800) - 340));
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, []);
+  }, [narrow]);
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const isBookmark = form.type === 'bookmark';
+  const actions = (
+    <>
+      <ButtonLink to="/" variant="ghost">Cancel</ButtonLink>
+      <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Creating…' : 'Create'}</Button>
+    </>
+  );
+  const chipPicker = (kind, all, ids, available, add, remove) => all.length > 0 && (
+    <div className="notion-prop notion-prop-chips">
+      <span className="notion-prop-label">{kind === 'domain' ? 'Domains' : 'Tags'}</span>
+      <div className="form-chips-row">
+        {ids.map((id) => {
+          const item = all.find((x) => x.id === id);
+          return item ? <Chip key={id} onRemove={() => remove(id)} removeLabel={`Remove ${kind} ${item.name}`}>{item.name}</Chip> : null;
+        })}
+      </div>
+      <Combobox
+        label={`Add ${kind}`}
+        labelHidden
+        placeholder={`Add ${kind}…`}
+        emptyText={available.length === 0 ? `No more ${kind}s to add` : undefined}
+        options={available.map((x) => ({ value: x.id, label: x.name }))}
+        onSelect={add}
+      />
+    </div>
+  );
+  const prop = (label, control) => (
+    <Field label={label}>{(f) => control(f.id)}</Field>
+  );
+  // The same properties in the sidebar (free form) and in a row under template fields.
+  const properties = (
+    <>
+      {prop('Type', (id) => (
+        <Select id={id} value={form.type} onChange={set('type')} required>
+          {OBJECT_TYPES.map((t) => <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>)}
+        </Select>
+      ))}
+      {prop('Status', (id) => (
+        <Select id={id} value={form.status} onChange={set('status')}>
+          {OBJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </Select>
+      ))}
+      {prop('Due date', (id) => <Input id={id} type="datetime-local" value={form.due_at} onChange={set('due_at')} />)}
+      {prop('Remind at', (id) => <Input id={id} type="datetime-local" value={form.remind_at} onChange={set('remind_at')} />)}
+      {chipPicker('domain', domains, form.domainIds, availableDomains, addDomain, removeDomain)}
+      {chipPicker('tag', tags, form.tagIds, availableTags, addTag, removeTag)}
+      {prop(isBookmark ? 'URL' : 'Source', (id) => (
+        <Input id={id} type={isBookmark ? 'url' : 'text'} value={form.source} onChange={set('source')} placeholder={isBookmark ? 'https://…' : 'URL or reference'} />
+      ))}
+    </>
+  );
 
   return (
-    <div className="object-form-page notion-style" >
-      <form onSubmit={handleSubmit} className="object-form form">
-        {error && <div className="form-error" role="alert">{error}</div>}
+    <div className="object-form-page notion-style">
+      <form onSubmit={handleSubmit} className="object-form">
+        {error && <div className="object-form-error" role="alert">{error}</div>}
 
         <header className="notion-form-header">
           <Breadcrumbs items={[{ label: 'Dashboard', to: '/' }, { label: 'New' }]} />
           <div className="notion-form-toolbar">
-            <div className="notion-form-toolbar-left">
-              <label className="notion-form-template-label" htmlFor="object-form-template-select">
-                Template
-              </label>
-              <select
-                id="object-form-template-select"
-                className="template-select"
-                value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                aria-label="Choose template"
-              >
-                <option value="">Free form</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="notion-form-toolbar-right">
-              <Link to="/" className="btn btn-ghost">Cancel</Link>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Creating…' : 'Create'}
-              </button>
-            </div>
+            <Field label="Template">
+              {(f) => (
+                <Select id={f.id} value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)}>
+                  <option value="">Free form</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            {!narrow && <div className="notion-form-toolbar-right">{actions}</div>}
           </div>
         </header>
 
         <div className="notion-form-body">
           {templateFields.length > 0 ? (
-            <div className="template-driven-fields">
-              {templateFields.map((f) => {
-                const isBlockNote = f.type === 'textarea' && (f.key === 'content' || f.key === 'body');
-                const Wrapper = isBlockNote ? 'div' : 'label';
-                return (
-                  <Wrapper key={f.key} className="notion-field">
-                    <span className="notion-field-label">{f.label || f.key} {f.required && <span className="required">*</span>}</span>
-                    {isBlockNote ? (
-                      <BlockNoteEditor
-                        value={templateValues[f.key] ?? ''}
-                        onChange={(val) => setTemplateValues((v) => ({ ...v, [f.key]: val }))}
-                        placeholder={f.label || f.key}
-                        minHeight={editorHeight}
-                        aria-label={f.label || f.key}
-                      />
-                    ) : f.type === 'textarea' ? (
-                      <textarea
-                        value={templateValues[f.key] ?? ''}
-                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                        placeholder={f.label || f.key}
-                        rows={4}
-                        required={!!f.required}
-                      />
-                    ) : f.type === 'select' ? (
-                      <select
-                        value={templateValues[f.key] ?? ''}
-                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                        required={!!f.required}
-                      >
-                        <option value="">—</option>
-                        {(f.options || []).map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={templateValues[f.key] ?? ''}
-                        onChange={(e) => setTemplateValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                        placeholder={f.label || f.key}
-                        required={!!f.required}
-                      />
-                    )}
-                  </Wrapper>
-                );
-              })}
-            </div>
+            <>
+              <div className="template-driven-fields">
+                {templateFields.map((f) => {
+                  const label = f.label || f.key;
+                  const value = templateValues[f.key] ?? '';
+                  const change = (val) => setTemplateValues((v) => ({ ...v, [f.key]: val }));
+                  if (f.type === 'textarea' && (f.key === 'content' || f.key === 'body')) {
+                    return (
+                      <div key={f.key} className="notion-field">
+                        <span className="notion-field-label">{label}</span>
+                        <BlockNoteEditor value={value} onChange={change} placeholder={label} minHeight={editorHeight} aria-label={label} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <Field key={f.key} label={f.required ? `${label} (required)` : label}>
+                      {(ids) => f.type === 'textarea' ? (
+                        <Textarea id={ids.id} value={value} onChange={(e) => change(e.target.value)} placeholder={label} rows={4} required={!!f.required} />
+                      ) : f.type === 'select' ? (
+                        <Select id={ids.id} value={value} onChange={(e) => change(e.target.value)} required={!!f.required}>
+                          <option value="">—</option>
+                          {(f.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                        </Select>
+                      ) : (
+                        <Input id={ids.id} type="text" value={value} onChange={(e) => change(e.target.value)} placeholder={label} required={!!f.required} />
+                      )}
+                    </Field>
+                  );
+                })}
+              </div>
+              <div className="notion-properties-row">{properties}</div>
+            </>
           ) : (
             <div className="notion-form-layout">
               <div className="notion-form-main">
-                <div className="notion-title-block">
-                  <input
-                    type="text"
-                    className="notion-title-input"
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder="Untitled"
-                    required
-                    aria-label="Title"
-                  />
-                </div>
-
-                {form.type === 'bookmark' && (
-                  <div className="notion-bookmark-url-block">
-                    <label className="notion-bookmark-url-label">URL</label>
-                    <input
-                      type="url"
-                      className="notion-bookmark-url-input"
-                      value={form.source}
-                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                      placeholder="https://…"
-                      aria-label="Bookmark URL"
-                    />
-                  </div>
+                <input
+                  type="text"
+                  className="notion-title-input"
+                  value={form.title}
+                  onChange={set('title')}
+                  placeholder="Untitled"
+                  required
+                  aria-label="Title"
+                />
+                {isBookmark && (
+                  <Field label="Bookmark URL">
+                    {(f) => <Input id={f.id} type="url" value={form.source} onChange={set('source')} placeholder="https://…" />}
+                  </Field>
                 )}
-
-                <div className="notion-summary-block">
-                  <input
-                    type="text"
-                    className="notion-summary-input"
-                    value={form.summary}
-                    onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
-                    placeholder="Add a short summary…"
-                    aria-label="Summary"
-                  />
-                </div>
-
+                <input
+                  type="text"
+                  className="notion-summary-input"
+                  value={form.summary}
+                  onChange={set('summary')}
+                  placeholder="Add a short summary…"
+                  aria-label="Summary"
+                />
                 <div className="notion-content-block">
                   <BlockNoteEditor
                     value={form.content}
@@ -348,194 +369,19 @@ export default function ObjectNew() {
               </div>
 
               <aside className="notion-form-sidebar" aria-label="Properties">
-                <div className="notion-sidebar-props">
-                  <div className="notion-prop">
-                    <span className="notion-prop-label">Type</span>
-                    <select
-                      value={form.type}
-                      onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                      className="notion-prop-select"
-                      aria-label="Type"
-                    >
-                      {OBJECT_TYPES.map((t) => (
-                        <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="notion-prop">
-                    <span className="notion-prop-label">Status</span>
-                    <select
-                      value={form.status}
-                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                      className="notion-prop-select"
-                      aria-label="Status"
-                    >
-                      {OBJECT_STATUSES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="notion-prop">
-                    <span className="notion-prop-label">Due date</span>
-                    <input type="datetime-local" value={form.due_at} onChange={(e) => setForm((f) => ({ ...f, due_at: e.target.value }))} className="notion-prop-input" aria-label="Due date" />
-                  </div>
-                  <div className="notion-prop">
-                    <span className="notion-prop-label">Remind at</span>
-                    <input type="datetime-local" value={form.remind_at} onChange={(e) => setForm((f) => ({ ...f, remind_at: e.target.value }))} className="notion-prop-input" aria-label="Remind at" />
-                  </div>
-                  <div className={`notion-prop notion-prop-source ${form.type === 'bookmark' ? 'notion-prop-bookmark-url' : ''}`}>
-                    <span className="notion-prop-label">{form.type === 'bookmark' ? 'URL' : 'Source'}</span>
-                    <input
-                      type={form.type === 'bookmark' ? 'url' : 'text'}
-                      value={form.source}
-                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                      placeholder={form.type === 'bookmark' ? 'https://…' : 'URL or reference'}
-                      className="notion-prop-input"
-                      aria-label={form.type === 'bookmark' ? 'Bookmark URL' : 'Source'}
-                    />
-                  </div>
-                  {domains.length > 0 && (
-                    <div className="notion-prop notion-prop-chips">
-                      <span className="notion-prop-label">Domains</span>
-                      <div className="form-chips-row">
-                        {form.domainIds.map((id) => {
-                          const d = domains.find((x) => x.id === id);
-                          return d ? (
-                            <span key={d.id} className="chip">
-                              {d.name}
-                              <button type="button" className="chip-remove" onClick={() => removeDomain(d.id)} aria-label={`Remove ${d.name}`}>×</button>
-                            </span>
-                          ) : null;
-                        })}
-                        <select
-                          className="chip-select"
-                          value=""
-                          onChange={(e) => { const v = e.target.value; if (v) addDomain(v); e.target.value = ''; }}
-                          aria-label="Add domain"
-                        >
-                          <option value="">+ Domain</option>
-                          {availableDomains.map((d) => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                  {tags.length > 0 && (
-                    <div className="notion-prop notion-prop-chips">
-                      <span className="notion-prop-label">Tags</span>
-                      <div className="form-chips-row">
-                        {form.tagIds.map((id) => {
-                          const t = tags.find((x) => x.id === id);
-                          return t ? (
-                            <span key={t.id} className="chip">
-                              {t.name}
-                              <button type="button" className="chip-remove" onClick={() => removeTag(t.id)} aria-label={`Remove ${t.name}`}>×</button>
-                            </span>
-                          ) : null;
-                        })}
-                        <select
-                          className="chip-select"
-                          value=""
-                          onChange={(e) => { const v = e.target.value; if (v) addTag(v); e.target.value = ''; }}
-                          aria-label="Add tag"
-                        >
-                          <option value="">+ Tag</option>
-                          {availableTags.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                  {taxonomy.error && (
-                    <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />
-                  )}
-                  {!taxonomy.error && domains.length === 0 && tags.length === 0 && (
-                    <p className="form-hint notion-hint"><Link to="/settings">Settings</Link> → Add domains and tags to classify objects.</p>
-                  )}
-                </div>
+                {properties}
+                {taxonomy.error && (
+                  <QueryError what="domains and tags" error={taxonomy.error} onRetry={taxonomy.refetch} />
+                )}
+                {!taxonomy.error && domains.length === 0 && tags.length === 0 && (
+                  <p className="notion-hint"><Link to="/settings">Settings</Link> → Add domains and tags to classify objects.</p>
+                )}
               </aside>
             </div>
           )}
-
-          {templateFields.length > 0 && (
-            <div className="notion-properties-row">
-              <div className="notion-prop">
-                <span className="notion-prop-label">Type</span>
-                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="notion-prop-select" required>
-                  {OBJECT_TYPES.map((t) => (
-                    <option key={t} value={t}>{formatObjectTypeLabel(t)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="notion-prop">
-                <span className="notion-prop-label">Status</span>
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className="notion-prop-select">
-                  {OBJECT_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="notion-prop">
-                <span className="notion-prop-label">Due date</span>
-                <input type="datetime-local" value={form.due_at} onChange={(e) => setForm((f) => ({ ...f, due_at: e.target.value }))} className="notion-prop-input" aria-label="Due date" />
-              </div>
-              <div className="notion-prop">
-                <span className="notion-prop-label">Remind at</span>
-                <input type="datetime-local" value={form.remind_at} onChange={(e) => setForm((f) => ({ ...f, remind_at: e.target.value }))} className="notion-prop-input" aria-label="Remind at" />
-              </div>
-              <div className={`notion-prop notion-prop-source ${form.type === 'bookmark' ? 'notion-prop-bookmark-url' : ''}`}>
-                <span className="notion-prop-label">{form.type === 'bookmark' ? 'URL' : 'Source'}</span>
-                <input type={form.type === 'bookmark' ? 'url' : 'text'} value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} placeholder={form.type === 'bookmark' ? 'https://…' : 'URL or reference'} className="notion-prop-input" aria-label={form.type === 'bookmark' ? 'Bookmark URL' : 'Source'} />
-              </div>
-              {domains.length > 0 && (
-                <div className="notion-prop notion-prop-chips">
-                  <span className="notion-prop-label">Domains</span>
-                  <div className="form-chips-row">
-                    {form.domainIds.map((id) => {
-                      const d = domains.find((x) => x.id === id);
-                      return d ? (
-                        <span key={d.id} className="chip">
-                          {d.name}
-                          <button type="button" className="chip-remove" onClick={() => removeDomain(d.id)} aria-label={`Remove ${d.name}`}>×</button>
-                        </span>
-                      ) : null;
-                    })}
-                    <select className="chip-select" value="" onChange={(e) => { const v = e.target.value; if (v) addDomain(v); e.target.value = ''; }} aria-label="Add domain">
-                      <option value="">+ Domain</option>
-                      {availableDomains.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-              {tags.length > 0 && (
-                <div className="notion-prop notion-prop-chips">
-                  <span className="notion-prop-label">Tags</span>
-                  <div className="form-chips-row">
-                    {form.tagIds.map((id) => {
-                      const t = tags.find((x) => x.id === id);
-                      return t ? (
-                        <span key={t.id} className="chip">
-                          {t.name}
-                          <button type="button" className="chip-remove" onClick={() => removeTag(t.id)} aria-label={`Remove ${t.name}`}>×</button>
-                        </span>
-                      ) : null;
-                    })}
-                    <select className="chip-select" value="" onChange={(e) => { const v = e.target.value; if (v) addTag(v); e.target.value = ''; }} aria-label="Add tag">
-                      <option value="">+ Tag</option>
-                      {availableTags.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
+
+        {narrow && <div className="object-form-submit-bar">{actions}</div>}
       </form>
     </div>
   );

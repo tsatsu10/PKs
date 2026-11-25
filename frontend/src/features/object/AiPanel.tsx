@@ -8,6 +8,7 @@ import { AI_PROVIDERS, aiProviderLabel } from '../../constants';
 import { resolveRunSelection, modelsForProvider, modelForProvider, serverSelection, isServerSelection } from '../../lib/aiProviders';
 import type { useRunPrompt } from './hooks/useRunPrompt';
 import type { ObjectRow, PromptTemplate } from './types';
+import { Textarea } from '../../components/ui/Input';
 
 type Run = ReturnType<typeof useRunPrompt>;
 
@@ -24,9 +25,7 @@ export function SynthesizeCta({ run }: { run: Run }) {
           ))}
         </select>
       )}
-      <button type="button" className="btn btn-primary detail-synthesize-btn" onClick={run.openRunPanel}>
-        Run prompt
-      </button>
+      <Button variant="primary" onClick={run.openRunPanel}>Run prompt</Button>
     </div>
   );
 }
@@ -163,11 +162,10 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
         )}
         <Field label="Prompt" className="run-prompt-prompt-block">
           {(ids) => (
-            <textarea
+            <Textarea
               id={ids.id}
               value={runPromptText}
               onChange={(e) => setRunPromptText(e.target.value)}
-              className="run-prompt-prompt-input"
               rows={runPromptSource === 'custom' ? 6 : 5}
               placeholder={
                 runPromptSource === 'custom' ? 'Type your prompt…' : 'Select a template or enable "Edit before running".'
@@ -235,11 +233,10 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
         </div>
         <Field label="Output" className="run-prompt-output-block">
           {(ids) => (
-            <textarea
+            <Textarea
               id={ids.id}
               value={runOutput}
               onChange={(e) => setRunOutput(e.target.value)}
-              className="run-prompt-output-input"
               rows={8}
               placeholder="Generate with AI or paste your own…"
             />
@@ -248,10 +245,10 @@ export function RunPromptPanel({ object, run, promptTemplates, error }: PanelPro
       </div>
       <ConfirmDialog
         open={confirmDiscard}
-        title="Discard the AI output?"
-        message="The generated text hasn't been saved."
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
+        title={generatingAI ? 'Stop generating?' : 'Discard the AI output?'}
+        message={generatingAI ? 'The response in progress will be lost.' : "The generated text hasn't been saved."}
+        confirmLabel={generatingAI ? 'Stop and close' : 'Discard'}
+        cancelLabel={generatingAI ? 'Keep waiting' : 'Keep editing'}
         danger
         onConfirm={discardAndClose}
         onCancel={keepEditing}
